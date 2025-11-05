@@ -1,0 +1,50 @@
+{
+  "name": "lab-evaluation-backend",
+  "version": "1.0.0",
+  "description": "Backend for Lab Evaluation System",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "seed": "node scripts/resetAndSeedDB.js",
+    "insert-users": "node scripts/insertUsers.js",
+    "setup-faculty": "node scripts/setupFacultyRoles.js",
+    "set-primary-roles": "node scripts/setPrimaryRoles.js",
+    "cleanup-roles": "node scripts/cleanupDuplicateRoles.js",
+    "update-faculty-roles": "node scripts/updateFacultyRoles.js",
+    "create-faculty": "node scripts/createFacultyUsers.js",
+    "fix-marks": "node scripts/fixMarkIndex.js",
+    "find-invalid-panels": "node scripts/findInvalidPanels.js",
+    "analyze-templates": "node utils/templateAnalyzer.js",
+    "setup-docs": "node setupDocumentSystem.js setup",
+    "check-docs": "node setupDocumentSystem.js health",
+    "prep-guides": "node utils/templatePreparator.js save-guides",
+    "test-internal": "node test/testInternalExaminer.js",
+    "test-external": "node scripts/testExternalExaminer.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.10.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "docxtemplater": "^3.65.2",
+    "dotenv": "^16.5.0",
+    "express": "^4.18.2",
+    "file-saver": "^2.0.5",
+    "jsonwebtoken": "^9.0.0",
+    "jszip-utils": "^0.1.0",
+    "lodash": "^4.17.21",
+    "mongoose": "^7.8.7",
+    "multer": "^2.0.1",
+    "nodemailer": "^7.0.9",
+    "officegen": "^0.6.5",
+    "pizzip": "^3.2.0"
+  },
+  "devDependencies": {
+    "jest": "^30.0.5",
+    "nodemon": "^2.0.22",
+    "supertest": "^7.1.4"
+  }
+}

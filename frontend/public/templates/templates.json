@@ -1,0 +1,9 @@
+{
+  "templates": [
+    { "id": "Viva_claim_for_Internal_Examiner", "name": "Viva Claim for Internal Examiner", "file": "/templates/Viva_claim_for_Internal_Examiner.docx" },
+    { "id": "Viva_claim_for_External_Examiner", "name": "Viva Claim for External Examiner", "file": "/templates/Viva_claim_for_External_Examiner.docx" },
+    { "id": "Viva_claim_supervisor", "name": "Viva Claim Supervisor", "file": "/templates/Viva_claim_supervisor.docx" },
+    { "id": "Viva_External_member_letter_to_Chairman", "name": "Viva External Member Letter to Chairman", "file": "/templates/Viva_External_member_letter_to_Chairman.docx" },
+    { "id": "Viva_Letter_to_external", "name": "Viva Letter to External", "file": "/templates/Viva_Letter_to_external.docx" }
+  ]
+}
