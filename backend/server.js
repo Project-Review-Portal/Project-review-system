@@ -77,33 +77,94 @@ app.listen(PORT, () => {
     try {
         const User = require('./models/User');
         const bcrypt = require('bcryptjs');
-        const adminEmail = 'cseceg2024@gmail.com';
-        const defaultPassword = 'cseceg@admin';
-        let admin = await User.findOne({ $or: [{ username: adminEmail }, { email: adminEmail }], role: 'admin' });
-        if (!admin) {
-            const salt = await bcrypt.genSalt(10);
-            const hashed = await bcrypt.hash(defaultPassword, salt);
-            admin = new User({
-                username: adminEmail,
-                email: adminEmail,
-                name: 'Admin',
-                password: hashed,
+
+        // 1. Define the default users array
+        const defaultUsers = [
+            {
+                email: 'cseceg2024@gmail.com',
+                username: 'cseceg2024@gmail.com',
+                name: 'System Admin',
+                password: 'cseceg@admin',
                 role: 'admin',
-                roles: [{ role: 'admin', team: null }],
-                mustChangePassword: true
+                roles: [{ role: 'admin', team: null }]
+            },
+            {
+                email: 'student@example.com',
+                username: 'student@example.com',
+                name: 'Default Student',
+                password: 'cseceg@student',
+                role: 'student',
+                roles: [{ role: 'student', team: null }]
+            },
+            {
+                email: 'guide@example.com',
+                username: 'guide@example.com',
+                name: 'Default Guide',
+                password: 'cseceg@guide',
+                role: 'guide',
+                roles: [{ role: 'guide', team: null }]
+            },
+            {
+                email: 'panel@example.com',
+                username: 'panel@example.com',
+                name: 'Default Panel Member',
+                password: 'cseceg@panel',
+                role: 'panel',
+                roles: [{ role: 'panel', team: null }]
+            },
+            {
+                email: 'coordinator@example.com',
+                username: 'coordinator@example.com',
+                name: 'Default Coordinator',
+                password: 'cseceg@coordinator',
+                role: 'coordinator',
+                roles: [{ role: 'coordinator', team: null }]
+            }
+        ];
+
+        const salt = await bcrypt.genSalt(10);
+
+        // 2. Loop through and upsert each user safely
+        for (const userData of defaultUsers) {
+            let user = await User.findOne({ 
+                $or: [{ username: userData.username }, { email: userData.email }] 
             });
-            await admin.save();
-            console.log('Default admin created:', adminEmail);
-        } else {
-            // Ensure email field and mustChangePassword flag are set
-            let changed = false;
-            if (!admin.email) { admin.email = adminEmail; changed = true; }
-            if (admin.username !== adminEmail) { admin.username = adminEmail; changed = true; }
-            if (admin.role !== 'admin') { admin.role = 'admin'; changed = true; }
-            if (!Array.isArray(admin.roles) || !admin.roles.find(r => r.role === 'admin')) { admin.roles = [{ role: 'admin', team: null }]; changed = true; }
-            if (changed) { await admin.save(); }
+
+            if (!user) {
+                // Hash the respective password for this specific user
+                const hashedPassword = await bcrypt.hash(userData.password, salt);
+
+                user = new User({
+                    username: userData.username,
+                    email: userData.email,
+                    name: userData.name,
+                    password: hashedPassword,
+                    role: userData.role,
+                    roles: userData.roles,
+                    mustChangePassword: true
+                });
+
+                await user.save();
+                console.log(`✅ Default ${userData.role} created: ${userData.email}`);
+            } else {
+                // Ensure existing users match up-to-date defaults if needed
+                let changed = false;
+                if (!user.email) { user.email = userData.email; changed = true; }
+                if (user.username !== userData.username) { user.username = userData.username; changed = true; }
+                if (user.role !== userData.role) { user.role = userData.role; changed = true; }
+                
+                if (!Array.isArray(user.roles) || !user.roles.find(r => r.role === userData.role)) { 
+                    user.roles = userData.roles; 
+                    changed = true; 
+                }
+
+                if (changed) { 
+                    await user.save(); 
+                    console.log(`🔄 Updated existing ${userData.role} profile fields.`);
+                }
+            }
         }
     } catch (e) {
-        console.error('Error ensuring default admin:', e.message);
+        console.error('Error ensuring default users:', e.message);
     }
 })();
