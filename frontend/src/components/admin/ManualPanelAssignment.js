@@ -152,7 +152,7 @@ const ManualPanelAssignment = () => {
             </div>
             
             {error && (
-                <div className="p-3 bg-red-100 text-red-700 rounded">
+                <div className="p-3 bg-red-100 text-red-700 rounded sticky top-0">
                     {error}
                 </div>
             )}

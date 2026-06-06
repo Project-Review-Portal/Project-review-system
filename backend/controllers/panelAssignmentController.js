@@ -269,6 +269,7 @@ exports.assignPanelToTeam = async (req, res) => {
         
         // Check if team already has a panel
         if (team.panel) {
+            console.log('team panel err') // displays in terminal - if a team has a panel already assigned, this err wil throw
             return res.status(400).json({ message: 'Team already has a panel assigned' });
         }
         
