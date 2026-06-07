@@ -1,11 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+
+const toLocalDateTimeInput = (utcString) => {
+    if (!utcString) return '';
+    const date = new Date(utcString);
+    // getFullYear/Month/Date/Hours/Minutes all use local timezone automatically
+    const yyyy = date.getFullYear();
+    const MM   = String(date.getMonth() + 1).padStart(2, '0');
+    const dd   = String(date.getDate()).padStart(2, '0');
+    const hh   = String(date.getHours()).padStart(2, '0');
+    const mm   = String(date.getMinutes()).padStart(2, '0');
+    return `${yyyy}-${MM}-${dd}T${hh}:${mm}`;
+};
+
+// Formats a "YYYY-MM-DDTHH:mm" local string into a readable display string
+const toDisplayString = (localDTString) => {
+    if (!localDTString) return '—';
+    const date = new Date(localDTString);
+    return date.toLocaleString('en-IN', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true
+    });
+};
+
 const GuideSelectionSettings = () => {
     const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
-    const [message, setMessage] = useState('');
-    const [error, setError] = useState('');
+    const [endDate, setEndDate]     = useState('');
+    const [saved, setSaved]         = useState(null); 
+    const [message, setMessage]     = useState('');
+    const [error, setError]         = useState('');
+    const [loading, setLoading]     = useState(false);
+
+    const token = localStorage.getItem('token');
+    const headers = { Authorization: `Bearer ${token}` };
 
     useEffect(() => {
         fetchCurrentSettings();
@@ -13,17 +41,18 @@ const GuideSelectionSettings = () => {
 
     const fetchCurrentSettings = async () => {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                setError('Authentication token not found');
-                return;
-            }
-            const response = await axios.get('http://localhost:5000/api/admin/guide-selection-dates', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const { startDate: currentStart, endDate: currentEnd } = response.data;
-            setStartDate(currentStart ? new Date(currentStart).toISOString().slice(0, 16) : '');
-            setEndDate(currentEnd ? new Date(currentEnd).toISOString().slice(0, 16) : '');
+            if (!token) { setError('Authentication token not found'); return; }
+            const response = await axios.get('/api/admin/guide-selection-dates', { headers });
+            const { startDate: s, endDate: e } = response.data;
+
+            // ✅ Use local timezone conversion — NOT .toISOString() which gives UTC
+            const localStart = toLocalDateTimeInput(s);
+            const localEnd   = toLocalDateTimeInput(e);
+
+            setStartDate(localStart);
+            setEndDate(localEnd);
+            setSaved({ start: localStart, end: localEnd });
+            setError('');
         } catch (err) {
             setError('Failed to fetch current settings');
             console.error('Error fetching settings:', err);
@@ -39,35 +68,40 @@ const GuideSelectionSettings = () => {
             setError('Both start and end dates are required');
             return;
         }
-
         if (new Date(startDate) >= new Date(endDate)) {
             setError('End date must be after start date');
             return;
         }
 
+        setLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                setError('Authentication token not found');
-                return;
-            }
+            if (!token) { setError('Authentication token not found'); return; }
 
-            await axios.post('http://localhost:5000/api/admin/guide-selection-dates', 
-                { startDate, endDate },
-                { headers: { Authorization: `Bearer ${token}` } }
+            // Send as ISO string — new Date(localString) correctly converts
+            // local time back to UTC for storage
+            await axios.post('/api/admin/guide-selection-dates',
+                {
+                    startDate: new Date(startDate).toISOString(),
+                    endDate:   new Date(endDate).toISOString()
+                },
+                { headers }
             );
+
+            setSaved({ start: startDate, end: endDate });
             setMessage('Guide selection dates updated successfully!');
-            setTimeout(() => setMessage(''), 3000);
+            setTimeout(() => setMessage(''), 4000);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to update settings');
             console.error('Error updating settings:', err);
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-2xl font-semibold mb-4">Guide Selection Request Settings</h2>
-            
+        <div className="bg-white p-6 rounded-lg shadow max-w-xl">
+            <h2 className="text-2xl font-semibold mb-2">Guide Selection Request Settings</h2>
+
             {message && (
                 <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
                     {message}
@@ -81,7 +115,7 @@ const GuideSelectionSettings = () => {
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
                         Start Date and Time
                     </label>
                     <input
@@ -89,13 +123,13 @@ const GuideSelectionSettings = () => {
                         id="startDate"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
                         required
                     />
                 </div>
 
                 <div>
-                    <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
                         End Date and Time
                     </label>
                     <input
@@ -103,20 +137,21 @@ const GuideSelectionSettings = () => {
                         id="endDate"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
                         required
                     />
                 </div>
 
                 <button
                     type="submit"
-                    className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    disabled={loading}
+                    className="inline-flex justify-center py-2 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none disabled:bg-gray-400"
                 >
-                    Update Settings
+                    {loading ? 'Saving...' : 'Update Settings'}
                 </button>
             </form>
         </div>
     );
 };
 
-export default GuideSelectionSettings; 
+export default GuideSelectionSettings;
