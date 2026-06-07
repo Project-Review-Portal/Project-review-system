@@ -82,15 +82,9 @@ app.listen(PORT, () => {
         const defaultUsers = [
             {
                 email: 'cseceg2024@gmail.com',
-<<<<<<< Updated upstream
                 username: 'cseceg2024@gmail.com',
                 name: 'System Admin',
                 password: 'cseceg@admin',
-=======
-                username: 'cseceg2024@gmail.com', 
-                name: 'System Admin',
-                password: 'cseceg@admin', //changed to cse@2026
->>>>>>> Stashed changes
                 role: 'admin',
                 roles: [{ role: 'admin', team: null }]
             },
