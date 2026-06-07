@@ -20,6 +20,14 @@ exports.getAllPanels = async (req, res) => {
                 path: 'coordinator',
                 select: 'username name'
             });
+
+            panels.sort((a, b) => {                             //this sorting part can be commented
+                let numA = Number(a.name.split(' ')[1])         //once when panel names are no longer dummy like (panel 1, panel 2, ...)
+                let numB = Number(b.name.split(' ')[1])
+                return numA - numB;
+            })
+
+
         res.json(panels);
     } catch (error) {
         console.error('Error fetching panels:', error);
