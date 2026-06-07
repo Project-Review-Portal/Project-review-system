@@ -58,8 +58,26 @@ exports.createPanel = async (req, res) => {
             return res.status(400).json({ message: 'Coordinator must be an internal faculty member.' });
         }
         // Generate panel name based on current count
-        const panelCount = await Panel.countDocuments({});
-        const newPanelName = `Panel ${panelCount + 1}`;
+
+        // Counting and adding 1 to the panelName does not work all time
+        const existingPanelNames = await Panel.find({},{_id:0, name: 1})
+        let numberTracker = 1;
+        if (existingPanelNames){
+            for(let x of existingPanelNames){
+                if( numberTracker != Number(x.name.split(' ')[1]))
+                    break;
+                numberTracker++;
+            }
+        }
+        
+        const panelCount = numberTracker;
+        // const panelCount = numberTracker
+        // console.log("----------------")
+        // console.log('number tracker is ', numberTracker)
+        
+        // const panelCount = await Panel.countDocuments({});
+
+        const newPanelName = `Panel ${panelCount}`;
         const newPanel = new Panel({
             name: newPanelName,
             members,
