@@ -4,5 +4,9 @@
     "docx": "^9.5.1",
     "dotenv": "^16.5.0",
     "multer": "^2.0.1"
+  },
+  "scripts": {
+    "fe": "cd frontend && npm start",
+    "be": "cd backend && npm run dev"
   }
 }

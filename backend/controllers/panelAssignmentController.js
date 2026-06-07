@@ -266,13 +266,18 @@ exports.assignPanelToTeam = async (req, res) => {
                 message: 'Cannot assign panel: Team guide is already a member or coordinator of this panel' 
             });
         }
+
+
+        // Allowing teams to change panel even if it assigned one! 
         
-        // Check if team already has a panel
+        /* // Check if team already has a panel
         if (team.panel) {
             console.log('team panel err') // displays in terminal - if a team has a panel already assigned, this err wil throw
             return res.status(400).json({ message: 'Team already has a panel assigned' });
         }
+         */
         
+
         // Assign panel and coordinator to team
         team.panel = panelId;
         team.coordinator = panel.coordinator; // Assign the panel's coordinator to the team
