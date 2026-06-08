@@ -103,15 +103,6 @@ const GuideSelectionSettings = () => {
         <div className="bg-white p-6 rounded-lg shadow max-w-xl">
             <h2 className="text-2xl font-semibold mb-2">Guide Selection Request Settings</h2>
 
-            {/* Currently saved values — shown so admin can see what's actually in DB */}
-            {saved && (saved.start || saved.end) && (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-                    <p className="font-medium mb-1">Currently saved in database:</p>
-                    <p>Start : {toDisplayString(saved.start)}</p>
-                    <p>End &nbsp;&nbsp;: {toDisplayString(saved.end)}</p>
-                </div>
-            )}
-
             {message && (
                 <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
                     {message}
