@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom'; // required for displaying activeness of section items
 import { useNavigate } from 'react-router-dom';
 
+
 const Navbar = ({ user, onLogout }) => {
+    const location = useLocation();
     const navigate = useNavigate();
 
     const handleLogout = () => {
@@ -91,15 +94,21 @@ const Navbar = ({ user, onLogout }) => {
                         {/* Desktop Navigation */}
                         <div className="hidden md:block ml-10">
                             <div className="flex items-baseline space-x-1 overflow-x-auto scrollbar-hide max-w-4xl">
-                                {getNavItems().map((item) => (
-                                    <button
-                                        key={item.path}
-                                        onClick={() => navigate(item.path)}
-                                        className="text-white hover:bg-indigo-500 px-2 py-2 rounded-md text-xs lg:text-sm font-medium whitespace-nowrap flex-shrink-0"
-                                    >
-                                        {item.label}
-                                    </button>
-                                ))}
+                                {getNavItems().map((item) => {
+                                    const isActive = location.pathname === item.path;
+
+                                    return (
+                                        <button
+                                            key={item.path}
+                                            onClick={() => navigate(item.path)}
+                                            className={`text-white hover:bg-indigo-500 px-2 py-2 rounded-md text-xs lg:text-sm font-medium whitespace-nowrap flex-shrink-0 ${
+                                                isActive ? 'border-b-2 border-r-2 border-black' : ''
+                                            }`}
+                                        >
+                                            {item.label}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
