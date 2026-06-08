@@ -194,6 +194,7 @@ const ManualPanelAssignment = () => {
                                 {selectedTeam && selectedTeam._id === team._id && (
                                     <div className="mt-4 pt-4 border-t">
                                         <h5 className="font-medium mb-2">Available Panels (Fewest assigned teams first):</h5>
+                                        <div className="font-light text-sm">Note: Panels having team guides as one of the member/coordinator (cannot be assigned) are not displayed </div>
                                         {availablePanels.length === 0 ? (
                                             <p className="text-gray-500">No available panels (all have conflicts with team guide)</p>
                                         ) : (
