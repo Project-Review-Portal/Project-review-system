@@ -27,6 +27,8 @@ exports.autoAssignPanels = async (req, res) => {
         // Get all approved teams with no panel assigned
         const teams = await Team.find({ panel: null, status: 'approved' })
             .populate('guidePreference', 'username name _id');
+        console.log('----------------')
+        console.log(teams)
 
         if (!teams || teams.length === 0) {
             return res.json({ message: 'No unassigned approved teams found', assignedCount: 0, skipped: [] });
