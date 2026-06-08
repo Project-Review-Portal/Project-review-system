@@ -1,4 +1,5 @@
 const Panel = require('../models/Panel');
+const TeamPanelAssignment = require('../models/TeamPanelAssignment')
 const User = require('../models/User');
 const TimeTable = require('../models/TimeTable');
 const Attendance = require('../models/Attendance');
@@ -147,6 +148,9 @@ exports.deletePanel = async (req, res) => {
         }
 
         await Panel.deleteOne({ _id: id }); // Use deleteOne or findByIdAndDelete
+
+        await TeamPanelAssignment.deleteMany({ panel : id })
+        
         res.json({ message: 'Panel deleted successfully!' });
     } catch (error) {
         console.error('Error deleting panel:', error);
