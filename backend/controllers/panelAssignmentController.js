@@ -242,10 +242,20 @@ exports.assignPanelToTeam = async (req, res) => {
         const team = await Team.findById(teamId)
             .populate('guidePreference', 'username name _id');
         
+        console.log('-----team----')
+        console.log(team)
+
         if (!team) {
             return res.status(404).json({ message: 'Team not found' });
         }
         
+        // Check whether the team has already assigned a panel
+        const isSamePanel = team.panel.toString() === panelId
+        if(isSamePanel){
+            return res.status(404).json({ message: 'Assingning the same panel '})
+        }
+        // console.log({teampanel : team.panel, type : typeof(team.panel), panelId, isSamePanel})
+
         // Validate panel exists
         const panel = await Panel.findById(panelId)
             .populate('members', 'username name _id')
