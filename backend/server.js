@@ -3,9 +3,10 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
-
+const morgan = require('morgan');
 const app = express();
-
+app.use(morgan('dev')); // Clean, colored logs outputting timing data
+const path = require('path'); // Make ed, and standardizsure this is required at the top of server.jse
 // Connect to database with default URI if MONGO_URI is not provided
 const connectDB = require('./config/db');
 if (!process.env.MONGO_URI) {
@@ -60,7 +61,7 @@ app.use('/api/external-examiner', externalExaminerRoutes);
 
 // Serve static files
 app.use('/uploads', express.static('uploads'));
-
+app.use('/templates', express.static(path.join(__dirname, 'uploads/templates')));
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {
     // ... existing code ...
