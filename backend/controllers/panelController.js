@@ -130,6 +130,17 @@ exports.updatePanel = async (req, res) => {
             panel.coordinator = coordinator;
         }
         await panel.save();
+
+        const teams = await Team.find({ panel : id });
+        const filteredTeams = teams.filter((t) => {
+            // console.log({ members, coordinator, t : t.guidePreference })
+            return members.includes(t.guidePreference.toString()) || coordinator === t.guidePreference.toString()
+        }).map((t) => t._id) 
+        console.log('---------------------------<<')
+        // console.log(await Team.find({ _id : { $in : filteredTeams._id} }))
+        // console.log({f : filteredTeams})
+        await Team.updateMany({ _id : { $in : filteredTeams} }, { $set : { panel : null}})
+
         res.json({ message: 'Panel updated successfully!', panel });
     } catch (error) {
         console.error('Error updating panel:', error);

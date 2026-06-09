@@ -250,7 +250,7 @@ exports.assignPanelToTeam = async (req, res) => {
         }
         
         // Check whether the team has already assigned a panel
-        const isSamePanel = team.panel.toString() === panelId
+        const isSamePanel = team.panel && team.panel.toString() === panelId
         if(isSamePanel){
             return res.status(404).json({ message: 'Assingning the same panel '})
         }

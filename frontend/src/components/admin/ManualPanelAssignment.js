@@ -211,14 +211,18 @@ const ManualPanelAssignment = () => {
                                                                     <p>Coordinator: {panel.coordinator ? panel.coordinator.name : 'Not assigned'}</p>
                                                                 </div>
                                                             </div>
-                                                            {panel._id === team.panel._id && 
+                                                            {
+                                                                console.log('----------------------'),
+                                                                console.log({panel, team})
+                                                            }
+                                                            { (team.panel && panel._id == team.panel._id) &&
                                                                 <button
                                                                     className="bg-green-400 text-white px-3 py-1 rounded text-sm hover:bg-green-300 cursor-not-allowed"
                                                                 >
                                                                     Assigned
                                                                 </button>
                                                             }
-                                                            {panel._id !== team.panel._id &&
+                                                            { (!team.panel || panel._id !== team.panel?._id) &&
                                                                 <button
                                                                     onClick={() => handleAssignPanel(team._id, panel._id)}
                                                                     className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
