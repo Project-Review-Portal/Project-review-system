@@ -79,6 +79,42 @@ const MaxTeamSizeSettings = () => {
                     </button>
                 </form>
             </div>
+
+
+
+            /* For pg */ Likely to be removed
+
+            <div className="mb-8 p-4 border rounded-lg">
+                <h3 className="text-xl font-semibold mb-4">PG Team Size</h3>
+                <form onSubmit={()=>{}} className="space-y-4">
+                    <div className="flex">
+                        <p className="block text-sm w-[70%] font-medium text-gray-700">Program:</p>
+                        <p className="block text-sm ml-[1%] w-[29%] font-medium text-gray-700">Max Team Size:</p>
+                    </div>
+                    <div className="flex">
+                        <input 
+                            type='text'
+                            className='mt-1 block w-[70%] p-2 border border-gray-300 rounded-md shadow-sm'
+
+                        />
+                        <input
+                            type="number"
+                            id="maxTeamSize"
+                            value={maxTeamSize}
+                            onChange={(e) => setMaxTeamSize(e.target.value)}
+                            className="mt-1 ml-[1%] block w-[29%] p-2 border border-gray-300 rounded-md shadow-sm"
+                            min="1"
+                            required
+                        />
+                    </div>
+                    <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                        Update Max Team Size
+                    </button>
+                </form>
+            </div>
         </div>
     );
 };
