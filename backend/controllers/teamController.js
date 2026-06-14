@@ -93,8 +93,19 @@ exports.createTeam = async (req, res) => {
         }
 
         // Get the count of existing teams to generate the next sequential team name
-        const teamCount = await Team.countDocuments({});
-        const newTeamName = `Team ${teamCount + 1}`;
+        // const maxTeamNumber = await Team.find({}, {teamName : 1});
+
+        const existingTeamNames = await Team.find({},{_id:0, teamName: 1})
+        let numberTracker = 1;
+        if (existingTeamNames){
+            for(let x of existingTeamNames){
+                if( numberTracker != Number(x.name.split(' ')[1]))
+                    break;
+                numberTracker++;
+            }
+        }
+
+        const newTeamName = `Team ${numberTracker}`;
 
         // Create team
         const team = new Team({
