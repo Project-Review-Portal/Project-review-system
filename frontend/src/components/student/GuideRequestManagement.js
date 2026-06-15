@@ -132,6 +132,17 @@ const GuideRequestManagement = () => {
         return <div className="bg-white p-6 rounded-lg shadow text-gray-700">You must be part of a team to request a guide.</div>;
     }
 
+    if (!myTeam.isLocked) {
+        return (
+            <div className="bg-white p-6 rounded-lg shadow space-y-4">
+                <h2 className="text-2xl font-semibold">Guide Request Management</h2>
+                <div className="p-4 bg-yellow-50 text-yellow-800 border-l-4 border-yellow-400 rounded text-sm font-medium">
+                    <strong>Notice:</strong> Your team is currently unlocked. You must lock and finalize your team on the <b>My Team</b> page before you can request a guide.
+                </div>
+            </div>
+        );
+    }
+
     const isTeamLeader = myTeam.teamLeader._id === user?.id; // Use optional chaining for user.id
 
     return (

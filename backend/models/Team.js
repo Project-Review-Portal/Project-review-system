@@ -15,6 +15,33 @@ const teamSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     }],
+    memberStatus: [{
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        status: {
+            type: String,
+            enum: ['accepted', 'pending', 'rejected'],
+            default: 'pending'
+        },
+        lockApproved: {
+            type: Boolean,
+            default: false
+        }
+    }],
+    isTeamComplete: {
+        type: Boolean,
+        default: false
+    },
+    lockRequested: {
+        type: Boolean,
+        default: false
+    },
+    isLocked: {
+        type: Boolean,
+        default: false
+    },
     guidePreference: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'

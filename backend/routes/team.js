@@ -19,6 +19,14 @@ router.get('/my-assigned-panel', auth, teamController.getAssignedPanel);
 router.post('/request-guide', auth, teamController.requestGuide);
 router.delete('/my-team', auth, teamController.deleteMyTeam);
 
+router.get('/invitations', auth, teamController.getTeamInvitations);
+router.post('/respond-invitation', auth, teamController.respondToInvitation);
+router.post('/invite', auth, teamController.inviteMember);
+router.post('/remove-member', auth, teamController.removeMember);
+router.post('/request-lock', auth, teamController.requestLock);
+router.post('/cancel-lock', auth, teamController.cancelLockRequest);
+router.post('/approve-lock', auth, teamController.approveLock);
+
 router.post('/report/upload', auth, upload, teamController.uploadReport);
 router.get('/report/status', auth, teamController.getReportStatus);
 
