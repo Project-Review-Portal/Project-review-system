@@ -9,7 +9,7 @@ exports.getAvailableStudents = async (req, res) => {
     try {
         const currentUserId = req.user.id; // Get the ID of the logged-in user
 
-        // Get all teams and extract both team leaders and members
+        // Get all teams and extract both team leaders and accepted members
         const teams = await Team.find();
         let teamMemberIds = teams.flatMap(team => [
             team.teamLeader,
@@ -17,7 +17,7 @@ exports.getAvailableStudents = async (req, res) => {
         ]);
 
         // Ensure current user is also excluded from available students
-        teamMemberIds = [...new Set([...teamMemberIds.map(id => id.toString()), currentUserId.toString()])];
+        teamMemberIds = [...new Set([...teamMemberIds.filter(Boolean).map(id => id.toString()), currentUserId.toString()])];
         
         // Find students who are not in any team (neither as leader nor member) and not the current user
         const availableStudents = await User.find({
@@ -80,6 +80,19 @@ exports.createTeam = async (req, res) => {
             return res.status(400).json({ message: 'You are already part of a team' });
         }
 
+        // Check if user has any pending invitations from other teams
+        const pendingInvitations = await Team.findOne({
+            memberStatus: {
+                $elemMatch: {
+                    user: teamLeaderId,
+                    status: 'pending'
+                }
+            }
+        });
+        if (pendingInvitations) {
+            return res.status(400).json({ message: 'You have pending team invitations. You must decline all invitations before creating your own team.' });
+        }
+
         // Get max team size from config
         const config = await Config.findOne();
         // Always allow team formation - no restrictions
@@ -93,14 +106,32 @@ exports.createTeam = async (req, res) => {
         }
 
         // Get the count of existing teams to generate the next sequential team name
-        const teamCount = await Team.countDocuments({});
-        const newTeamName = `Team ${teamCount + 1}`;
+        // const maxTeamNumber = await Team.find({}, {teamName : 1});
+
+        const existingTeamNames = await Team.find({},{_id:0, teamName: 1})
+        let numberTracker = 1;
+        if (existingTeamNames){
+            for(let x of existingTeamNames){
+                if( numberTracker != Number(x.teamName.split(' ')[1]))
+                    break;
+                numberTracker++;
+            }
+        }
+
+        const newTeamName = `Team ${numberTracker}`;
 
         // Create team
         const team = new Team({
             teamName: newTeamName, // Automatically generated team name
             teamLeader: teamLeaderId,
-            members,
+            members: [], // Keep empty until invitations are accepted
+            memberStatus : members.map((m) => {
+                return {
+                    user : m,
+                    status : 'pending'
+                }
+            }),
+            isTeamComplete: false,
             status: 'pending'
         });
 
@@ -123,6 +154,10 @@ exports.getUserTeam = async (req, res) => {
                 { members: userId }
             ]
         }).populate('teamLeader members', 'username name')
+          .populate({
+              path: 'memberStatus.user',
+              select: 'username name'
+          })
           .populate({ 
               path: 'guidePreference', 
               select: 'username name'
@@ -156,6 +191,10 @@ exports.requestGuide = async (req, res) => {
 
         if (!team) {
             return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
+        }
+
+        if (!team.isLocked) {
+            return res.status(400).json({ message: 'You cannot request a guide until your team is locked and finalized.' });
         }
 
         // Check if there's an existing guide request that is pending or accepted
@@ -325,6 +364,10 @@ exports.deleteMyTeam = async (req, res) => {
             return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
         }
 
+        if (team.isLocked) {
+            return res.status(400).json({ message: 'This team is locked and cannot be disbanded. Only an administrator can delete a locked team.' });
+        }
+
         // Clear any schedules and assignments referencing this team
         try {
             const TimeTable = require('../models/TimeTable');
@@ -340,5 +383,290 @@ exports.deleteMyTeam = async (req, res) => {
     } catch (error) {
         console.error('Error deleting team:', error);
         res.status(500).json({ message: 'Error deleting team' });
+    }
+};
+
+// Get all pending team invitations for a student
+exports.getTeamInvitations = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const invitations = await Team.find({
+            memberStatus: {
+                $elemMatch: {
+                    user: userId,
+                    status: 'pending'
+                }
+            }
+        }).populate('teamLeader', 'username name')
+          .populate('memberStatus.user', 'username name');
+        
+        res.json(invitations);
+    } catch (error) {
+        console.error('Error fetching team invitations:', error);
+        res.status(500).json({ message: 'Error fetching team invitations' });
+    }
+};
+
+// Accept or reject a team invitation
+exports.respondToInvitation = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { teamId, action } = req.body;
+
+        if (!['accept', 'reject'].includes(action)) {
+            return res.status(400).json({ message: 'Invalid action. Must be accept or reject.' });
+        }
+
+        const team = await Team.findById(teamId);
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found' });
+        }
+
+        const memberIdx = team.memberStatus.findIndex(m => m.user.toString() === userId && m.status === 'pending');
+        if (memberIdx === -1) {
+            return res.status(400).json({ message: 'No pending invitation found for this team.' });
+        }
+
+        if (action === 'accept') {
+            team.memberStatus[memberIdx].status = 'accepted';
+            if (!team.members.includes(userId)) {
+                team.members.push(userId);
+            }
+            
+            // Recalculate if team is complete
+            const allAccepted = team.memberStatus.length > 0 && team.memberStatus.every(m => m.status === 'accepted');
+            team.isTeamComplete = allAccepted;
+
+            await team.save();
+
+            // Set pending status in all other teams to rejected
+            await Team.updateMany(
+                {
+                    _id: { $ne: teamId },
+                    memberStatus: {
+                        $elemMatch: {
+                            user: userId,
+                            status: 'pending'
+                        }
+                    }
+                },
+                {
+                    $set: { 'memberStatus.$[elem].status': 'rejected' }
+                },
+                {
+                    arrayFilters: [{ 'elem.user': userId, 'elem.status': 'pending' }]
+                }
+            );
+
+            return res.json({ message: 'Invitation accepted successfully', team });
+        } else {
+            // reject
+            team.memberStatus[memberIdx].status = 'rejected';
+            team.members = team.members.filter(m => m.toString() !== userId);
+            
+            // Recalculate complete
+            const allAccepted = team.memberStatus.length > 0 && team.memberStatus.every(m => m.status === 'accepted');
+            team.isTeamComplete = allAccepted;
+
+            await team.save();
+            return res.json({ message: 'Invitation rejected successfully', team });
+        }
+    } catch (error) {
+        console.error('Error responding to invitation:', error);
+        res.status(500).json({ message: 'Error processing response to invitation' });
+    }
+};
+
+// Invite a new member to an existing team (leader only)
+exports.inviteMember = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { studentId } = req.body;
+
+        const team = await Team.findOne({ teamLeader: userId });
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
+        }
+
+        if (team.isLocked) {
+            return res.status(400).json({ message: 'This team is locked and cannot be modified.' });
+        }
+
+        // Get max team size from config
+        const config = await Config.findOne();
+        const maxTeamSize = config ? config.maxTeamSize : 4;
+
+        // Check current number of invited/accepted members + leader (1) (EXCLUDING REJECTED MEMBERS!)
+        const activeInvitesCount = team.memberStatus.filter(m => m.status !== 'rejected').length;
+        const currentTotalSize = activeInvitesCount + 1;
+        if (currentTotalSize >= maxTeamSize) {
+            return res.status(400).json({ message: `Team size cannot exceed ${maxTeamSize} members.` });
+        }
+
+        // Check if student is already in memberStatus
+        const alreadyInvited = team.memberStatus.some(m => m.user.toString() === studentId);
+        if (alreadyInvited) {
+            const member = team.memberStatus.find(m => m.user.toString() === studentId);
+            if (member.status === 'rejected') {
+                member.status = 'pending';
+                team.isTeamComplete = false;
+                await team.save();
+                return res.json({ message: 'Member re-invited successfully!', team });
+            }
+            return res.status(400).json({ message: 'Student is already invited or a member.' });
+        }
+
+        // Check if student is already a team leader or member of a complete team
+        const otherTeam = await Team.findOne({
+            $or: [
+                { teamLeader: studentId },
+                { members: studentId }
+            ]
+        });
+        if (otherTeam) {
+            return res.status(400).json({ message: 'Student is already part of another team.' });
+        }
+
+        // Add to memberStatus
+        team.memberStatus.push({ user: studentId, status: 'pending' });
+        team.isTeamComplete = false;
+        await team.save();
+
+        res.json({ message: 'Invitation sent successfully!', team });
+    } catch (error) {
+        console.error('Error inviting member:', error);
+        res.status(500).json({ message: 'Error inviting member.' });
+    }
+};
+
+// Remove a member from the team (leader only)
+exports.removeMember = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { studentId } = req.body;
+
+        const team = await Team.findOne({ teamLeader: userId });
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
+        }
+
+        if (team.isLocked) {
+            return res.status(400).json({ message: 'This team is locked and cannot be modified.' });
+        }
+
+        // Remove from members
+        team.members = team.members.filter(m => m.toString() !== studentId);
+
+        // Remove from memberStatus
+        team.memberStatus = team.memberStatus.filter(m => m.user.toString() !== studentId);
+
+        // Recalculate completeness
+        const allAccepted = team.memberStatus.length > 0 && team.memberStatus.every(m => m.status === 'accepted');
+        team.isTeamComplete = allAccepted;
+
+        await team.save();
+        res.json({ message: 'Member removed successfully!', team });
+    } catch (error) {
+        console.error('Error removing member:', error);
+        res.status(500).json({ message: 'Error removing member.' });
+    }
+};
+
+// Request to lock the team (leader only)
+exports.requestLock = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const team = await Team.findOne({ teamLeader: userId });
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
+        }
+
+        if (!team.isTeamComplete) {
+            return res.status(400).json({ message: 'You cannot request to lock the team until all members have accepted.' });
+        }
+
+        if (team.isLocked) {
+            return res.status(400).json({ message: 'The team is already locked.' });
+        }
+
+        team.lockRequested = true;
+        // Reset lock approvals just in case
+        team.memberStatus.forEach(m => {
+            if (m.status === 'accepted') {
+                m.lockApproved = false;
+            }
+        });
+
+        await team.save();
+        res.json({ message: 'Lock request sent to team members successfully!', team });
+    } catch (error) {
+        console.error('Error requesting team lock:', error);
+        res.status(500).json({ message: 'Error requesting team lock.' });
+    }
+};
+
+// Cancel lock request (leader only)
+exports.cancelLockRequest = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const team = await Team.findOne({ teamLeader: userId });
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
+        }
+
+        if (team.isLocked) {
+            return res.status(400).json({ message: 'Cannot cancel. The team is already locked.' });
+        }
+
+        team.lockRequested = false;
+        team.memberStatus.forEach(m => {
+            m.lockApproved = false;
+        });
+
+        await team.save();
+        res.json({ message: 'Lock request cancelled successfully!', team });
+    } catch (error) {
+        console.error('Error cancelling lock request:', error);
+        res.status(500).json({ message: 'Error cancelling lock request.' });
+    }
+};
+
+// Approve lock request (member only)
+exports.approveLock = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        
+        // Find team where user is an accepted member and lock is requested
+        const team = await Team.findOne({
+            members: userId,
+            lockRequested: true
+        });
+
+        if (!team) {
+            return res.status(404).json({ message: 'No active lock request found for your team.' });
+        }
+
+        if (team.isLocked) {
+            return res.status(400).json({ message: 'The team is already locked.' });
+        }
+
+        const memberIdx = team.memberStatus.findIndex(m => m.user.toString() === userId && m.status === 'accepted');
+        if (memberIdx === -1) {
+            return res.status(400).json({ message: 'Member not found or status not accepted.' });
+        }
+
+        team.memberStatus[memberIdx].lockApproved = true;
+
+        // Check if all accepted members have approved lock
+        const allApproved = team.memberStatus.filter(m => m.status === 'accepted').every(m => m.lockApproved === true);
+        if (allApproved) {
+            team.isLocked = true;
+        }
+
+        await team.save();
+        res.json({ message: 'Lock approved successfully!', team });
+    } catch (error) {
+        console.error('Error approving lock request:', error);
+        res.status(500).json({ message: 'Error approving lock request.' });
     }
 };

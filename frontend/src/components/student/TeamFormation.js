@@ -12,6 +12,7 @@ const TeamFormation = () => {
     const [success, setSuccess] = useState('');
     const [existingTeam, setExistingTeam] = useState(null);
     const [teamFormationOpen, setTeamFormationOpen] = useState(true);
+    const [invitations, setInvitations] = useState([]);
 
     useEffect(() => {
         fetchData();
@@ -48,7 +49,7 @@ const TeamFormation = () => {
                 console.log('Could not ensure team formation is open:', err);
             }
     
-            const [studentsRes, teamRes, configRes] = await Promise.all([
+            const [studentsRes, teamRes, configRes, configPublicRes, invitationsRes] = await Promise.all([
                 axios.get('http://localhost:5000/api/teams/available-students', {
                     headers: { Authorization: `Bearer ${token}` }
                 }),
@@ -63,11 +64,15 @@ const TeamFormation = () => {
                 axios.get('http://localhost:5000/api/teams/max-team-size', { // Fetch max team size from new public endpoint
                     headers: { Authorization: `Bearer ${token}` }
                 }),
-                axios.get('http://localhost:5000/api/teams/config/public')
+                axios.get('http://localhost:5000/api/teams/config/public'),
+                axios.get('http://localhost:5000/api/teams/invitations', {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
             ]);
     
             setAvailableStudents(studentsRes.data);
             setFilteredStudents(studentsRes.data);
+            setInvitations(invitationsRes.data || []);
             
             if (teamRes.data) {
                 setExistingTeam(teamRes.data);
@@ -89,6 +94,30 @@ const TeamFormation = () => {
             setError(error.response?.data?.message || 'Error fetching data');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleRespondInvitation = async (teamId, action) => {
+        try {
+            setError('');
+            setSuccess('');
+            const token = localStorage.getItem('token');
+            if (!token) {
+                setError('Authentication token not found');
+                return;
+            }
+
+            await axios.post('http://localhost:5000/api/teams/respond-invitation', {
+                teamId,
+                action
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            setSuccess(`Successfully ${action === 'accept' ? 'accepted' : 'declined'} the invitation!`);
+            fetchData();
+        } catch (error) {
+            setError(error.response?.data?.message || 'Error responding to invitation');
         }
     };
 
@@ -176,6 +205,37 @@ const TeamFormation = () => {
 
     return (
         <div className="bg-white p-6 rounded-lg shadow">
+            {invitations.length > 0 && (
+                <div className="mb-6 p-4 bg-indigo-50 border-l-4 border-indigo-500 rounded-r-md">
+                    <h3 className="text-lg font-semibold text-indigo-900 mb-2">Pending Team Invitations</h3>
+                    <div className="space-y-3">
+                        {invitations.map(inv => (
+                            <div key={inv._id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-3 rounded shadow-sm border border-indigo-100 gap-2">
+                                <div>
+                                    <p className="font-semibold text-gray-800 text-sm">Invitation to join <span className="text-indigo-600">{inv.teamName}</span></p>
+                                    <p className="text-xs text-gray-500">Created by {inv.teamLeader?.name} ({inv.teamLeader?.username})</p>
+                                </div>
+                                <div className="flex space-x-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRespondInvitation(inv._id, 'accept')}
+                                        className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold transition-colors"
+                                    >
+                                        Accept
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRespondInvitation(inv._id, 'reject')}
+                                        className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold transition-colors"
+                                    >
+                                        Decline
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
             <h2 className="text-xl font-semibold mb-4">Form Your Team</h2>
             <p className="mb-4 text-gray-700">
                 You are not currently part of any team. Use the search below to find available students and add them to your team. When ready, click <b>Create Team</b> to form your team. You will become the team leader.
@@ -186,6 +246,11 @@ const TeamFormation = () => {
             <div className="mb-4 p-3 bg-yellow-100 text-yellow-700 rounded">
                 <strong>Note:</strong> After forming your team, you will not be able to edit or change team members.
             </div>
+            {invitations.length > 0 && (
+                <div className="mb-4 p-3 bg-red-50 text-red-800 border-l-4 border-red-500 rounded text-sm">
+                    <strong>Notice:</strong> You have pending team invitations. You must decline all invitations before you can form your own team.
+                </div>
+            )}
             {error && (
                 <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
                     {error}
@@ -222,8 +287,13 @@ const TeamFormation = () => {
                                     <span className="text-sm">{student.name} ({student.username})</span>
                                     <button
                                         type="button"
+                                        disabled={invitations.length > 0}
                                         onClick={() => handleAddMember(student)}
-                                        className="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                        className={`px-3 py-1 text-sm rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+                                            invitations.length > 0
+                                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                        }`}
                                     >
                                         Add
                                     </button>
@@ -258,9 +328,9 @@ const TeamFormation = () => {
                 <div>
                     <button
                         type="submit"
-                        disabled={selectedMembers.length === 0}
+                        disabled={selectedMembers.length === 0 || invitations.length > 0}
                         className={`px-4 py-2 text-sm font-medium rounded-md text-white ${
-                            selectedMembers.length === 0
+                            selectedMembers.length === 0 || invitations.length > 0
                                 ? 'bg-gray-400 cursor-not-allowed'
                                 : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
                         }`}

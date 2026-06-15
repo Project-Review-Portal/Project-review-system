@@ -19,7 +19,19 @@ router.get('/my-assigned-panel', auth, teamController.getAssignedPanel);
 router.post('/request-guide', auth, teamController.requestGuide);
 router.delete('/my-team', auth, teamController.deleteMyTeam);
 
+<<<<<<< HEAD
 router.post('/report/upload', auth, reportUpload, teamController.uploadReport);
+=======
+router.get('/invitations', auth, teamController.getTeamInvitations);
+router.post('/respond-invitation', auth, teamController.respondToInvitation);
+router.post('/invite', auth, teamController.inviteMember);
+router.post('/remove-member', auth, teamController.removeMember);
+router.post('/request-lock', auth, teamController.requestLock);
+router.post('/cancel-lock', auth, teamController.cancelLockRequest);
+router.post('/approve-lock', auth, teamController.approveLock);
+
+router.post('/report/upload', auth, upload, teamController.uploadReport);
+>>>>>>> 2b9131a59ddb8af2864da03b92c55658b2c7897b
 router.get('/report/status', auth, teamController.getReportStatus);
 
 // New route for fetching max team size for public (student) view

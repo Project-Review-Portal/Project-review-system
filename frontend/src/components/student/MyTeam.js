@@ -6,10 +6,32 @@ const MyTeam = () => {
     const [loading, setLoading] = useState(true);
     const [apiError, setApiError] = useState('');
     const [noTeamFound, setNoTeamFound] = useState(false);
+    
+    // Member management states
+    const [availableStudents, setAvailableStudents] = useState([]);
+    const [filteredStudents, setFilteredStudents] = useState([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [maxTeamSize, setMaxTeamSize] = useState(4);
+    const [inviteError, setInviteError] = useState('');
+    const [inviteSuccess, setInviteSuccess] = useState('');
+
+    const user = JSON.parse(localStorage.getItem('user'));
+    const currentUserId = user?._id || user?.id;
 
     useEffect(() => {
         fetchMyTeam();
     }, []);
+
+    useEffect(() => {
+        if (searchQuery.trim() === '') {
+            setFilteredStudents(availableStudents);
+        } else {
+            const filtered = availableStudents.filter(student =>
+                student.username.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+            setFilteredStudents(filtered);
+        }
+    }, [searchQuery, availableStudents]);
 
     const fetchMyTeam = async () => {
         setLoading(true);
@@ -22,20 +44,149 @@ const MyTeam = () => {
                 setLoading(false);
                 return;
             }
-            const response = await axios.get('http://localhost:5000/api/teams/my-team', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setTeam(response.data);
-        } catch (err) {
-            console.error('Error fetching my team:', err);
-            if (err.response && err.response.status === 404) {
+
+            const [teamRes, sizeRes, studentsRes] = await Promise.all([
+                axios.get('http://localhost:5000/api/teams/my-team', {
+                    headers: { Authorization: `Bearer ${token}` }
+                }).catch(err => {
+                    if (err.response && err.response.status === 404) {
+                        return { data: null };
+                    }
+                    throw err;
+                }),
+                axios.get('http://localhost:5000/api/teams/max-team-size', {
+                    headers: { Authorization: `Bearer ${token}` }
+                }),
+                axios.get('http://localhost:5000/api/teams/available-students', {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+            ]);
+
+            if (teamRes.data) {
+                setTeam(teamRes.data);
+            } else {
                 setNoTeamFound(true);
                 setTeam(null);
-            } else {
-                setApiError(err.response?.data?.message || 'Failed to fetch team data.');
             }
+
+            if (sizeRes.data && sizeRes.data.maxTeamSize) {
+                setMaxTeamSize(sizeRes.data.maxTeamSize);
+            }
+
+            if (studentsRes.data) {
+                setAvailableStudents(studentsRes.data);
+                setFilteredStudents(studentsRes.data);
+            }
+        } catch (err) {
+            console.error('Error fetching team data:', err);
+            setApiError(err.response?.data?.message || 'Failed to fetch team data.');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleInviteMember = async (studentId) => {
+        setInviteError('');
+        setInviteSuccess('');
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post('http://localhost:5000/api/teams/invite', {
+                studentId
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setInviteSuccess(res.data.message || 'Invitation sent successfully!');
+            setSearchQuery('');
+            fetchMyTeam();
+        } catch (err) {
+            setInviteError(err.response?.data?.message || 'Failed to invite member.');
+        }
+    };
+
+    const handleRemoveMember = async (studentId) => {
+        setInviteError('');
+        setInviteSuccess('');
+        if (!window.confirm('Are you sure you want to remove this member from the team?')) {
+            return;
+        }
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post('http://localhost:5000/api/teams/remove-member', {
+                studentId
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setInviteSuccess('Member removed successfully!');
+            fetchMyTeam();
+        } catch (err) {
+            setInviteError(err.response?.data?.message || 'Failed to remove member.');
+        }
+    };
+
+    const handleDeleteTeam = async () => {
+        if (!window.confirm('Are you sure you want to disband this team? All members and pending requests will be removed.')) {
+            return;
+        }
+        try {
+            const token = localStorage.getItem('token');
+            await axios.delete('http://localhost:5000/api/teams/my-team', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert('Team disbanded successfully!');
+            window.location.reload();
+        } catch (err) {
+            setApiError(err.response?.data?.message || 'Failed to disband team.');
+        }
+    };
+
+    const handleRequestLock = async () => {
+        setInviteError('');
+        setInviteSuccess('');
+        if (!window.confirm('Are you sure you want to request to lock the team? Once locked, you cannot modify members.')) {
+            return;
+        }
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post('http://localhost:5000/api/teams/request-lock', {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setInviteSuccess(res.data.message || 'Lock request sent successfully!');
+            fetchMyTeam();
+        } catch (err) {
+            setInviteError(err.response?.data?.message || 'Failed to request lock.');
+        }
+    };
+
+    const handleCancelLockRequest = async () => {
+        setInviteError('');
+        setInviteSuccess('');
+        if (!window.confirm('Are you sure you want to cancel the lock request?')) {
+            return;
+        }
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post('http://localhost:5000/api/teams/cancel-lock', {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setInviteSuccess(res.data.message || 'Lock request cancelled successfully!');
+            fetchMyTeam();
+        } catch (err) {
+            setInviteError(err.response?.data?.message || 'Failed to cancel lock request.');
+        }
+    };
+
+    const handleApproveLock = async () => {
+        setInviteError('');
+        setInviteSuccess('');
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post('http://localhost:5000/api/teams/approve-lock', {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setInviteSuccess(res.data.message || 'Lock approved successfully!');
+            fetchMyTeam();
+        } catch (err) {
+            setInviteError(err.response?.data?.message || 'Failed to approve lock request.');
         }
     };
 
@@ -47,7 +198,7 @@ const MyTeam = () => {
         return <div className="bg-white p-6 rounded-lg shadow text-red-600">Error: {apiError}</div>;
     }
 
-    if (noTeamFound) {
+    if (noTeamFound || !team) {
         return (
             <div className="bg-white p-6 rounded-lg shadow">
                 <h2 className="text-xl font-semibold mb-4">My Team</h2>
@@ -59,40 +210,213 @@ const MyTeam = () => {
         );
     }
 
-    if (!team) {
-        return (
-            <div className="bg-white p-6 rounded-lg shadow">
-                <h2 className="text-xl font-semibold mb-4">My Team</h2>
-                <p className="text-gray-600">You are not currently part of any team.</p>
-                <p className="text-gray-500 mt-2">
-                    Please go to <b>Team Formation</b> to create or join a team.
-                </p>
-            </div>
-        );
-    }
+    const isLeader = team.teamLeader?._id === currentUserId;
+    const memberList = team.memberStatus && team.memberStatus.length > 0
+        ? team.memberStatus
+        : team.members.map(m => ({ user: m, status: 'accepted' }));
+
+    const activeMembers = memberList.filter(m => m.status !== 'rejected');
+    const rejectedMembers = memberList.filter(m => m.status === 'rejected');
+
+    const myStatus = team.memberStatus?.find(m => m.user?._id === currentUserId || m.user === currentUserId);
+    const hasApprovedLock = myStatus?.lockApproved;
 
     return (
         <div className="bg-white p-6 rounded-lg shadow space-y-6">
-            <h2 className="text-xl font-semibold mb-4">My Team</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h2 className="text-xl font-semibold">My Team</h2>
+                <div className="flex gap-2">
+                    {team.isLocked && (
+                        <span className="px-3 py-1 bg-red-100 text-red-800 text-xs font-bold rounded-full border border-red-200">
+                            🔒 Team Locked
+                        </span>
+                    )}
+                    {!team.isLocked && !team.isTeamComplete && (
+                        <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-bold rounded-full border border-yellow-200">
+                            Incomplete Team
+                        </span>
+                    )}
+                    {!team.isLocked && team.isTeamComplete && (
+                        <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-bold rounded-full border border-green-200">
+                            Complete Team
+                        </span>
+                    )}
+                </div>
+            </div>
             
-            <div className="mb-4 p-3 bg-blue-100 text-blue-700 rounded">
-                <h3 className="font-semibold">Team Name: {team.teamName}</h3>
+            <div className="p-3 bg-blue-50 text-blue-700 rounded border border-blue-100">
+                <h3 className="font-semibold text-lg">Team Name: {team.teamName}</h3>
             </div>
 
-            <div className="border p-4 rounded-lg">
-                <h3 className="text-xl font-semibold mb-3">Team Members</h3>
+            {/* Lock Status Section */}
+            {team.isLocked && (
+                <div className="p-4 bg-green-50 border-l-4 border-green-500 text-green-800 rounded shadow-sm">
+                    <h4 className="font-bold flex items-center gap-2">
+                        <span>🔒 Team is Locked & Finalized</span>
+                    </h4>
+                    <p className="text-sm mt-1">This team is locked. Members and settings cannot be changed. Only an administrator can unlock or disband this team.</p>
+                </div>
+            )}
+
+            {!team.isLocked && team.lockRequested && (
+                <div className="p-4 bg-indigo-50 border-l-4 border-indigo-500 text-indigo-800 rounded shadow-sm space-y-3">
+                    <h4 className="font-bold">🔒 Lock Request Pending</h4>
+                    <p className="text-sm">The team leader has requested to lock the team to finalize it. All members must approve to lock the team.</p>
+                    
+                    {!isLeader && myStatus && myStatus.status === 'accepted' && !hasApprovedLock && (
+                        <button
+                            onClick={handleApproveLock}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-semibold transition-colors"
+                        >
+                            Approve Lock Request
+                        </button>
+                    )}
+                    
+                    {!isLeader && myStatus && hasApprovedLock && (
+                        <div className="text-sm text-green-600 font-semibold flex items-center gap-1">
+                            <span>✓ You have approved this lock request. Waiting for other members.</span>
+                        </div>
+                    )}
+
+                    {isLeader && (
+                        <button
+                            onClick={handleCancelLockRequest}
+                            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold transition-colors"
+                        >
+                            Cancel Lock Request
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {!team.isLocked && !team.lockRequested && team.isTeamComplete && isLeader && (
+                <div className="p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-800 rounded shadow-sm space-y-2">
+                    <h4 className="font-bold">🔒 Lock Team</h4>
+                    <p className="text-sm">All invited members have accepted. You should lock the team to finalize it. Locking the team requires approval from all members.</p>
+                    <button
+                        onClick={handleRequestLock}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-semibold transition-colors"
+                    >
+                        Request Team Lock
+                    </button>
+                </div>
+            )}
+
+            {!team.isLocked && !team.isTeamComplete && (
+                <div className="p-3 bg-yellow-50 text-yellow-800 border-l-4 border-yellow-400 rounded text-sm">
+                    <strong>Status: Incomplete Team.</strong> Waiting for all invited members to accept their invitations before guide selection or team locking can be unlocked.
+                </div>
+            )}
+
+            {/* Team Members List */}
+            <div className="border p-4 rounded-lg space-y-3 bg-gray-50">
+                <h3 className="text-lg font-semibold text-gray-800">Team Members</h3>
                 <ul className="space-y-2">
-                    <li className="flex items-center p-2 rounded-md bg-gray-50">
-                        <span className="font-medium">Team Leader: {team.teamLeader?.name} ({team.teamLeader?.username})</span>
+                    <li className="flex items-center justify-between p-2 rounded-md bg-indigo-50 border border-indigo-100">
+                        <span className="font-medium text-indigo-900">Leader: {team.teamLeader?.name} ({team.teamLeader?.username})</span>
+                        <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-bold">Leader</span>
                     </li>
-                    {team.members.map(member => (
-                        <li key={member._id} className="flex items-center p-2 rounded-md bg-gray-50">
-                            <span className="text-sm">Member: {member.name} ({member.username})</span>
+                    {activeMembers.map(m => (
+                        <li key={m.user?._id} className="flex items-center justify-between p-2 rounded-md bg-white border border-gray-200">
+                            <span className="text-sm text-gray-700">{m.user?.name} ({m.user?.username})</span>
+                            <div className="flex items-center space-x-3">
+                                <span className={`text-xs px-2 py-1 rounded font-semibold ${
+                                    m.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                                    'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                    {m.status.charAt(0).toUpperCase() + m.status.slice(1)}
+                                </span>
+                                
+                                {team.lockRequested && m.status === 'accepted' && (
+                                    <span className={`text-xs px-2 py-1 rounded font-semibold ${
+                                        m.lockApproved ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                                    }`}>
+                                        {m.lockApproved ? '✓ Lock Approved' : '⏳ Lock Pending'}
+                                    </span>
+                                )}
+
+                                {isLeader && !team.isLocked && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveMember(m.user?._id)}
+                                        className="text-xs text-red-600 hover:text-red-800 font-semibold focus:outline-none"
+                                    >
+                                        Remove
+                                    </button>
+                                )}
+                            </div>
                         </li>
                     ))}
                 </ul>
             </div>
 
+            {/* Declined Invitations Section */}
+            {rejectedMembers.length > 0 && (
+                <div className="border p-4 rounded-lg space-y-3 bg-red-50/50 border-red-100">
+                    <h3 className="text-lg font-semibold text-red-800">Declined Invitations</h3>
+                    <ul className="space-y-2">
+                        {rejectedMembers.map(m => (
+                            <li key={m.user?._id} className="flex items-center justify-between p-2 rounded-md bg-white border border-red-200">
+                                <span className="text-sm text-gray-700">{m.user?.name} ({m.user?.username})</span>
+                                <div className="flex items-center space-x-3">
+                                    <span className="text-xs px-2 py-1 rounded font-semibold bg-red-100 text-red-800">
+                                        Declined
+                                    </span>
+                                    {isLeader && !team.isLocked && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveMember(m.user?._id)}
+                                            className="text-xs text-red-600 hover:text-red-800 font-semibold focus:outline-none"
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {/* Invite More Members Section */}
+            {isLeader && !team.isLocked && activeMembers.length + 1 < maxTeamSize && (
+                <div className="border p-4 rounded-lg space-y-3">
+                    <h3 className="text-lg font-semibold text-gray-800">Invite More Members ({activeMembers.length + 1}/{maxTeamSize})</h3>
+                    {inviteError && <div className="text-sm text-red-600 bg-red-50 p-2 rounded">{inviteError}</div>}
+                    {inviteSuccess && <div className="text-sm text-green-600 bg-green-50 p-2 rounded">{inviteSuccess}</div>}
+                    <div className="flex space-x-2">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search available students by username..."
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                        />
+                    </div>
+                    {searchQuery && (
+                        <div className="border rounded-md p-2 max-h-40 overflow-y-auto bg-white shadow-inner">
+                            {filteredStudents.length === 0 ? (
+                                <p className="text-gray-500 text-center py-2 text-sm">No students found</p>
+                            ) : (
+                                filteredStudents.map(student => (
+                                    <div key={student._id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded text-sm">
+                                        <span className="text-gray-700">{student.name} ({student.username})</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleInviteMember(student._id)}
+                                            className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold"
+                                        >
+                                            Invite
+                                        </button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Guide Preferences */}
             {team.guidePreference && (
                 <div className="border p-4 rounded-lg">
                     <h3 className="text-xl font-semibold mb-3">Guide</h3>
@@ -106,8 +430,20 @@ const MyTeam = () => {
                     </p>
                 </div>
             )}
+
+            {/* Disband Team Button */}
+            {isLeader && !team.isLocked && (
+                <div className="pt-4 border-t flex justify-end">
+                    <button
+                        onClick={handleDeleteTeam}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-semibold transition-colors"
+                    >
+                        Disband Team
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
 
-export default MyTeam; 
+export default MyTeam;
