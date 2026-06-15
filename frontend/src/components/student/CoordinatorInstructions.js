@@ -112,7 +112,7 @@ const CoordinatorInstructions = () => {
           <svg className="w-12 h-12 text-amber-500 mx-auto mb-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
           </svg>
-          <h3 className="text-lg font-bold text-amber-900 mb-2">Notice From Coordinator Panel</h3>
+          <h3 className="text-lg font-bold text-amber-900 mb-2">Notice From Panel Coordinator </h3>
           <p className="text-sm leading-relaxed max-w-md mx-auto text-amber-700">{errorState.message}</p>
         </div>
       </div>
@@ -141,8 +141,8 @@ const CoordinatorInstructions = () => {
         <div className="w-full bg-white border border-gray-200 rounded-xl shadow-sm p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Coordinator Panel</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Official directives for Panel ID: {panelId}</p>
+              <h2 className="text-xl font-bold text-gray-900">Announcement by the Coordinator</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Access instructions, announcements, and resources for upcoming reviews/viva.</p>
             </div>
             <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm font-medium text-gray-800 self-start sm:self-center">
               <span className="text-xs text-gray-400 font-normal mr-1">Coordinator:</span> 
@@ -159,7 +159,7 @@ const CoordinatorInstructions = () => {
           >
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Instruction Broadcast
+                Instructions/Guidelines
               </span>
               <span className="text-xs font-medium text-gray-400 bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100">
                 {new Date(template.createdAt).toLocaleDateString()} • {new Date(template.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

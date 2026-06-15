@@ -42,14 +42,14 @@ const CoordinatorInstructionTemplate = () => {
     e.preventDefault();
 
     if (!instructions.trim() && !selectedFile) {
-      alert("Please enter detailed review instructions or attach a review template.");
+      alert("Please enter detailed review instructions or attach a resource.");
       return;
     }
 
     const formData = new FormData();
     formData.append('reviewInstructions', instructions);
     if (selectedFile) {
-      formData.append('reviewTemplate', selectedFile);
+      formData.append('reviewResource', selectedFile);
     }
 
     try {
@@ -61,7 +61,7 @@ const CoordinatorInstructionTemplate = () => {
         },
       });
       console.log('Submission successful:', response.data);
-      alert('Review guidelines and templates dispatched successfully to teams!');
+      alert('Instructions and uploaded documents dispatched successfully to teams!');
     } catch (error) {
       console.error('Error submitting template details:', error);
       alert('Failed to submit form data. Please try again.');
@@ -84,9 +84,9 @@ const CoordinatorInstructionTemplate = () => {
           
           {/* Section Header */}
           <div className="border-b border-gray-100 pb-4 mb-6">
-            <h1 className="text-xl font-bold text-gray-900">Instruction and Templates to Student Teams</h1>
+            <h1 className="text-xl font-bold text-gray-900">Announcement to Student Teams</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Publish review guidelines, grading structures, and baseline templates ahead of the scheduled project review.
+              {/*Publish review guidelines, grading structures, and baseline templates ahead of the scheduled project review.*/}
             </p>
           </div>
 
@@ -95,7 +95,7 @@ const CoordinatorInstructionTemplate = () => {
             {/* Input Element 1: Review Guidelines Textbox */}
             <div>
               <label htmlFor="instructions" className="block text-sm font-semibold text-gray-900 mb-2">
-                Project Review Instructions
+                Review / Viva Instructions
               </label>
               <textarea
                 id="instructions"
@@ -103,14 +103,14 @@ const CoordinatorInstructionTemplate = () => {
                 onChange={handleTextChange}
                 rows={6}
                 className="w-full px-3 py-2 text-sm rounded border border-gray-300 shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-gray-700 placeholder-gray-400 transition-all duration-200 resize-y min-h-[120px]"
-                placeholder="Outline specific review metrics, presentation layout protocols, batch distribution, or panel expectations here..."
+                placeholder="Provide instructions, review expectations, presentation guidelines, and important updates for student teams"
               />
             </div>
 
             {/* Input Element 2: Review Template File Drop Zone */}
             <div>
               <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Review Template File
+                Review / Viva Resources
               </label>
               
               <div
@@ -146,17 +146,17 @@ const CoordinatorInstructionTemplate = () => {
                   
                   <div className="flex text-sm text-gray-600 justify-center">
                     <span className="relative font-medium text-indigo-600 group-hover:text-indigo-700 transition-colors duration-200">
-                      Select review template
+                      Select file
                     </span>
                     <p className="pl-1">or drag it directly here</p>
                   </div>
 
                   {selectedFile ? (
                     <p className="text-xs text-green-600 font-semibold bg-green-50 border border-green-100 px-3 py-1 rounded inline-block mt-2">
-                      Selected Template: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                      Selected Document: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
                     </p>
                   ) : (
-                    <p className="text-xs text-gray-400">Upload review rubrics, report templates (DOCX, PDF, XLSX), or presentation structures</p>
+                    <><p className="text-xs text-gray-400">Upload templates, guidelines, reference documents, evaluation rubrics, presentation formats, or other review-related resources.</p><p className="text-xs text-gray-400">Supported formats: PDF, DOCX, PPTX, XLSX and other academic resource files.</p></>
                   )}
                 </div>
               </div>

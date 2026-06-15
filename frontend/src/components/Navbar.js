@@ -25,7 +25,7 @@ const Navbar = ({ user, onLogout }) => {
                     { label: 'My Panel', path: '/student-dashboard/my-panel' },
                     { label: 'Review Schedules', path: '/student-dashboard/review-schedules' },
                     { label: 'Final Report', path: '/student-dashboard/final-report' },
-                    { label: 'Coordinator Instructions', path: '/student-dashboard/coordinator-instructions' }
+                    { label: 'Announcements', path: '/student-dashboard/coordinator-instructions' }
                 ];
             case 'guide':
                 return [
@@ -75,7 +75,7 @@ const Navbar = ({ user, onLogout }) => {
                     { label: 'Review Schedule', path: '/coordinator-dashboard/review-schedule' },
                     { label: 'Viva Schedule', path: '/coordinator-dashboard/viva-schedule' },
                     { label: 'Letter Generation', path: '/coordinator-dashboard/letter-generation' },
-                    { label: 'Instructions to Teams', path: '/coordinator-dashboard/instruction-template' }
+                    { label: 'Broadcasts', path: '/coordinator-dashboard/instruction-template' }
                 ];
             default:
                 return [];
