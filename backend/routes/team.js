@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const teamController = require('../controllers/teamController');
 const auth = require('../middleware/auth');
-const upload = require('../middleware/upload');
+const { reportUpload } = require('../middleware/upload');
 const Config = require('../models/Config');
 
 // Catch-all logger for team routes
@@ -19,7 +19,7 @@ router.get('/my-assigned-panel', auth, teamController.getAssignedPanel);
 router.post('/request-guide', auth, teamController.requestGuide);
 router.delete('/my-team', auth, teamController.deleteMyTeam);
 
-router.post('/report/upload', auth, upload, teamController.uploadReport);
+router.post('/report/upload', auth, reportUpload, teamController.uploadReport);
 router.get('/report/status', auth, teamController.getReportStatus);
 
 // New route for fetching max team size for public (student) view

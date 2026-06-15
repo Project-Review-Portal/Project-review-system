@@ -7,7 +7,7 @@ const Team = require('../models/Team');
 const Availability = require('../models/Availability');
 const Config = require('../models/Config');
 const Mark = require('../models/Mark');
-
+const InstructionTemplate = require('../models/InstructionTemplate'); 
 // Get all panels
 exports.getAllPanels = async (req, res) => {
     try {
@@ -850,4 +850,72 @@ exports.deleteAllottedSchedule = async (req, res) => {
         console.error('Error deleting allotted schedule:', error);
         res.status(500).json({ message: 'Server error deleting schedule' });
     }
+};
+
+//Coordinator: Sends instructions/template to students
+exports.createInstructionTemplate = async (req, res) => {
+  try {
+    // 1. Safety logs
+    console.log("Uploaded file object context:", req.file);
+    console.log("Text fields form-data payload:", req.body);
+
+    const { reviewInstructions } = req.body;
+
+    // 2. Hard Validation: Text instructions are explicitly required
+    if (!reviewInstructions || !reviewInstructions.trim()) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Validation Error: 'reviewInstructions' text body is required." 
+      });
+    }
+
+    // 3. Extract and Verify User ID from Auth Middleware payload
+    const coordinatorId = req.user?._id;
+    if (!coordinatorId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication Error: Unable to identify the submitting coordinator."
+      });
+    }
+
+    // 4. NEW: Dynamically query all panel IDs assigned to this coordinator
+    // .distinct('_id') returns a clean, flat array of ObjectIDs: [ObjectId('...'), ObjectId('...')]
+    const coordinatorPanelIds = await Panel.find({ coordinator: coordinatorId }).distinct('_id');
+
+    // 5. Structure the payload with the gathered data strings and panel arrays
+    const newTemplatePayload = {
+      reviewInstructions: reviewInstructions.trim(),
+      uploadedBy: coordinatorId,
+      panels: coordinatorPanelIds // Automatically binds all matching panels found in Step 4
+    };
+
+    // 6. Conditionally append file parameters if an asset was uploaded
+    if (req.file) {
+      newTemplatePayload.filePath = req.file.path;         // System storage path
+      newTemplatePayload.fileName = req.file.originalname; // Saved as original filename per your requirement
+    }
+
+    // 7. Persist records straight to MongoDB
+    const templateDocument = new InstructionTemplate(newTemplatePayload);
+    const savedDocument = await templateDocument.save();
+
+    // 8. Return response context payload back to your client application
+    return res.status(201).json({
+      success: true,
+      message: `Review guidelines dispatched successfully to your ${coordinatorPanelIds.length} assigned panels!`,
+      data: savedDocument
+    });
+
+  } catch (error) {
+    console.error("Critical database transaction error within createInstructionTemplate:", error);
+    
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    return res.status(500).json({ 
+      success: false,
+      message: "Internal Server Error: Failed to commit the instruction template records." 
+    });
+  }
 };

@@ -9,7 +9,7 @@ import FinalReport from './student/FinalReport';
 import StudentReviewSchedule from './student/StudentReviewSchedule';
 import TeamRules from './student/TeamRules';
 import GuideMe from './GuideMe';
-
+import CoordinatorInstructions from './student/CoordinatorInstructions';
 const StudentDashboard = () => {
     const user = JSON.parse(localStorage.getItem('user'));
 
@@ -32,6 +32,7 @@ const StudentDashboard = () => {
                     <Route path="review-schedules" element={<StudentReviewSchedule />} />
                     <Route path="final-report" element={<FinalReport />} />
                     <Route path="guide-me" element={<GuideMe userRole="student" />} />
+                    <Route path="coordinator-instructions" element={<CoordinatorInstructions/>}/>
                 </Routes>
             </main>
         </div>

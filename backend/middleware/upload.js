@@ -3,7 +3,13 @@ const path = require('path');
 
 // Set up storage engine
 const storage = multer.diskStorage({
-  destination: './uploads/',
+  destination: './uploads/general',
+  filename: function(req, file, cb){
+    cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
+  }
+});
+const storageReport = multer.diskStorage({
+  destination: './uploads/report',
   filename: function(req, file, cb){
     cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
   }
@@ -11,12 +17,28 @@ const storage = multer.diskStorage({
 
 // Init upload for reports (PDF only)
 const uploadReport = multer({
-  storage: storage,
+  storage: storageReport,
   limits:{fileSize: 10000000}, // 10MB limit
   fileFilter: function(req, file, cb){
     checkPDFFileType(file, cb);
   }
 }).single('report');
+
+const storageTemplate = multer.diskStorage({
+  destination: './uploads/review-templates', 
+  filename: function(req, file, cb){
+    cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
+  }
+});
+
+const uploadTemplate = multer({
+  storage: storageTemplate,
+  limits: {fileSize: 25000000}, // Slightly bumped to 25MB to accommodate larger code repo zips or datasets
+  fileFilter: function(req, file, cb){
+    // Pass true instantly—bypassing any extension or mime matching constraints entirely
+    cb(null, true);
+  }
+}).single('reviewTemplate');
 
 // Init upload for general files (templates and signatures)
 const uploadGeneral = multer({
@@ -60,7 +82,9 @@ function checkGeneralFileType(file, cb){
 }
 
 // Export both upload configurations
-module.exports = uploadReport; // Default export for backward compatibility
+module.exports=uploadReport;// Default export for backward compatibility
+module.exports.reportUpload = uploadReport; 
+module.exports.templateUpload=uploadTemplate;
 module.exports.single = uploadGeneral.single.bind(uploadGeneral);
 module.exports.array = uploadGeneral.array.bind(uploadGeneral);
 module.exports.fields = uploadGeneral.fields.bind(uploadGeneral); 

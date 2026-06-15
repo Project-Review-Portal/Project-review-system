@@ -4,6 +4,7 @@ import Navbar from './Navbar';
 import CoordinatorReviewSchedule from './CoordinatorReviewSchedule';
 import CoordinatorVivaSchedule from './coordinator/CoordinatorVivaSchedule';
 import CoordinatorAssignedTeams from './coordinator/CoordinatorAssignedTeams';
+import CoordinatorInstructionTemplate from './coordinator/CoordinatorInstructionTemplate';
 // Replaces old LetterGeneration page with the live editor
 import GuideMe from './GuideMe';
 import CoordinatorLetterLiveEditorCK from './CoordinatorLetterLiveEditorCK';
@@ -234,6 +235,7 @@ const CoordinatorDashboard = () => {
                     <Route path="review-schedule" element={<CoordinatorReviewSchedule />} />
                     <Route path="viva-schedule" element={<CoordinatorVivaSchedule />} />
                     <Route path="*" element={<Navigate to="dashboard" replace />} />
+                    <Route path="instruction-template" element={<CoordinatorInstructionTemplate />} />
                 </Routes>
             </div>
         </div>

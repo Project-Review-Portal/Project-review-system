@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const panelController = require('../controllers/panelController');
 const auth = require('../middleware/auth');
+const { templateUpload } = require('../middleware/upload');
 const authorize = require('../middleware/authorize');
 const attendanceController = require('../controllers/attendanceController');
 
@@ -140,5 +141,5 @@ router.post('/attendance/check', auth, attendanceController.checkAttendanceForTe
 
 // New route for checking schedule existence
 router.post('/check-schedule-exists', auth, attendanceController.checkPreviousScheduleExists);
-
+router.post('/coordinator/instruction-template',auth,authorize(['coordinator']),templateUpload,panelController.createInstructionTemplate)
 module.exports = router; 
