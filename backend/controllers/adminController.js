@@ -1,4 +1,5 @@
 const Config = require('../models/Config');
+const DesignationTeamLimit = require('../models/DesignationTeamLimit');
 const Team = require('../models/Team');
 const User = require('../models/User');
 const Panel = require('../models/Panel');
@@ -1772,5 +1773,89 @@ exports.deleteAllStudents = async (req, res) => {
     } catch (error) {
         console.error('Error deleting all students:', error);
         res.status(500).json({ message: 'Error deleting all students' });
+    }
+};
+
+function escapeRegex(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+exports.getDesignationTeamLimits = async (req, res) => {
+    try {
+        const limits = await DesignationTeamLimit.find({}).sort({ designation: 1 });
+        res.json(limits);
+    } catch (error) {
+        console.error('Error fetching designation team limits:', error);
+        res.status(500).json({ message: 'Error fetching designation team limits' });
+    }
+};
+
+exports.saveDesignationTeamLimits = async (req, res) => {
+    try {
+        const { limits } = req.body;
+
+        if (!Array.isArray(limits)) {
+            return res.status(400).json({ message: 'Invalid payload: limits must be an array' });
+        }
+
+        // Deduplicate incoming limits: last entry wins for same designation (case-insensitive)
+        const deduped = new Map();
+        for (const item of limits) {
+            const designation = String(item.designation || '').trim();
+            const teamLimit = Number(item.teamLimit ?? item.team_limit);
+
+            if (!designation) {
+                continue;
+            }
+
+            if (!Number.isInteger(teamLimit) || teamLimit < 0) {
+                return res.status(400).json({
+                    message: `Invalid team limit for designation "${designation}". Must be a non-negative integer.`
+                });
+            }
+
+            // Use lowercase key so duplicate designations (any casing) overwrite each other
+            deduped.set(designation.toLowerCase(), { designation, teamLimit });
+        }
+
+        // Clear all existing limits and insert the clean, deduplicated set
+        await DesignationTeamLimit.deleteMany({});
+
+        const toInsert = Array.from(deduped.values());
+        let saved = [];
+        if (toInsert.length > 0) {
+            saved = await DesignationTeamLimit.insertMany(toInsert);
+        }
+
+        res.json({
+            message: `Successfully saved ${saved.length} designation team limit(s)`,
+            limits: saved
+        });
+    } catch (error) {
+        console.error('Error saving designation team limits:', error);
+        res.status(500).json({ message: 'Error saving designation team limits' });
+    }
+};
+
+exports.deleteDesignationTeamLimit = async (req, res) => {
+    try {
+        const designation = decodeURIComponent(req.params.designation || '').trim();
+
+        if (!designation) {
+            return res.status(400).json({ message: 'Designation is required' });
+        }
+
+        const deleted = await DesignationTeamLimit.findOneAndDelete({
+            designation: { $regex: new RegExp(`^${escapeRegex(designation)}$`, 'i') }
+        });
+
+        if (!deleted) {
+            return res.status(404).json({ message: 'Designation team limit not found' });
+        }
+
+        res.json({ message: 'Designation team limit deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting designation team limit:', error);
+        res.status(500).json({ message: 'Error deleting designation team limit' });
     }
 };

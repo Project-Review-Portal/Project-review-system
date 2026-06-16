@@ -1,6 +1,11 @@
 const Team = require('../models/Team');
 const User = require('../models/User');
 const Config = require('../models/Config');
+const {
+    buildDesignationLimitMap,
+    getTeamCountsByGuideIds,
+    resolveGuideLimitStatus
+} = require('../utils/guideTeamLimit');
 const TeamPanelAssignment = require('../models/TeamPanelAssignment');
 const FinalReport = require('../models/FinalReport');
 
@@ -53,9 +58,23 @@ exports.getGuides = async (req, res) => {
             'roles.role': 'guide',
             'memberType': 'internal', // Only show internal faculty as guides
             _id: { $nin: rejectedGuideIds }
-        }).select('username name');
-        
-        res.json(guides);
+        }).select('username name designation');
+
+        const limitMap = await buildDesignationLimitMap();
+        const guideIds = guides.map((guide) => guide._id);
+        const countMap = await getTeamCountsByGuideIds(guideIds);
+
+        const guidesWithStatus = guides.map((guide) => {
+            const currentTeamCount = countMap.get(guide._id.toString()) || 0;
+            const limitStatus = resolveGuideLimitStatus(guide, currentTeamCount, limitMap);
+
+            return {
+                ...guide.toObject(),
+                ...limitStatus
+            };
+        });
+
+        res.json(guidesWithStatus);
     } catch (error) {
         console.error('Error fetching guides:', error); // Added error logging
         res.status(500).json({ message: 'Error fetching guides' });
@@ -206,6 +225,15 @@ exports.requestGuide = async (req, res) => {
         const guide = await User.findById(guideId);
         if (!guide || !guide.roles.some(r => r.role === 'guide')) {
             return res.status(400).json({ message: 'Invalid guide selected.' });
+        }
+
+        const limitMap = await buildDesignationLimitMap();
+        const countMap = await getTeamCountsByGuideIds([guide._id]);
+        const currentTeamCount = countMap.get(guide._id.toString()) || 0;
+        const limitStatus = resolveGuideLimitStatus(guide, currentTeamCount, limitMap);
+
+        if (!limitStatus.canRequest && limitStatus.teamLimit !== null) {
+            return res.status(400).json({ message: 'Request not available (limit reached)' });
         }
 
         // Update team with new guide preference and set status to pending

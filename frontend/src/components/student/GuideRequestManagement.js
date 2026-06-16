@@ -88,6 +88,12 @@ const GuideRequestManagement = () => {
         console.log('Current user ID:', user?.id); // Debug log
         console.log('My team object:', myTeam); // Debug log
 
+        const selectedGuide = guides.find((guide) => guide._id === guideId);
+        if (selectedGuide && selectedGuide.canRequest === false) {
+            setError('Request not available (limit reached) for this guide.');
+            return;
+        }
+
         if (!myTeam || myTeam.teamLeader._id !== user?.id) {
             setError('Only team leaders can send guide requests.');
             console.log('Error: Not team leader or no team.'); // Debug log
@@ -238,17 +244,50 @@ const GuideRequestManagement = () => {
                         <p className="text-gray-500">No guides available at this time.</p>
                     ) : (
                         <ul className="space-y-3">
-                            {guides.map(guide => (
-                                <li key={guide._id} className="flex justify-between items-center p-2 border rounded-md bg-gray-50">
-                                    <span className="font-medium">{guide.name}</span>
-                                    <button
-                                        onClick={() => handleSendRequest(guide._id)}
-                                        className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                            {guides.map(guide => {
+                                const limitReached = guide.canRequest === false;
+                                return (
+                                    <li
+                                        key={guide._id}
+                                        className={`flex justify-between items-center p-3 border rounded-md ${
+                                            limitReached
+                                                ? 'bg-gray-200 border-gray-300 opacity-80'
+                                                : 'bg-gray-50 border-gray-200'
+                                        }`}
                                     >
-                                        Send Request
-                                    </button>
-                                </li>
-                            ))}
+                                        <div>
+                                            <span className={`font-medium ${limitReached ? 'text-gray-600' : 'text-gray-900'}`}>
+                                                {guide.name}
+                                            </span>
+                                            {guide.designation && (
+                                                <span className="text-sm text-gray-500 ml-2">({guide.designation})</span>
+                                            )}
+                                            {guide.teamLimit != null && (
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Teams: {guide.currentTeamCount}/{guide.teamLimit}
+                                                </p>
+                                            )}
+                                            {limitReached && (
+                                                <p className="text-sm text-red-600 mt-1 font-medium">
+                                                    Request limit reached
+                                                </p>
+                                            )}
+                                        </div>
+                                        {limitReached ? (
+                                            <span className="text-sm text-gray-500 italic px-4 py-2">
+                                                Request not available
+                                            </span>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleSendRequest(guide._id)}
+                                                className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                                            >
+                                                Send Request
+                                            </button>
+                                        )}
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                 </div>

@@ -72,6 +72,10 @@ router.delete('/delete-user/:userId', auth, authorize(['admin']), adminControlle
 router.get('/faculty-list', auth, authorize(['admin']), adminController.getAllFaculty);
 router.get('/student-list', auth, authorize(['admin']), adminController.getAllStudents);
 
+router.get('/designation-team-limits', auth, authorize(['admin']), adminController.getDesignationTeamLimits);
+router.post('/designation-team-limits', auth, authorize(['admin']), adminController.saveDesignationTeamLimits);
+router.delete('/designation-team-limits/:designation', auth, authorize(['admin']), adminController.deleteDesignationTeamLimit);
+
 // Danger: Delete all teams and related assignments/schedules
 router.delete('/teams', auth, authorize(['admin']), adminController.deleteAllTeams);
 router.delete('/solo-teams', auth, authorize(['admin']), adminController.deleteSoloTeams);
