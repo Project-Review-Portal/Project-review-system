@@ -264,12 +264,12 @@ const GuideRequestManagement = () => {
                                             )}
                                             {guide.teamLimit != null && (
                                                 <p className="text-xs text-gray-500 mt-1">
-                                                    Teams: {guide.currentTeamCount}/{guide.teamLimit}
+                                                    Accepted teams: {guide.currentTeamCount}/{guide.teamLimit}
                                                 </p>
                                             )}
                                             {limitReached && (
                                                 <p className="text-sm text-red-600 mt-1 font-medium">
-                                                    Request limit reached
+                                                    Guide has reached their team limit
                                                 </p>
                                             )}
                                         </div>

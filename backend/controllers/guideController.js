@@ -65,19 +65,49 @@ exports.acceptRequest = async (req, res) => {
             return res.status(404).json({ message: 'Team request not found or already processed.' });
         }
 
+        // Check if accepting this team would exceed the guide's designation team limit
+        const {
+            buildDesignationLimitMap,
+            getTeamCountsByGuideIds,
+            resolveGuideLimitStatus
+        } = require('../utils/guideTeamLimit');
+
+        const guide = await User.findById(guideId);
+        const limitMap = await buildDesignationLimitMap();
+        const countMap = await getTeamCountsByGuideIds([guide._id]);
+        const currentApprovedCount = countMap.get(guide._id.toString()) || 0;
+        const limitStatus = resolveGuideLimitStatus(guide, currentApprovedCount, limitMap);
+
+        if (limitStatus.teamLimit !== null && currentApprovedCount >= limitStatus.teamLimit) {
+            return res.status(400).json({
+                message: `Cannot accept: you have already reached your team limit (${currentApprovedCount}/${limitStatus.teamLimit}).`
+            });
+        }
+
         // Accept the request for this team
         team.status = 'approved';
         await team.save();
 
-        // Optionally, reject all other pending requests for this guide
-        await Team.updateMany(
-            {
+        // Auto-reject remaining pending requests only if the guide is now at full capacity
+        const newApprovedCount = currentApprovedCount + 1;
+        if (limitStatus.teamLimit !== null && newApprovedCount >= limitStatus.teamLimit) {
+            // Find all remaining pending teams for this guide
+            const remainingPending = await Team.find({
                 guidePreference: guideId,
                 status: 'pending',
                 _id: { $ne: teamId }
-            },
-            { $set: { status: 'rejected' } }
-        );
+            });
+
+            // Clear guidePreference and add guide to rejectedGuides so teams can request another guide
+            for (const pendingTeam of remainingPending) {
+                pendingTeam.guidePreference = null;
+                pendingTeam.status = 'rejected';
+                if (!pendingTeam.rejectedGuides.includes(guideId)) {
+                    pendingTeam.rejectedGuides.push(guideId);
+                }
+                await pendingTeam.save();
+            }
+        }
 
         res.json({ message: 'Guide request accepted successfully!', team });
 

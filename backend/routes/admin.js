@@ -74,6 +74,7 @@ router.get('/student-list', auth, authorize(['admin']), adminController.getAllSt
 
 router.get('/designation-team-limits', auth, authorize(['admin']), adminController.getDesignationTeamLimits);
 router.post('/designation-team-limits', auth, authorize(['admin']), adminController.saveDesignationTeamLimits);
+router.delete('/designation-team-limits/all', auth, authorize(['admin']), adminController.deleteAllDesignationTeamLimits);
 router.delete('/designation-team-limits/:designation', auth, authorize(['admin']), adminController.deleteDesignationTeamLimit);
 
 // Danger: Delete all teams and related assignments/schedules

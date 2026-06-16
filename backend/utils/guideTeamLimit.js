@@ -19,7 +19,7 @@ async function getTeamCountsByGuideIds(guideIds) {
         {
             $match: {
                 guidePreference: { $in: guideIds },
-                status: { $in: ['approved', 'pending'] }
+                status: 'approved' // Only accepted teams count toward the limit
             }
         },
         {

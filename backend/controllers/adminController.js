@@ -216,7 +216,9 @@ exports.getUnassignedTeams = async (req, res) => {
 // Get guides with the count of teams assigned to them, sorted by count
 exports.getGuidesWithTeamCounts = async (req, res) => {
     try {
-        const guides = await User.find({ role: 'guide' }).select('username name');
+        const guides = await User.find({ role: 'guide' }).select('username name designation');
+        const { buildDesignationLimitMap, resolveGuideLimitStatus } = require('../utils/guideTeamLimit');
+        const limitMap = await buildDesignationLimitMap();
 
         const guidesWithCounts = await Promise.all(guides.map(async (guide) => {
             const teamsAssigned = await Team.find({
@@ -224,10 +226,14 @@ exports.getGuidesWithTeamCounts = async (req, res) => {
                 status: 'approved'
             }).select('_id teamName'); // Select team _id and teamName
 
+            const limitStatus = resolveGuideLimitStatus(guide, teamsAssigned.length, limitMap);
+
             return { 
                 ...guide.toObject(), 
                 teamCount: teamsAssigned.length, 
-                assignedTeams: teamsAssigned // Add assigned teams array
+                assignedTeams: teamsAssigned, // Add assigned teams array
+                teamLimit: limitStatus.teamLimit,
+                limitReached: limitStatus.teamLimit !== null && teamsAssigned.length >= limitStatus.teamLimit
             };
         }));
 
@@ -335,7 +341,13 @@ exports.assignAllUnassignedGuides = async (req, res) => {
             const eligibleAndAvailableGuide = guidesByTeamCount.find(guide => {
                 // Ensure guide is not in the team's rejectedGuides list
                 const isRejectedByTeam = teamRejectedGuides.includes(guide._id.toString());
-                return !isRejectedByTeam;
+                if (isRejectedByTeam) return false;
+
+                // Ensure guide has not reached their designation's team limit
+                if (guide.teamLimit !== null && guide.teamCount >= guide.teamLimit) {
+                    return false;
+                }
+                return true;
             });
 
             if (eligibleAndAvailableGuide) {
@@ -1857,5 +1869,18 @@ exports.deleteDesignationTeamLimit = async (req, res) => {
     } catch (error) {
         console.error('Error deleting designation team limit:', error);
         res.status(500).json({ message: 'Error deleting designation team limit' });
+    }
+};
+
+exports.deleteAllDesignationTeamLimits = async (req, res) => {
+    try {
+        const result = await DesignationTeamLimit.deleteMany({});
+        res.json({
+            message: `All designation team limits deleted successfully (${result.deletedCount} removed)`,
+            deleted: result.deletedCount
+        });
+    } catch (error) {
+        console.error('Error deleting all designation team limits:', error);
+        res.status(500).json({ message: 'Error deleting all designation team limits' });
     }
 };

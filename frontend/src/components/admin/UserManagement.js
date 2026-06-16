@@ -15,6 +15,10 @@ const UserManagement = () => {
     const [editingLimitIndex, setEditingLimitIndex] = useState(null);
     const [newLimit, setNewLimit] = useState({ designation: '', teamLimit: '' });
     const [limitsSaved, setLimitsSaved] = useState(true);
+    const [showLimitsPanel, setShowLimitsPanel] = useState(false);
+    const [limitMessage, setLimitMessage] = useState('');
+    const [limitMessageType, setLimitMessageType] = useState('');
+    const [limitCsvFileName, setLimitCsvFileName] = useState('');
 
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
@@ -86,6 +90,8 @@ const UserManagement = () => {
         const file = e.target.files[0];
         if (!file) return;
 
+        setLimitCsvFileName(file.name);
+
         const reader = new FileReader();
         reader.onload = (event) => {
             // Strip BOM (byte order mark) that some editors/Excel add to CSV files
@@ -111,11 +117,11 @@ const UserManagement = () => {
 
             setDesignationLimits((prev) => mergeDesignationLimits(prev, parsedRows));
             setLimitsSaved(false);
-            setMessage('CSV parsed. Review the table and click Save to persist changes.');
-            setMessageType('success');
+            setShowLimitsPanel(true);
+            setLimitMessage(`CSV "${file.name}" parsed (${parsedRows.length} rows). Review the table and click Save to persist.`);
+            setLimitMessageType('success');
         };
         reader.readAsText(file);
-        e.target.value = '';
     };
 
     const fetchDesignationLimits = async () => {
@@ -128,11 +134,39 @@ const UserManagement = () => {
             }));
             setDesignationLimits(limits);
             setLimitsSaved(true);
-            setMessage('');
-            setMessageType('');
+            setLimitMessage('');
+            setLimitMessageType('');
         } catch (error) {
-            setMessage(error.response?.data?.message || 'Error fetching designation team limits');
-            setMessageType('error');
+            setLimitMessage(error.response?.data?.message || 'Error fetching designation team limits');
+            setLimitMessageType('error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleViewDesignationLimits = async () => {
+        if (!showLimitsPanel) {
+            await fetchDesignationLimits();
+        }
+        setShowLimitsPanel(prev => !prev);
+    };
+
+    const deleteAllDesignationLimits = async () => {
+        if (!window.confirm("Are you sure you want to delete all designation team limits? This cannot be undone.")) {
+            return;
+        }
+        setLoading(true);
+        setLimitMessage('');
+        setLimitMessageType('');
+        try {
+            await axios.delete('/api/admin/designation-team-limits/all', { headers });
+            setDesignationLimits([]);
+            setLimitMessage('All designation team limits deleted successfully.');
+            setLimitMessageType('success');
+            setLimitsSaved(true);
+        } catch (error) {
+            setLimitMessage(error.response?.data?.message || 'Error deleting all designation team limits');
+            setLimitMessageType('error');
         } finally {
             setLoading(false);
         }
@@ -140,8 +174,8 @@ const UserManagement = () => {
 
     const saveDesignationLimits = async () => {
         if (designationLimits.length === 0) {
-            setMessage('Add at least one designation team limit before saving');
-            setMessageType('error');
+            setLimitMessage('Add at least one designation team limit before saving');
+            setLimitMessageType('error');
             return;
         }
 
@@ -150,8 +184,8 @@ const UserManagement = () => {
         );
 
         if (invalidRow) {
-            setMessage('Each row must have a designation and a valid non-negative team limit');
-            setMessageType('error');
+            setLimitMessage('Each row must have a designation and a valid non-negative team limit');
+            setLimitMessageType('error');
             return;
         }
 
@@ -164,12 +198,12 @@ const UserManagement = () => {
 
             await axios.post('/api/admin/designation-team-limits', { limits: payload }, { headers });
             setLimitsSaved(true);
-            setMessage('Designation team limits saved successfully');
-            setMessageType('success');
+            setLimitMessage('Designation team limits saved successfully');
+            setLimitMessageType('success');
             await fetchDesignationLimits();
         } catch (error) {
-            setMessage(error.response?.data?.message || 'Error saving designation team limits');
-            setMessageType('error');
+            setLimitMessage(error.response?.data?.message || 'Error saving designation team limits');
+            setLimitMessageType('error');
         } finally {
             setLoading(false);
         }
@@ -180,16 +214,16 @@ const UserManagement = () => {
         const teamLimit = Number(newLimit.teamLimit);
 
         if (!designation || Number.isNaN(teamLimit) || teamLimit < 0) {
-            setMessage('Enter a valid designation and non-negative team limit');
-            setMessageType('error');
+            setLimitMessage('Enter a valid designation and non-negative team limit');
+            setLimitMessageType('error');
             return;
         }
 
         setDesignationLimits((prev) => mergeDesignationLimits(prev, [{ designation, teamLimit }]));
         setNewLimit({ designation: '', teamLimit: '' });
         setLimitsSaved(false);
-        setMessage('');
-        setMessageType('');
+        setLimitMessage('');
+        setLimitMessageType('');
     };
 
     const deleteDesignationLimitRow = async (index) => {
@@ -201,11 +235,11 @@ const UserManagement = () => {
             try {
                 await axios.delete(`/api/admin/designation-team-limits/${encodeURIComponent(row.designation)}`, { headers });
                 setDesignationLimits((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
-                setMessage('Designation team limit deleted successfully');
-                setMessageType('success');
+                setLimitMessage('Designation team limit deleted successfully');
+                setLimitMessageType('success');
             } catch (error) {
-                setMessage(error.response?.data?.message || 'Error deleting designation team limit');
-                setMessageType('error');
+                setLimitMessage(error.response?.data?.message || 'Error deleting designation team limit');
+                setLimitMessageType('error');
             } finally {
                 setLoading(false);
             }
@@ -644,159 +678,196 @@ const UserManagement = () => {
             </div>
 
             {/* Team Limit Management */}
-            <div className="mb-8">
-                <h3 className="text-xl font-semibold mb-4">Team Limit Management</h3>
+            <div className="mb-8 font-sans">
+                <h3 className="text-xl font-semibold mb-4 text-gray-800">Team Limit Management</h3>
                 <p className="text-sm text-gray-600 mb-4">
                     Set the maximum number of teams each guide can supervise based on their designation.
                     Upload a CSV to preview changes, edit rows manually, then click Save to persist.
                 </p>
 
-                <div className="mb-4">
+                {/* Section-specific messages placed above the component */}
+                {limitMessage && (
+                    <div className={`mb-4 p-3 rounded text-sm ${
+                        limitMessageType === 'success' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'
+                    }`}>
+                        {limitMessage}
+                    </div>
+                )}
+
+                <div className="mb-4 flex flex-wrap gap-3">
                     <button
                         onClick={() => downloadTemplate('teamLimit')}
-                        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mr-4"
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors text-sm font-medium shadow-sm"
                     >
                         Download Team Limit Template
                     </button>
                     <button
-                        onClick={fetchDesignationLimits}
-                        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                        onClick={handleViewDesignationLimits}
+                        className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded transition-colors text-sm font-medium shadow-sm"
                     >
-                        Load Saved Limits
-                    </button>
-                </div>
-
-                <div className="mb-4">
-                    <input
-                        type="file"
-                        accept=".csv"
-                        onChange={handleTeamLimitFileChange}
-                        className="border border-gray-300 rounded px-3 py-2"
-                    />
-                </div>
-
-                <div className="mb-4 flex flex-wrap gap-2 items-end">
-                    <div>
-                        <label className="block text-sm text-gray-600 mb-1">Designation</label>
-                        <input
-                            type="text"
-                            value={newLimit.designation}
-                            onChange={(e) => setNewLimit({ ...newLimit, designation: e.target.value })}
-                            className="border border-gray-300 rounded px-3 py-2"
-                            placeholder="Assistant Professor"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm text-gray-600 mb-1">Team Limit</label>
-                        <input
-                            type="number"
-                            min="0"
-                            value={newLimit.teamLimit}
-                            onChange={(e) => setNewLimit({ ...newLimit, teamLimit: e.target.value })}
-                            className="border border-gray-300 rounded px-3 py-2 w-32"
-                            placeholder="3"
-                        />
-                    </div>
-                    <button
-                        onClick={addDesignationLimitRow}
-                        className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600"
-                    >
-                        Add Row
+                        {showLimitsPanel ? 'Hide Designation and Limits' : 'View Designation and Limits'}
                     </button>
                     <button
-                        onClick={saveDesignationLimits}
-                        disabled={loading || designationLimits.length === 0}
-                        className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 disabled:bg-gray-400"
+                        onClick={deleteAllDesignationLimits}
+                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors text-sm font-medium shadow-sm"
                     >
-                        {loading ? 'Saving...' : 'Save Limits'}
+                        Delete All Limits
                     </button>
                 </div>
 
-                {!limitsSaved && (
-                    <div className="mb-4 p-3 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded text-sm">
-                        You have unsaved changes. Click Save Limits to persist them.
+                <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Upload Designation limits CSV</label>
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="file"
+                            accept=".csv"
+                            onChange={handleTeamLimitFileChange}
+                            className="border border-gray-300 rounded px-3 py-2 bg-white text-sm cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
                     </div>
-                )}
+                </div>
 
-                {designationLimits.length > 0 && (
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full border border-gray-300">
-                            <thead>
-                                <tr className="bg-gray-100">
-                                    <th className="border px-4 py-2">Designation</th>
-                                    <th className="border px-4 py-2">Team Limit</th>
-                                    <th className="border px-4 py-2">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {designationLimits.map((limit, index) => (
-                                    <tr key={`${limit.designation}-${index}`}>
-                                        <td className="border px-4 py-2">
-                                            {editingLimitIndex === index ? (
-                                                <input
-                                                    type="text"
-                                                    value={limit.designation}
-                                                    onChange={(e) => {
-                                                        const updated = [...designationLimits];
-                                                        updated[index].designation = e.target.value;
-                                                        setDesignationLimits(updated);
-                                                        setLimitsSaved(false);
-                                                    }}
-                                                    className="w-full px-2 py-1 border rounded"
-                                                />
-                                            ) : (
-                                                limit.designation
-                                            )}
-                                        </td>
-                                        <td className="border px-4 py-2">
-                                            {editingLimitIndex === index ? (
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    value={limit.teamLimit}
-                                                    onChange={(e) => {
-                                                        const updated = [...designationLimits];
-                                                        updated[index].teamLimit = e.target.value;
-                                                        setDesignationLimits(updated);
-                                                        setLimitsSaved(false);
-                                                    }}
-                                                    className="w-full px-2 py-1 border rounded"
-                                                />
-                                            ) : (
-                                                limit.teamLimit
-                                            )}
-                                        </td>
-                                        <td className="border px-4 py-2">
-                                            {editingLimitIndex === index ? (
-                                                <div>
-                                                    <button
-                                                        onClick={() => setEditingLimitIndex(null)}
-                                                        className="bg-green-500 text-white px-2 py-1 rounded mr-2"
-                                                    >
-                                                        Done
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <div>
-                                                    <button
-                                                        onClick={() => setEditingLimitIndex(index)}
-                                                        className="bg-blue-500 text-white px-2 py-1 rounded mr-2"
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        onClick={() => deleteDesignationLimitRow(index)}
-                                                        className="bg-red-500 text-white px-2 py-1 rounded"
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </td>
+                {/* Add new designation limits */}
+                <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">Add / Edit Limit manually</h4>
+                    <div className="flex flex-wrap gap-3 items-end">
+                        <div className="flex-1 min-w-[200px]">
+                            <label className="block text-xs text-gray-600 mb-1">Designation</label>
+                            <input
+                                type="text"
+                                value={newLimit.designation}
+                                onChange={(e) => setNewLimit({ ...newLimit, designation: e.target.value })}
+                                className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white"
+                                placeholder="Assistant Professor"
+                            />
+                        </div>
+                        <div className="w-32">
+                            <label className="block text-xs text-gray-600 mb-1">Team Limit</label>
+                            <input
+                                type="number"
+                                min="0"
+                                value={newLimit.teamLimit}
+                                onChange={(e) => setNewLimit({ ...newLimit, teamLimit: e.target.value })}
+                                className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white"
+                                placeholder="3"
+                            />
+                        </div>
+                        <button
+                            onClick={() => {
+                                addDesignationLimitRow();
+                                setShowLimitsPanel(true);
+                            }}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors shadow-sm"
+                        >
+                            Add / Update Limit
+                        </button>
+                        <button
+                            onClick={saveDesignationLimits}
+                            disabled={loading}
+                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-medium disabled:bg-gray-400 transition-colors shadow-sm"
+                        >
+                            {loading ? 'Saving...' : 'Save Changes'}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Only show the list of designations when showLimitsPanel is true */}
+                {showLimitsPanel && (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                            <span className="font-semibold text-gray-700">Designation & Team Limits List</span>
+                            {!limitsSaved && (
+                                <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                                    Unsaved Changes
+                                </span>
+                            )}
+                        </div>
+                        {designationLimits.length === 0 ? (
+                            <div className="p-6 text-center text-gray-500 text-sm">
+                                No designation limits set. Use CSV upload or the form above to add limits.
+                            </div>
+                        ) : (
+                            <table className="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead className="bg-gray-50 text-gray-700">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left font-medium">Designation</th>
+                                        <th className="px-6 py-3 text-left font-medium">Team Limit</th>
+                                        <th className="px-6 py-3 text-left font-medium">Actions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 bg-white text-gray-800">
+                                    {designationLimits.map((limit, index) => (
+                                        <tr key={`${limit.designation}-${index}`} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-6 py-3 whitespace-nowrap">
+                                                {editingLimitIndex === index ? (
+                                                    <input
+                                                        type="text"
+                                                        value={limit.designation}
+                                                        onChange={(e) => {
+                                                            const updated = [...designationLimits];
+                                                            updated[index].designation = e.target.value;
+                                                            setDesignationLimits(updated);
+                                                            setLimitsSaved(false);
+                                                        }}
+                                                        className="px-2 py-1 border rounded w-full bg-white text-sm"
+                                                    />
+                                                ) : (
+                                                    limit.designation
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-3 whitespace-nowrap">
+                                                {editingLimitIndex === index ? (
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        value={limit.teamLimit}
+                                                        onChange={(e) => {
+                                                            const updated = [...designationLimits];
+                                                            updated[index].teamLimit = e.target.value;
+                                                            setDesignationLimits(updated);
+                                                            setLimitsSaved(false);
+                                                        }}
+                                                        className="px-2 py-1 border rounded w-32 bg-white text-sm"
+                                                    />
+                                                ) : (
+                                                    limit.teamLimit
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-3 whitespace-nowrap">
+                                                {editingLimitIndex === index ? (
+                                                    <div>
+                                                        <button
+                                                            onClick={() => setEditingLimitIndex(null)}
+                                                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs mr-2 transition-colors"
+                                                        >
+                                                            Done
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingLimitIndex(index);
+                                                                setShowLimitsPanel(true);
+                                                            }}
+                                                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs mr-2 transition-colors"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => deleteDesignationLimitRow(index)}
+                                                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs transition-colors"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 )}
             </div>
