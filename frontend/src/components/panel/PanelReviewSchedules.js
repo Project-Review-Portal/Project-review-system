@@ -111,16 +111,22 @@ const PanelReviewSchedules = () => {
                         };
                         const filtered = isExternal ? reviewSchedules.filter(s => isViva(s)) : reviewSchedules;
                         return filtered.map(schedule => {
-                            const inferFromName = (name) => {
-                                if (!name) return '';
-                                const n = name.toLowerCase();
-                                if (n.includes('review 1') || n.includes('review1')) return 'Review 1';
-                                if (n.includes('review 2') || n.includes('review2')) return 'Review 2';
-                                if (n.includes('review 3') || n.includes('review3')) return 'Review 3';
-                                if (n.includes('viva')) return 'Viva';
-                                return '';
+                            const getDynamicSlotLabel = (s) => {
+                                if (s.slotLabel) return s.slotLabel;
+                                const rawType = (s.slotType || s.type || '').toString().toLowerCase();
+                                if (rawType === 'viva') return 'Viva';
+                                if (rawType.startsWith('review')) {
+                                    return `Review ${rawType.replace('review', '')}`;
+                                }
+                                if (s.name) {
+                                    const n = s.name.toLowerCase();
+                                    if (n.includes('viva')) return 'Viva';
+                                    const match = n.match(/review\s*(\d+)/);
+                                    if (match) return `Review ${match[1]}`;
+                                }
+                                return s.slotType || s.type || 'Review';
                             };
-                            const slotLabel = schedule.slotLabel || (schedule.slotType || schedule.type ? ((schedule.slotType || schedule.type) === 'review1' ? 'Review 1' : (schedule.slotType || schedule.type) === 'review2' ? 'Review 2' : (schedule.slotType || schedule.type) === 'review3' ? 'Review 3' : (schedule.slotType || schedule.type) === 'viva' ? 'Viva' : (schedule.slotType || schedule.type)) : inferFromName(schedule.name) || 'Review');
+                            const slotLabel = getDynamicSlotLabel(schedule);
                             const displayName = schedule.name || slotLabel || 'Review';
                             let duration = schedule.duration;
                             try {

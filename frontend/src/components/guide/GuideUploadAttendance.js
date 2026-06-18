@@ -6,8 +6,7 @@ const GuideUploadAttendance = () => {
     const [attendanceData, setAttendanceData] = useState({}); // { studentId: { review1: bool, ... } }
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-
-    const reviewEvents = ['review1', 'review2', 'review3', 'viva'];
+    const [reviewEvents, setReviewEvents] = useState(['review1', 'review2', 'review3', 'viva']);
 
     useEffect(() => {
         fetchData();
@@ -17,6 +16,10 @@ const GuideUploadAttendance = () => {
         try {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
+
+            const settingsRes = await axios.get('/api/auth/review-settings', { headers });
+            const validSlots = settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva'];
+            setReviewEvents(validSlots);
 
             const teamsRes = await axios.get('/api/guide/assigned-teams', { headers });
             setAssignedTeams(teamsRes.data);
@@ -49,15 +52,20 @@ const GuideUploadAttendance = () => {
 
             const team = assignedTeams.find(t => t._id === teamId);
             const studentAttendances = [];
+
+            // Helper function to map flat UI state to the dynamic assessments array schema
+            const formatAssessments = (studentId) => {
+                return reviewEvents.map(event => ({
+                    name: event, // Keeps 'review1', 'viva', etc. completely raw as requested
+                    isPresent: !!attendanceData[studentId]?.[event]
+                }));
+            };
             
             // Add team leader if exists
             if (team.teamLeader) {
                 studentAttendances.push({
                     student: team.teamLeader._id,
-                    review1: !!attendanceData[team.teamLeader._id]?.review1,
-                    review2: !!attendanceData[team.teamLeader._id]?.review2,
-                    review3: !!attendanceData[team.teamLeader._id]?.review3,
-                    viva: !!attendanceData[team.teamLeader._id]?.viva,
+                    assessments: formatAssessments(team.teamLeader._id)
                 });
             }
             
@@ -65,13 +73,11 @@ const GuideUploadAttendance = () => {
             team.members.forEach(member => {
                 studentAttendances.push({
                     student: member._id,
-                    review1: !!attendanceData[member._id]?.review1,
-                    review2: !!attendanceData[member._id]?.review2,
-                    review3: !!attendanceData[member._id]?.review3,
-                    viva: !!attendanceData[member._id]?.viva,
+                    assessments: formatAssessments(member._id)
                 });
             });
             
+            // Sends the restructured array matching your new Mongoose schema
             await axios.post('/api/guide/upload-attendance', { teamId, studentAttendances }, { headers });
             alert(`Attendance for ${team.teamName} submitted successfully!`);
             fetchData();
@@ -111,7 +117,8 @@ const GuideUploadAttendance = () => {
                                         <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-600">Student Name</th>
                                         {reviewEvents.map(event => (
                                             <th key={event} className="py-2 px-4 border-b text-center text-sm font-semibold text-gray-600">
-                                                {event.replace('review', 'Review ').toUpperCase()}
+                                                {/* Text transform applied purely visually for the table column header */}
+                                                {event.toUpperCase()} 
                                             </th>
                                         ))}
                                         <th className="py-2 px-4 border-b text-center text-sm font-semibold text-gray-600">Attendance %</th>
@@ -180,4 +187,4 @@ const GuideUploadAttendance = () => {
     );
 };
 
-export default GuideUploadAttendance; 
+export default GuideUploadAttendance;

@@ -8,6 +8,7 @@ const Availability = require('../models/Availability');
 const Config = require('../models/Config');
 const Mark = require('../models/Mark');
 const InstructionTemplate = require('../models/InstructionTemplate'); 
+const { getReviewSettings } = require('../utils/reviewSettings');
 // Get all panels
 exports.getAllPanels = async (req, res) => {
     try {
@@ -541,9 +542,9 @@ exports.submitMarks = async (req, res) => {
         const { teamId, studentId, mark1, mark2, mark3, mark4, slotType } = req.body;
 
         // Validate slotType
-        const validSlotTypes = ['review1', 'review2', 'review3', 'viva'];
+        const { validSlotTypes } = await getReviewSettings();
         if (!slotType || !validSlotTypes.includes(slotType)) {
-            return res.status(400).json({ message: 'Invalid or missing slotType. Expected one of review1, review2, review3, viva.' });
+            return res.status(400).json({ message: `Invalid or missing slotType. Expected one of ${validSlotTypes.join(', ')}.` });
         }
 
         // External examiners can only mark Viva

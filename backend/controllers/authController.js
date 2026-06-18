@@ -345,3 +345,14 @@ exports.resetPasswordOtp = async (req, res) => {
         return res.status(500).json({ message: 'Failed to reset password' });
     }
 };
+
+exports.getReviewSettings = async (req, res) => {
+    try {
+        const { getReviewSettings } = require('../utils/reviewSettings');
+        const settings = await getReviewSettings();
+        return res.json(settings);
+    } catch (error) {
+        console.error('Error fetching review settings:', error);
+        return res.status(500).json({ message: 'Server error fetching review settings' });
+    }
+};

@@ -23,7 +23,6 @@ const markSchema = new mongoose.Schema({
     },
     slotType: {
         type: String,
-        enum: ['review1', 'review2', 'review3', 'viva'],
         required: true,
     },
     mark1: {

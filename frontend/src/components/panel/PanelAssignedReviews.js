@@ -100,7 +100,22 @@ const PanelAssignedReviews = () => {
                             <div className="flex justify-between items-start">
                                 <div className="flex-1">
                                     {/* Use server-provided slotLabel when available */}
-                                    <h3 className="text-lg font-medium text-gray-900">{sch.slotLabel || (sch.slotType ? (sch.slotType === 'review1' ? 'Review 1' : sch.slotType === 'review2' ? 'Review 2' : sch.slotType === 'review3' ? 'Review 3' : sch.slotType === 'viva' ? 'Viva' : sch.slotType) : (sch.name ? (sch.name.includes('viva') ? 'Viva' : sch.name) : 'Review'))}</h3>
+                                    <h3 className="text-lg font-medium text-gray-900">
+                                        {sch.slotLabel || (() => {
+                                            const rawType = (sch.slotType || sch.type || '').toString().toLowerCase();
+                                            if (rawType === 'viva') return 'Viva';
+                                            if (rawType.startsWith('review')) {
+                                                return `Review ${rawType.replace('review', '')}`;
+                                            }
+                                            if (sch.name) {
+                                                const n = sch.name.toLowerCase();
+                                                if (n.includes('viva')) return 'Viva';
+                                                const match = n.match(/review\s*(\d+)/);
+                                                if (match) return `Review ${match[1]}`;
+                                            }
+                                            return sch.slotType || 'Review';
+                                        })()}
+                                    </h3>
                                     <div className="mt-2 space-y-1">
                                         <p className="text-sm text-gray-600"><span className="font-medium">Team:</span> {sch.team?.teamName || 'N/A'}</p>
                                         <p className="text-sm text-gray-600"><span className="font-medium">Panel:</span> {sch.panel?.name || 'N/A'}</p>

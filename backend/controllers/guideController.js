@@ -9,6 +9,7 @@ const Mark = require('../models/Mark');
 const FinalReport = require('../models/FinalReport');
 const fs = require('fs');
 const path = require('path');
+const { getReviewSettings } = require('../utils/reviewSettings');
 
 // Get all pending guide requests for the logged-in guide
 exports.getGuideRequests = async (req, res) => {
@@ -440,16 +441,27 @@ exports.getDailyAttendance = async (req, res) => {
 
         const attendanceRecords = await Attendance.find({ team: { $in: teamIds } });
 
+        // Build the list of review keys dynamically from config
+        const { validSlotTypes } = await getReviewSettings();
+
         const formattedAttendance = {};
         for (const record of attendanceRecords) {
             for (const studentAtt of record.studentAttendances) {
                 const studentId = studentAtt.student.toString();
-                formattedAttendance[studentId] = {
-                    review1: studentAtt.review1,
-                    review2: studentAtt.review2,
-                    review3: studentAtt.review3,
-                    viva: studentAtt.viva,
-                };
+                const attEntry = {};
+                
+                // Loop through the valid slot configurations ('review1', 'viva', etc.)
+                for (const key of validSlotTypes) {
+                    // Look inside the new assessments array for an object with a matching name
+                    const matchingAssessment = studentAtt.assessments.find(
+                        (asm) => asm.name === key
+                    );
+
+                    // If it exists, use its isPresent value; otherwise, default to false
+                    attEntry[key] = matchingAssessment ? matchingAssessment.isPresent : false;
+                }
+                
+                formattedAttendance[studentId] = attEntry;
             }
         }
 
@@ -471,11 +483,12 @@ exports.uploadAttendance = async (req, res) => {
             return res.status(403).json({ message: 'You are not authorized to mark attendance for this team.' });
         }
         
+        // This works out of the box because the frontend structures the data correctly
         await Attendance.findOneAndUpdate(
             { team: teamId },
             {
                 $set: {
-                    studentAttendances: studentAttendances,
+                    studentAttendances: studentAttendances, 
                     guide: guideId
                 }
             },
@@ -494,10 +507,9 @@ exports.submitMarks = async (req, res) => {
     try {
         const { teamId, studentId, mark1, mark2, mark3, mark4, slotType } = req.body;
 
-        // Validate slotType
-        const validSlotTypes = ['review1', 'review2', 'review3', 'viva'];
+        const { validSlotTypes } = await getReviewSettings();
         if (!slotType || !validSlotTypes.includes(slotType)) {
-            return res.status(400).json({ message: 'Invalid or missing slotType. Expected one of review1, review2, review3, viva.' });
+            return res.status(400).json({ message: `Invalid or missing slotType. Expected one of: ${validSlotTypes.join(', ')}.` });
         }
         const guideId = req.user.id;
 

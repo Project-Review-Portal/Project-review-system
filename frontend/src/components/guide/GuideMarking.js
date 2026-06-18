@@ -4,20 +4,29 @@ import axios from 'axios';
 const GuideMarking = () => {
     const [teams, setTeams] = useState([]);
     const [marks, setMarks] = useState({}); // { studentId: { review1: {...}, review2: {...}, review3: {...}, viva: {...} } }
+    const [slotTypes, setSlotTypes] = useState(['review1', 'review2', 'review3', 'viva']);
     const [activeSlotType, setActiveSlotType] = useState('review1');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [submittingTeamId, setSubmittingTeamId] = useState(null);
 
     useEffect(() => {
-        fetchData();
+        fetchSettingsAndData();
     }, []);
 
-    const fetchData = async () => {
+    const fetchSettingsAndData = async () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
+            
+            const settingsRes = await axios.get('/api/auth/review-settings', { headers });
+            const validSlots = settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva'];
+            setSlotTypes(validSlots);
+            if (validSlots.length > 0) {
+                setActiveSlotType(validSlots[0]);
+            }
+
             const teamsRes = await axios.get('/api/guide/assigned-teams', { headers });
             setTeams(teamsRes.data);
 
@@ -59,7 +68,7 @@ const GuideMarking = () => {
             });
             await Promise.all(requests);
             alert('All marks submitted successfully!');
-            await fetchData();
+            await fetchSettingsAndData();
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to submit marks.');
         } finally {
@@ -75,8 +84,10 @@ const GuideMarking = () => {
             <h2 className="text-2xl font-bold">Mark Teams</h2>
             {/* Slot type tabs */}
             <div className="flex space-x-2">
-                {['review1','review2','review3','viva'].map(st => (
-                    <button key={st} onClick={() => setActiveSlotType(st)} className={`px-3 py-1 rounded ${activeSlotType===st?'bg-indigo-600 text-white':'bg-gray-200 text-gray-800'}`}>{st.toUpperCase()}</button>
+                {slotTypes.map(st => (
+                    <button key={st} onClick={() => setActiveSlotType(st)} className={`px-3 py-1 rounded ${activeSlotType===st?'bg-indigo-600 text-white':'bg-gray-200 text-gray-800'}`}>
+                        {st === 'viva' ? 'VIVA' : `REVIEW ${st.replace('review', '')}`}
+                    </button>
                 ))}
             </div>
 

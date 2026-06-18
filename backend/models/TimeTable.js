@@ -42,10 +42,9 @@ const timeTableSchema = new mongoose.Schema({
         type: String,
         required: false,
     },
-    // The logical slot type: 'review1' | 'review2' | 'review3' | 'viva'
+    // The logical slot type: 'review1' | 'review2' | ... | 'reviewN' | 'viva' (dynamic)
     slotType: {
         type: String,
-        enum: ['review1', 'review2', 'review3', 'viva'],
         required: false,
     },
     // Type field for backward compatibility (e.g., 'Team Review')

@@ -60,6 +60,7 @@ const Navbar = ({ user, onLogout }) => {
                     { label: 'Registration', path: '/admin-dashboard/user-management' },
                     { label: 'Guide settings', path: '/admin-dashboard/guide-selection' },
                     { label: 'Team Size', path: '/admin-dashboard/settings' },
+                    { label: 'Review Settings', path: '/admin-dashboard/reviews-viva-settings' },
                     { label: 'Teams', path: '/admin-dashboard/teams' },
                     { label: 'Guides', path: '/admin-dashboard/guide-assignment-summary' },
                     { label: 'Panels', path: '/admin-dashboard/panel-creation' },

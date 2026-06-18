@@ -7,6 +7,7 @@ const TimeTable = require('../models/TimeTable');
 const Attendance = require('../models/Attendance');
 const Availability = require('../models/Availability');
 const Mark = require('../models/Mark');
+const { getReviewSettings } = require('../utils/reviewSettings');
 
 // Define daily review periods (9 periods of 40 minutes with 10 min break)
 const dailyPeriods = [
@@ -26,25 +27,41 @@ const doSlotsOverlap = (slot1Start, slot1End, slot2Start, slot2End) => {
     return slot1Start < slot2End && slot2Start < slot1End;
 };
 
-// Helper: Determine if a team has completed a given review ('review1' | 'review2' | 'review3')
+// Helper: Determine if a team has completed a given review key (e.g. 'review1')
 const hasTeamCompletedReview = async (teamId, reviewKey) => {
-    if (!['review1','review2','review3'].includes(reviewKey)) return false;
     const record = await Attendance.findOne({ team: teamId }).lean();
     if (!record || !Array.isArray(record.studentAttendances) || record.studentAttendances.length === 0) return false;
     // Completed only if ALL team members marked true for that review
     return record.studentAttendances.every(sa => !!sa[reviewKey]);
 };
 
-// Helper: Validate prerequisite chain for target slotType
+// Helper: Validate prerequisite chain for target slotType (dynamic based on config)
 const validatePrerequisiteForSlotType = async (teamId, slotType) => {
-    if (slotType === 'review2') {
-        const ok = await hasTeamCompletedReview(teamId, 'review1');
-        if (!ok) return { ok: false, message: 'Team must complete review1 before scheduling review2' };
+    const { numReviews, vivaRequired, validSlotTypes } = await getReviewSettings();
+
+    if (!validSlotTypes.includes(slotType)) {
+        return { ok: false, message: `Invalid slotType '${slotType}'. Valid types: ${validSlotTypes.join(', ')}` };
     }
-    if (slotType === 'review3') {
-        const ok = await hasTeamCompletedReview(teamId, 'review2');
-        if (!ok) return { ok: false, message: 'Team must complete review2 before scheduling review3' };
+
+    // For reviewN (N > 1), require review(N-1) to be completed
+    const reviewMatch = slotType.match(/^review(\d+)$/);
+    if (reviewMatch) {
+        const n = parseInt(reviewMatch[1], 10);
+        if (n > 1) {
+            const prevKey = `review${n - 1}`;
+            const ok = await hasTeamCompletedReview(teamId, prevKey);
+            if (!ok) return { ok: false, message: `Team must complete ${prevKey} before scheduling ${slotType}` };
+        }
     }
+
+    // For viva, require all reviews to be completed
+    if (slotType === 'viva') {
+        for (let i = 1; i <= numReviews; i++) {
+            const ok = await hasTeamCompletedReview(teamId, `review${i}`);
+            if (!ok) return { ok: false, message: `Team must complete review${i} before scheduling viva` };
+        }
+    }
+
     return { ok: true };
 };
 
@@ -665,8 +682,9 @@ exports.createReviewSchedule = async (req, res) => {
             return res.status(400).json({ message: 'Team, panel, date, and period are required.' });
         }
 
-        // Determine target slot type; default to review1 if not provided
-        const targetSlot = slotType && ['review1','review2','review3','viva'].includes(slotType) ? slotType : 'review1';
+        // Determine target slot type dynamically from config
+        const { validSlotTypes } = await getReviewSettings();
+        const targetSlot = slotType && validSlotTypes.includes(slotType) ? slotType : validSlotTypes[0];
 
         // Enforce prerequisites for review2/review3
         const prereq = await validatePrerequisiteForSlotType(teamId, targetSlot);
@@ -723,7 +741,7 @@ exports.updateReviewSchedule = async (req, res) => {
         }
 
         // Validate prerequisites if slotType provided/changed
-        if (slotType && ['review1','review2','review3','viva'].includes(slotType)) {
+        if (slotType) {
             const prereq = await validatePrerequisiteForSlotType(teamId, slotType);
             if (!prereq.ok) {
                 return res.status(400).json({ message: prereq.message });
@@ -748,7 +766,7 @@ exports.updateReviewSchedule = async (req, res) => {
         schedule.panel = panelId;
         schedule.date = updatedDate;
         schedule.period = period;
-        if (slotType && ['review1','review2','review3','viva'].includes(slotType)) {
+        if (slotType) {
             schedule.slotType = slotType;
         }
         if (schedule.slotType) {
@@ -975,6 +993,9 @@ exports.getAttendanceRecords = async (req, res) => {
 // Admin: Get daily attendance and marks records for all teams (for admin view)
 exports.getDailyAttendanceRecords = async (req, res) => {
     try {
+        const { validSlotTypes } = await getReviewSettings();
+        const totalEvents = validSlotTypes.length || 1;
+
         const teams = await Team.find({})
             .populate('teamLeader', 'name')
             .populate('members', 'name')
@@ -999,17 +1020,24 @@ exports.getDailyAttendanceRecords = async (req, res) => {
 
             for (const member of allTeamMembers) {
                 let presentCount = 0;
-                const totalEvents = 4; // review1, review2, review3, viva
 
                 if (attendanceRecord) {
                     const studentAtt = attendanceRecord.studentAttendances.find(
                         sa => sa.student.toString() === member._id.toString()
                     );
-                    if (studentAtt) {
-                        if (studentAtt.review1) presentCount++;
-                        if (studentAtt.review2) presentCount++;
-                        if (studentAtt.review3) presentCount++;
-                        if (studentAtt.viva) presentCount++;
+                    
+                    if (studentAtt && studentAtt.assessments) {
+                        validSlotTypes.forEach(slot => {
+                            // Find the matching assessment item by name within the array
+                            const matchingAssessment = studentAtt.assessments.find(
+                                asm => asm.name === slot
+                            );
+                            
+                            // If found and the student was marked present, increment the count
+                            if (matchingAssessment && matchingAssessment.isPresent) {
+                                presentCount++;
+                            }
+                        });
                     }
                 }
 
@@ -1105,8 +1133,9 @@ exports.deleteTeam = async (req, res) => {
 // Admin: Generate schedules automatically
 exports.generateSchedules = async (req, res) => {
     try {
-        // Accept optional slotType to generate for a specific review stage; default to review1
-        const targetSlot = req.body && ['review1','review2','review3','viva'].includes(req.body.slotType) ? req.body.slotType : 'review1';
+        // Accept optional slotType; default to first valid slot from config
+        const { validSlotTypes } = await getReviewSettings();
+        const targetSlot = req.body && validSlotTypes.includes(req.body.slotType) ? req.body.slotType : validSlotTypes[0];
 
         // Get all teams that need schedules
         const teams = await Team.find({ status: 'approved' })
@@ -1192,8 +1221,9 @@ exports.generateSlotForTeam = async (req, res) => {
             return res.status(404).json({ message: 'Team not found' });
         }
 
-        // Decide target slot type; default to review1
-        const targetSlot = slotType && ['review1','review2','review3','viva'].includes(slotType) ? slotType : 'review1';
+        // Decide target slot type dynamically from config
+        const { validSlotTypes } = await getReviewSettings();
+        const targetSlot = slotType && validSlotTypes.includes(slotType) ? slotType : validSlotTypes[0];
 
         // Enforce prerequisites
         const prereq = await validatePrerequisiteForSlotType(team._id, targetSlot);
@@ -1882,5 +1912,49 @@ exports.deleteAllDesignationTeamLimits = async (req, res) => {
     } catch (error) {
         console.error('Error deleting all designation team limits:', error);
         res.status(500).json({ message: 'Error deleting all designation team limits' });
+    }
+};
+
+// Admin: Get current reviews/viva settings
+exports.getReviewsVivaSettings = async (req, res) => {
+    try {
+        const config = await Config.findOne();
+        res.json({
+            numReviews: config ? config.numReviews : 3,
+            vivaRequired: config ? config.vivaRequired : true
+        });
+    } catch (error) {
+        console.error('Error fetching reviews/viva settings:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Admin: Update reviews/viva settings
+exports.setReviewsVivaSettings = async (req, res) => {
+    try {
+        const { numReviews, vivaRequired } = req.body;
+
+        if (numReviews === undefined || vivaRequired === undefined) {
+            return res.status(400).json({ message: 'numReviews and vivaRequired are required.' });
+        }
+
+        const n = parseInt(numReviews, 10);
+        if (isNaN(n) || n < 1 || n > 10) {
+            return res.status(400).json({ message: 'numReviews must be a number between 1 and 10.' });
+        }
+
+        let config = await Config.findOne();
+        if (!config) {
+            config = new Config({ numReviews: n, vivaRequired: !!vivaRequired });
+        } else {
+            config.numReviews = n;
+            config.vivaRequired = !!vivaRequired;
+        }
+
+        await config.save();
+        res.json({ message: 'Reviews/Viva settings updated successfully', numReviews: config.numReviews, vivaRequired: config.vivaRequired });
+    } catch (error) {
+        console.error('Error updating reviews/viva settings:', error);
+        res.status(500).json({ message: 'Server error' });
     }
 };

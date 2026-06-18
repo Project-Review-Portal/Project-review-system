@@ -11,6 +11,7 @@ import AdminManageReviewSchedules from './admin/AdminManageReviewSchedules';
 import AdminViewAvailabilities from './admin/AdminViewAvailabilities';
 import UserManagement from './admin/UserManagement';
 import AdminTeams from './admin/AdminTeams';
+import ReviewsVivaSettings from './admin/ReviewsVivaSettings';
 import GuideMe from './GuideMe';
 
 const AdminDashboard = () => {
@@ -52,6 +53,8 @@ const AdminDashboard = () => {
                 return <UserManagement />;
             case '/admin-dashboard/teams':
                 return <AdminTeams />;
+            case '/admin-dashboard/reviews-viva-settings':
+                return <ReviewsVivaSettings />;
             case '/admin-dashboard/guide-me':
                 return <GuideMe userRole={user.role} memberType={user.memberType} />;
             default:

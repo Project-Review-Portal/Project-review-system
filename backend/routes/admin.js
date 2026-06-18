@@ -83,4 +83,8 @@ router.delete('/solo-teams', auth, authorize(['admin']), adminController.deleteS
 router.delete('/students', auth, authorize(['admin']), adminController.deleteAllStudents);
 router.delete('/faculty', auth, authorize(['admin']), adminController.deleteAllFaculty);
 
+// Reviews / Viva settings
+router.get('/reviews-viva-settings', auth, authorize(['admin']), adminController.getReviewsVivaSettings);
+router.post('/reviews-viva-settings', auth, authorize(['admin']), adminController.setReviewsVivaSettings);
+
 module.exports = router; 

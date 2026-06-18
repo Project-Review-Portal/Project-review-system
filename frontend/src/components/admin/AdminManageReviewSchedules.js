@@ -19,6 +19,7 @@ const AdminManageReviewSchedules = () => {
     const [selectedTeamForSlot, setSelectedTeamForSlot] = useState(null);
     const [selectedPanelForSlot, setSelectedPanelForSlot] = useState(null);
     const [notificationMessage, setNotificationMessage] = useState('');
+    const [slotTypes, setSlotTypes] = useState(['review1', 'review2', 'review3', 'viva']);
 
     useEffect(() => {
         fetchData();
@@ -27,12 +28,13 @@ const AdminManageReviewSchedules = () => {
     const fetchData = async () => {
         try {
             const token = localStorage.getItem('token');
-            const [panelsRes, teamsRes, availabilitiesRes, schedulesRes, reviewPeriodRes] = await Promise.all([
+            const [panelsRes, teamsRes, availabilitiesRes, schedulesRes, reviewPeriodRes, settingsRes] = await Promise.all([
                 axios.get('/api/admin/panels-with-members', { headers: { Authorization: `Bearer ${token}` } }),
                 axios.get('/api/admin/teams', { headers: { Authorization: `Bearer ${token}` } }),
                 axios.get('/api/admin/availabilities', { headers: { Authorization: `Bearer ${token}` } }),
                 axios.get('/api/admin/review-schedules', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('/api/admin/review-period-dates', { headers: { Authorization: `Bearer ${token}` } })
+                axios.get('/api/admin/review-period-dates', { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get('/api/auth/review-settings', { headers: { Authorization: `Bearer ${token}` } })
             ]);
 
             console.log('Raw Availabilities Data:', availabilitiesRes.data);
@@ -45,6 +47,7 @@ const AdminManageReviewSchedules = () => {
             setSchedules(schedulesRes.data);
             setCurrentReviewPeriodStart(reviewPeriodRes.data.startDate || '');
             setCurrentReviewPeriodEnd(reviewPeriodRes.data.endDate || '');
+            setSlotTypes(settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva']);
             setLoading(false);
         } catch (err) {
             console.error('Error fetching data:', err);
@@ -264,10 +267,9 @@ const AdminManageReviewSchedules = () => {
                             onChange={e => setTypeFilter(e.target.value)}
                         >
                             <option value="all">All</option>
-                            <option value="review1">review1</option>
-                            <option value="review2">review2</option>
-                            <option value="review3">review3</option>
-                            <option value="viva">viva</option>
+                            {slotTypes.map(st => (
+                                <option key={st} value={st}>{st === 'viva' ? 'VIVA' : `Review ${st.replace('review', '')}`}</option>
+                            ))}
                         </select>
                     </div>
                 </div>
@@ -291,20 +293,13 @@ const AdminManageReviewSchedules = () => {
                                 {schedules
                                     .filter((schedule) => {
                                         const rawType = (schedule.slotType || schedule.type || '').toString().toLowerCase();
-                                        const inferred = rawType.includes('review1') || rawType === 'review1' ? 'review1'
-                                            : rawType.includes('review2') || rawType === 'review2' ? 'review2'
-                                            : rawType.includes('review3') || rawType === 'review3' ? 'review3'
-                                            : rawType.includes('viva') ? 'viva' : '';
                                         if (typeFilter === 'all') return true;
-                                        return inferred === typeFilter;
+                                        return rawType === typeFilter;
                                     })
                                     .map((schedule) => {
                                     const displayName = schedule.name || (schedule.type ? schedule.type : 'Review');
                                     const rawType = (schedule.slotType || schedule.type || '').toString().toLowerCase();
-                                    const typeLabel = rawType.includes('review1') || rawType === 'review1' ? 'review1'
-                                        : rawType.includes('review2') || rawType === 'review2' ? 'review2'
-                                        : rawType.includes('review3') || rawType === 'review3' ? 'review3'
-                                        : rawType.includes('viva') ? 'viva' : (rawType || '-');
+                                    const typeLabel = rawType === 'viva' ? 'VIVA' : `Review ${rawType.replace('review', '')}`;
                                     let duration = schedule.duration;
                                     try {
                                         if ((!duration || duration === 0) && schedule.startTime && schedule.endTime) {
