@@ -69,7 +69,16 @@ const AdminTeams = () => {
                                     <td className="px-3 py-2 border">{team.teamName}</td>
                                     <td className="px-3 py-2 border">{team.teamLeader ? `${team.teamLeader.name} (${team.teamLeader.username})` : '—'}</td>
                                     <td className="px-3 py-2 border">{(team.members || []).map(m => m.username).join(', ') || '—'}</td>
-                                    <td className="px-3 py-2 border">{team.guidePreference ? team.guidePreference.username : '—'}</td>
+                                    {
+                                        console.log('team : ', team)
+                                    }
+                                    <td className="px-3 py-2 border">{
+                                        team.guidePreference ?
+                                        team.status === 'approved'? 
+                                            team.guidePreference.username 
+                                            : team.guidePreference.username + ' (pending)'
+                                            : '—'
+                                    }</td>
                                     <td className="px-3 py-2 border">{team.panel ? team.panel.name : '—'}</td>
                                     <td className="px-3 py-2 border">
                                         <button onClick={() => deleteTeam(team._id)} className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
