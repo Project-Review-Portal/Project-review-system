@@ -30,6 +30,10 @@ const attendanceSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    isLocked: {
+        type: Boolean,
+        default: false
+    },
     lastUpdated: {
         type: Date,
         default: Date.now

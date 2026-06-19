@@ -399,13 +399,41 @@ exports.getGuideReviewSchedules = async (req, res) => {
 // Get assigned teams for a guide
 exports.getAssignedTeams = async (req, res) => {
     try {
-        const guideId = req.user.id;
-        console.log(`Fetching assigned teams for guide ID: ${guideId}`);
-        const teams = await Team.find({ guidePreference: guideId, status: 'approved' })
+        const userId = req.user.id;
+        const role = req.user.role;
+        const subRoles = req.user.roles || [];
+
+        const isPanelOrCoordinatorOrAdmin = 
+            role === 'panel' || 
+            role === 'coordinator' || 
+            role === 'admin' ||
+            subRoles.some(r => r.role === 'panel' || r.role === 'coordinator' || r.role === 'admin');
+
+        let query = {};
+        if (isPanelOrCoordinatorOrAdmin) {
+            query = { status: 'approved' };
+        } else {
+            query = { guidePreference: userId, status: 'approved' };
+        }
+
+        const teams = await Team.find(query)
             .populate('teamLeader', 'name')
             .populate('members', 'name');
-        console.log(`Found ${teams.length} assigned teams:`, teams);
-        res.json(teams);
+
+        const teamIds = teams.map(t => t._id);
+        const attendances = await Attendance.find({ team: { $in: teamIds } });
+        const attendanceMap = {};
+        attendances.forEach(att => {
+            attendanceMap[att.team.toString()] = att.isLocked;
+        });
+
+        const teamsWithLockedStatus = teams.map(t => {
+            const teamObj = t.toObject();
+            teamObj.isAttendanceLocked = attendanceMap[t._id.toString()] || false;
+            return teamObj;
+        });
+
+        res.json(teamsWithLockedStatus);
     } catch (error) {
         console.error('Error fetching assigned teams:', error);
         res.status(500).json({ message: 'Error fetching assigned teams' });
@@ -432,8 +460,24 @@ exports.getReviewPeriodDatesPublic = async (req, res) => {
 // Get daily attendance for guide's teams
 exports.getDailyAttendance = async (req, res) => {
     try {
-        const guideId = req.user.id;
-        const teams = await Team.find({ guidePreference: guideId, status: 'approved' }).select('_id');
+        const userId = req.user.id;
+        const role = req.user.role;
+        const subRoles = req.user.roles || [];
+
+        const isPanelOrCoordinatorOrAdmin = 
+            role === 'panel' || 
+            role === 'coordinator' || 
+            role === 'admin' ||
+            subRoles.some(r => r.role === 'panel' || r.role === 'coordinator' || r.role === 'admin');
+
+        let query = {};
+        if (isPanelOrCoordinatorOrAdmin) {
+            query = { status: 'approved' };
+        } else {
+            query = { guidePreference: userId, status: 'approved' };
+        }
+
+        const teams = await Team.find(query).select('_id');
         if (teams.length === 0) {
             return res.json({});
         }
@@ -476,20 +520,41 @@ exports.getDailyAttendance = async (req, res) => {
 exports.uploadAttendance = async (req, res) => {
     try {
         const { teamId, studentAttendances } = req.body;
-        const guideId = req.user.id;
+        const userId = req.user.id;
+        const role = req.user.role;
+        const subRoles = req.user.roles || [];
 
-        const team = await Team.findOne({ _id: teamId, guidePreference: guideId });
+        const isPanelOrCoordinatorOrAdmin = 
+            role === 'panel' || 
+            role === 'coordinator' || 
+            role === 'admin' ||
+            subRoles.some(r => r.role === 'panel' || r.role === 'coordinator' || r.role === 'admin');
+
+        if (!isPanelOrCoordinatorOrAdmin) {
+            return res.status(403).json({ message: 'Forbidden: Guides are not authorized to mark attendance.' });
+        }
+
+        const team = await Team.findOne({ _id: teamId, status: 'approved' });
         if (!team) {
-            return res.status(403).json({ message: 'You are not authorized to mark attendance for this team.' });
+            return res.status(404).json({ message: 'Team not found or not approved.' });
+        }
+
+        // Check if attendance is locked
+        const existingAttendance = await Attendance.findOne({ team: teamId });
+        if (existingAttendance && existingAttendance.isLocked) {
+            // Only admin can edit a locked attendance
+            const isAdmin = role === 'admin' || subRoles.some(r => r.role === 'admin');
+            if (!isAdmin) {
+                return res.status(400).json({ message: 'Attendance is locked and cannot be modified.' });
+            }
         }
         
-        // This works out of the box because the frontend structures the data correctly
         await Attendance.findOneAndUpdate(
             { team: teamId },
             {
                 $set: {
                     studentAttendances: studentAttendances, 
-                    guide: guideId
+                    guide: userId
                 }
             },
             { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -499,6 +564,91 @@ exports.uploadAttendance = async (req, res) => {
     } catch (error) {
         console.error('Error uploading attendance:', error);
         res.status(500).json({ message: 'Error uploading attendance' });
+    }
+};
+
+// Lock attendance for a team
+exports.lockAttendance = async (req, res) => {
+    try {
+        const { teamId } = req.body;
+        const userId = req.user.id;
+        const role = req.user.role;
+        const subRoles = req.user.roles || [];
+
+        const isAuthorized = 
+            role === 'coordinator' || 
+            role === 'admin' ||
+            subRoles.some(r => r.role === 'coordinator' || r.role === 'admin');
+
+        if (!isAuthorized) {
+            return res.status(403).json({ message: 'Forbidden: Only coordinators and admins can lock attendance.' });
+        }
+
+        const team = await Team.findById(teamId);
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found.' });
+        }
+
+        await Attendance.findOneAndUpdate(
+            { team: teamId },
+            {
+                $set: {
+                    isLocked: true,
+                },
+                $setOnInsert: {
+                    guide: userId,
+                    studentAttendances: []
+                }
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+
+        res.json({ message: 'Attendance locked successfully' });
+    } catch (error) {
+        console.error('Error locking attendance:', error);
+        res.status(500).json({ message: 'Error locking attendance' });
+    }
+};
+
+// Unlock attendance for a team
+exports.unlockAttendance = async (req, res) => {
+    try {
+        const { teamId } = req.body;
+        const userId = req.user.id;
+        const role = req.user.role;
+        const subRoles = req.user.roles || [];
+
+        const isAuthorized = 
+            role === 'admin' ||
+            subRoles.some(r => r.role === 'admin');
+
+        if (!isAuthorized) {
+            return res.status(403).json({ message: 'Forbidden: Only administrators can unlock attendance.' });
+        }
+
+        const team = await Team.findById(teamId);
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found.' });
+        }
+
+        await Attendance.findOneAndUpdate(
+            { team: teamId },
+            {
+                $set: {
+                    isLocked: false,
+                },
+                $setOnInsert: {
+                    guide: userId,
+                    studentAttendances: []
+                }
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+
+        res.json({ message: 'Attendance unlocked successfully' });
+    } catch (error) {
+        console.error('Error unlocking attendance:', error);
+        res.status(500).json({ message: 'Error unlocking attendance' });
     }
 };
 

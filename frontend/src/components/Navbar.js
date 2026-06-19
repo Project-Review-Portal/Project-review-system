@@ -34,7 +34,6 @@ const Navbar = ({ user, onLogout }) => {
                     { label: 'Requests', path: '/guide-dashboard/requests' },
                     { label: 'My Teams', path: '/guide-dashboard/my-teams' },
                     { label: 'Review Schedules', path: '/guide-dashboard/review-schedules' },
-                    { label: 'Upload Attendance', path: '/guide-dashboard/upload-attendance' },
                     { label: 'Mark Teams', path: '/guide-dashboard/mark-teams' },
                     { label: 'Final Reports', path: '/guide-dashboard/final-reports' }
                 ];
@@ -43,7 +42,7 @@ const Navbar = ({ user, onLogout }) => {
                     { label: 'Dashboard', path: '/panel-dashboard' },
                     { label: 'Guide Me', path: '/panel-dashboard/guide-me' },
                     { label: 'Assigned Teams', path: '/panel-dashboard/assigned-teams' },
-                    
+                    { label: 'Upload Attendance', path: '/panel-dashboard/upload-attendance' }
                 ];
                  if (user.memberType === 'external') {
                     panelNavItems.push({ label: 'Schedules', path: '/panel-dashboard/review-schedules' });
@@ -65,6 +64,7 @@ const Navbar = ({ user, onLogout }) => {
                     { label: 'Guides', path: '/admin-dashboard/guide-assignment-summary' },
                     { label: 'Panels', path: '/admin-dashboard/panel-creation' },
                     { label: 'Assignments', path: '/admin-dashboard/panel-assignment' },
+                    { label: 'Upload Attendance', path: '/admin-dashboard/upload-attendance' },
                     { label: 'Summary', path: '/admin-dashboard/view-attendance' },
                     { label: 'Schedules', path: '/admin-dashboard/manage-review-schedules' }
                 ];
@@ -73,6 +73,7 @@ const Navbar = ({ user, onLogout }) => {
                     { label: 'Dashboard', path: '/coordinator-dashboard/dashboard' },
                     { label: 'Guide Me', path: '/coordinator-dashboard/guide-me' },
                     { label: 'Assigned Teams', path: '/coordinator-dashboard/assigned-teams' },
+                    { label: 'Upload Attendance', path: '/coordinator-dashboard/upload-attendance' },
                     { label: 'Review Schedule', path: '/coordinator-dashboard/review-schedule' },
                     { label: 'Viva Schedule', path: '/coordinator-dashboard/viva-schedule' },
                     { label: 'Letter Generation', path: '/coordinator-dashboard/letter-generation' },

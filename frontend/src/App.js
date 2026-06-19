@@ -67,6 +67,7 @@ const App = () => {
                     <Route path="review-schedules" element={<PanelReviewSchedules />} />
                     <Route path="mark-teams" element={<PanelMarking />} />
                     <Route path="assigned-reviews" element={<PanelAssignedReviews />} />
+                    <Route path="upload-attendance" element={<GuideUploadAttendance />} />
                     <Route path="guide-me" element={<GuideMe userRole="panel" />} />
                 </Route>
                 <Route path="/admin/panel-management" element={

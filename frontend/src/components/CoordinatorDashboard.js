@@ -8,6 +8,7 @@ import CoordinatorInstructionTemplate from './coordinator/CoordinatorInstruction
 // Replaces old LetterGeneration page with the live editor
 import GuideMe from './GuideMe';
 import CoordinatorLetterLiveEditorCK from './CoordinatorLetterLiveEditorCK';
+import GuideUploadAttendance from './guide/GuideUploadAttendance';
 
 const CoordinatorRulesDashboard = () => {
     const [teamFormationOpen, setTeamFormationOpen] = useState(true);
@@ -232,10 +233,11 @@ const CoordinatorDashboard = () => {
                     <Route path="letter-generation" element={<CoordinatorLetterLiveEditorCK />} />
                     <Route path="guide-me" element={<GuideMe userRole="coordinator" />} />
                     <Route path="assigned-teams" element={<CoordinatorAssignedTeams />} />
+                    <Route path="upload-attendance" element={<GuideUploadAttendance />} />
                     <Route path="review-schedule" element={<CoordinatorReviewSchedule />} />
                     <Route path="viva-schedule" element={<CoordinatorVivaSchedule />} />
-                    <Route path="*" element={<Navigate to="dashboard" replace />} />
                     <Route path="instruction-template" element={<CoordinatorInstructionTemplate />} />
+                    <Route path="*" element={<Navigate to="dashboard" replace />} />
                 </Routes>
             </div>
         </div>

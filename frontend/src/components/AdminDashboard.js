@@ -13,6 +13,7 @@ import UserManagement from './admin/UserManagement';
 import AdminTeams from './admin/AdminTeams';
 import ReviewsVivaSettings from './admin/ReviewsVivaSettings';
 import GuideMe from './GuideMe';
+import GuideUploadAttendance from './guide/GuideUploadAttendance';
 
 const AdminDashboard = () => {
     const location = useLocation();
@@ -45,6 +46,8 @@ const AdminDashboard = () => {
                 return <GuideAssignmentManagement />;
             case '/admin-dashboard/view-attendance':
                 return <AdminViewAttendance />;
+            case '/admin-dashboard/upload-attendance':
+                return <GuideUploadAttendance />;
             case '/admin-dashboard/manage-review-schedules':
                 return <AdminManageReviewSchedules />;
             case '/admin-dashboard/view-availabilities':

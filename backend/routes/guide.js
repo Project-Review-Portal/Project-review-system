@@ -24,16 +24,20 @@ router.get('/review-schedules', auth, authorize(['guide', 'admin']), guideContro
 router.get('/selection-dates', auth, guideController.getGuideSelectionDatesPublic);
 
 // New route for getting assigned teams
-router.get('/assigned-teams', auth, guideController.getAssignedTeams);
+router.get('/assigned-teams', auth, authorize(['guide', 'panel', 'coordinator', 'admin']), guideController.getAssignedTeams);
 
 // New route for getting review period dates
 router.get('/review-period-dates', auth, guideController.getReviewPeriodDatesPublic);
 
 // New route for getting daily attendance
-router.get('/daily-attendance', auth, guideController.getDailyAttendance);
+router.get('/daily-attendance', auth, authorize(['guide', 'panel', 'coordinator', 'admin']), guideController.getDailyAttendance);
 
 // New route for uploading attendance
-router.post('/upload-attendance', auth, guideController.uploadAttendance);
+router.post('/upload-attendance', auth, authorize(['panel', 'coordinator', 'admin']), guideController.uploadAttendance);
+
+// New routes for locking/unlocking attendance
+router.post('/lock-attendance', auth, authorize(['coordinator', 'admin']), guideController.lockAttendance);
+router.post('/unlock-attendance', auth, authorize(['admin']), guideController.unlockAttendance);
 
 // New route for submitting marks (allow both guide and admin)
 router.post('/marks', auth, authorize(['guide', 'admin']), guideController.submitMarks);
