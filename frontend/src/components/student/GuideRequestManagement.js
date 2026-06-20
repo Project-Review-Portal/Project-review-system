@@ -126,6 +126,30 @@ const GuideRequestManagement = () => {
         }
     };
 
+    const handleCancelRequest = async () => {
+        if (!window.confirm('Are you sure you want to cancel your guide request?')) {
+            return;
+        }
+
+        setMessage('');
+        setError('');
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('Unable to cancel request: Authentication token not found.');
+                return;
+            }
+            const headers = { Authorization: `Bearer ${token}` };
+            await axios.post('http://localhost:5000/api/teams/cancel-guide-request', {}, { headers });
+            setMessage('Guide request cancelled successfully!');
+            fetchData(user);
+        } catch (err) {
+            console.error('Error cancelling request:', err);
+            const errMsg = err.response?.data?.message || 'Failed to cancel request.';
+            alert(`Unable to cancel request: ${errMsg}`);
+        }
+    };
+
     if (loading) {
         return <div className="flex justify-center items-center h-64"><div className="text-lg text-gray-600">Loading...</div></div>;
     }
@@ -216,6 +240,19 @@ const GuideRequestManagement = () => {
                                  myTeam.status}
                             </span>
                         </p>
+                        {myTeam.guidePreference && isTeamLeader && (
+                            <button
+                                onClick={handleCancelRequest}
+                                disabled={myTeam.status === 'approved'}
+                                className={`mt-2 px-4 py-2 text-sm text-white rounded-md transition-colors ${
+                                    myTeam.status === 'approved'
+                                        ? 'bg-gray-400 cursor-not-allowed'
+                                        : 'bg-red-600 hover:bg-red-700'
+                                }`}
+                            >
+                                Cancel Request
+                            </button>
+                        )}
                         {myTeam.status === 'rejected' && isTeamLeader && isRequestPeriodActive && (
                             <button
                                 onClick={() => {

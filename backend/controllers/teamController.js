@@ -698,3 +698,35 @@ exports.approveLock = async (req, res) => {
         res.status(500).json({ message: 'Error approving lock request.' });
     }
 };
+
+// Cancel guide request (leader only)
+exports.cancelGuideRequest = async (req, res) => {
+    try {
+        const teamLeaderId = req.user.id;
+
+        // Find the team where the current user is the team leader
+        const team = await Team.findOne({ teamLeader: teamLeaderId });
+
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
+        }
+
+        if (!team.guidePreference) {
+            return res.status(400).json({ message: 'No active guide request to cancel.' });
+        }
+
+        if (team.status !== 'pending') {
+            return res.status(400).json({ message: 'Only pending guide requests can be cancelled.' });
+        }
+
+        // Cancel the guide request
+        team.guidePreference = null;
+        team.status = 'pending';
+        await team.save();
+
+        res.json({ message: 'Guide request cancelled successfully!', team });
+    } catch (error) {
+        console.error('Error cancelling guide request:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};

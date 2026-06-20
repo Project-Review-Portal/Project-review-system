@@ -17,6 +17,7 @@ router.post('/create', auth, teamController.createTeam);
 router.get('/my-team', auth, teamController.getUserTeam);
 router.get('/my-assigned-panel', auth, teamController.getAssignedPanel);
 router.post('/request-guide', auth, teamController.requestGuide);
+router.post('/cancel-guide-request', auth, teamController.cancelGuideRequest);
 router.delete('/my-team', auth, teamController.deleteMyTeam);
 
 router.post('/report/upload', auth, reportUpload, teamController.uploadReport);

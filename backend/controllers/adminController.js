@@ -1850,9 +1850,9 @@ exports.saveDesignationTeamLimits = async (req, res) => {
                 continue;
             }
 
-            if (!Number.isInteger(teamLimit) || teamLimit < 0) {
+            if (!Number.isInteger(teamLimit) || teamLimit < 1) {
                 return res.status(400).json({
-                    message: `Invalid team limit for designation "${designation}". Must be a non-negative integer.`
+                    message: `Invalid team limit for designation "${designation}". Must be a positive integer starting from 1.`
                 });
             }
 
