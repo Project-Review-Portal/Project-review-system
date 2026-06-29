@@ -69,5 +69,54 @@ const teamSchema = new mongoose.Schema({
         default: Date.now
     }
 });
+// Cascade deletion logic for Team
+teamSchema.pre('findOneAndDelete', async function(next) {
+    const teamId = this.getQuery()._id;
+    if (teamId) {
+        await mongoose.model('TeamPanelAssignment').updateMany({}, { $pull: { teams: teamId } });
+        try { await mongoose.model('Mark').deleteMany({ team: teamId }); } catch(e) {}
+        try { await mongoose.model('Attendance').deleteMany({ team: teamId }); } catch(e) {}
+        try { await mongoose.model('TimeTable').deleteMany({ team: teamId }); } catch(e) {}
+        try { await mongoose.model('FinalReport').deleteMany({ team: teamId }); } catch(e) {}
+    }
+    next();
+});
+
+teamSchema.pre('deleteOne', { document: true, query: false }, async function(next) {
+    const teamId = this._id;
+    await mongoose.model('TeamPanelAssignment').updateMany({}, { $pull: { teams: teamId } });
+    try { await mongoose.model('Mark').deleteMany({ team: teamId }); } catch(e) {}
+    try { await mongoose.model('Attendance').deleteMany({ team: teamId }); } catch(e) {}
+    try { await mongoose.model('TimeTable').deleteMany({ team: teamId }); } catch(e) {}
+    try { await mongoose.model('FinalReport').deleteMany({ team: teamId }); } catch(e) {}
+    next();
+});
+
+teamSchema.pre('deleteOne', { document: false, query: true }, async function(next) {
+    const teamId = this.getQuery()._id;
+    if (teamId) {
+        await mongoose.model('TeamPanelAssignment').updateMany({}, { $pull: { teams: teamId } });
+        try { await mongoose.model('Mark').deleteMany({ team: teamId }); } catch(e) {}
+        try { await mongoose.model('Attendance').deleteMany({ team: teamId }); } catch(e) {}
+        try { await mongoose.model('TimeTable').deleteMany({ team: teamId }); } catch(e) {}
+        try { await mongoose.model('FinalReport').deleteMany({ team: teamId }); } catch(e) {}
+    }
+    next();
+});
+
+teamSchema.pre('deleteMany', async function(next) {
+    const conditions = this.getQuery();
+    // For deleteMany, it's safer to not run complex hooks or only handle known patterns.
+    // If the query is simple { _id: { $in: [...] } }:
+    if (conditions._id && conditions._id.$in) {
+        const teamIds = conditions._id.$in;
+        await mongoose.model('TeamPanelAssignment').updateMany({}, { $pull: { teams: { $in: teamIds } } });
+        try { await mongoose.model('Mark').deleteMany({ team: { $in: teamIds } }); } catch(e) {}
+        try { await mongoose.model('Attendance').deleteMany({ team: { $in: teamIds } }); } catch(e) {}
+        try { await mongoose.model('TimeTable').deleteMany({ team: { $in: teamIds } }); } catch(e) {}
+        try { await mongoose.model('FinalReport').deleteMany({ team: { $in: teamIds } }); } catch(e) {}
+    }
+    next();
+});
 
 module.exports = mongoose.model('Team', teamSchema); 

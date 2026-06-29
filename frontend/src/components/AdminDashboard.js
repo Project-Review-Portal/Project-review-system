@@ -3,14 +3,12 @@ import { useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
 import MaxTeamSizeSettings from './admin/MaxTeamSizeSettings';
 import PanelManagement from './admin/PanelManagement';
-import PanelAssignment from './admin/PanelAssignment';
 import GuideSelectionSettings from './admin/GuideSelectionSettings';
-import GuideAssignmentManagement from './admin/GuideAssignmentManagement';
 import AdminViewAttendance from './admin/AdminViewAttendance';
 import AdminManageReviewSchedules from './admin/AdminManageReviewSchedules';
 import AdminViewAvailabilities from './admin/AdminViewAvailabilities';
 import UserManagement from './admin/UserManagement';
-import AdminTeams from './admin/AdminTeams';
+import AllocationsDashboard from './admin/AllocationsDashboard';
 import ReviewsVivaSettings from './admin/ReviewsVivaSettings';
 import GuideMe from './GuideMe';
 import GuideUploadAttendance from './guide/GuideUploadAttendance';
@@ -38,12 +36,10 @@ const AdminDashboard = () => {
                 return <MaxTeamSizeSettings />;
             case '/admin-dashboard/panel-creation':
                 return <PanelManagement />;
-            case '/admin-dashboard/panel-assignment':
-                return <PanelAssignment />;
+            case '/admin-dashboard/allocations':
+                return <AllocationsDashboard />;
             case '/admin-dashboard/guide-selection':
                 return <GuideSelectionSettings />;
-            case '/admin-dashboard/guide-assignment-summary':
-                return <GuideAssignmentManagement />;
             case '/admin-dashboard/view-attendance':
                 return <AdminViewAttendance />;
             case '/admin-dashboard/upload-attendance':
@@ -54,8 +50,6 @@ const AdminDashboard = () => {
                 return <AdminViewAvailabilities />;
             case '/admin-dashboard/user-management':
                 return <UserManagement />;
-            case '/admin-dashboard/teams':
-                return <AdminTeams />;
             case '/admin-dashboard/reviews-viva-settings':
                 return <ReviewsVivaSettings />;
             case '/admin-dashboard/guide-me':

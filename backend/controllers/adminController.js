@@ -127,8 +127,55 @@ exports.setMaxTeamSize = async (req, res) => {
         }
 
         await config.save();
+
+        if (Number(maxTeamSize) === 1) {
+            // Find all students and auto-generate teams for those without one
+            const students = await User.find({ role: 'student' });
+            const allTeams = await Team.find({});
+            const usersWithTeam = new Set();
+            allTeams.forEach(t => {
+                if (t.teamLeader) usersWithTeam.add(t.teamLeader.toString());
+                if (t.members) t.members.forEach(m => usersWithTeam.add(m.toString()));
+            });
+
+            const studentsWithoutTeam = students.filter(s => !usersWithTeam.has(s._id.toString()));
+
+            if (studentsWithoutTeam.length > 0) {
+                let existingNumbers = allTeams
+                    .map(t => parseInt(t.teamName.split(' ')[1], 10))
+                    .filter(n => !isNaN(n))
+                    .sort((a, b) => a - b);
+                
+                let nextNumber = 1;
+                let existingIndex = 0;
+                
+                for (const student of studentsWithoutTeam) {
+                    while (existingIndex < existingNumbers.length && nextNumber >= existingNumbers[existingIndex]) {
+                        if (nextNumber === existingNumbers[existingIndex]) {
+                            nextNumber++;
+                        }
+                        existingIndex++;
+                    }
+                    
+                    const newTeamName = `Team ${nextNumber}`;
+                    const team = new Team({
+                        teamName: newTeamName,
+                        teamLeader: student._id,
+                        members: [],
+                        memberStatus: [],
+                        isTeamComplete: true,
+                        isLocked: true,
+                        status: 'pending'
+                    });
+                    await team.save();
+                    nextNumber++;
+                }
+            }
+        }
+
         res.json({ message: 'Team size updated successfully', config });
     } catch (error) {
+        console.error('Error setting max team size:', error);
         res.status(500).json({ message: 'Server error' });
     }
 };
@@ -1956,5 +2003,146 @@ exports.setReviewsVivaSettings = async (req, res) => {
     } catch (error) {
         console.error('Error updating reviews/viva settings:', error);
         res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Admin: Update team allocation (guide and panel)
+exports.updateTeamAllocation = async (req, res) => {
+    try {
+        const { teamId } = req.params;
+        const { guideId, panelId } = req.body;
+
+        const team = await Team.findById(teamId);
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found.' });
+        }
+
+        let updated = false;
+
+        // Update Guide
+        if (guideId !== undefined) {
+            if (guideId === null) {
+                team.guidePreference = null;
+                team.status = 'pending';
+            } else {
+                const guide = await User.findById(guideId);
+                if (!guide || !guide.roles.some(r => r.role === 'guide')) {
+                    return res.status(400).json({ message: 'Invalid guide ID or guide not found.' });
+                }
+                team.guidePreference = guideId;
+                team.status = 'approved';
+            }
+            updated = true;
+        }
+
+        // Update Panel
+        if (panelId !== undefined) {
+            if (panelId === null) {
+                team.panel = null;
+                team.coordinator = null;
+            } else {
+                const panel = await Panel.findById(panelId);
+                if (!panel) {
+                    return res.status(404).json({ message: 'Panel not found.' });
+                }
+                team.panel = panelId;
+                team.coordinator = panel.coordinator;
+            }
+            updated = true;
+        }
+
+        if (updated) {
+            await team.save();
+        }
+
+        res.json({ message: 'Team allocation updated successfully!', team });
+    } catch (error) {
+        console.error('Error updating team allocation:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Auto-assign panels to teams
+exports.autoAssignPanels = async (req, res) => {
+    try {
+        const teams = await Team.find({ panel: null, status: 'approved' }).populate('guidePreference');
+        const panels = await Panel.find();
+        
+        if (panels.length === 0) {
+            return res.status(400).json({ message: 'No panels exist to assign.' });
+        }
+
+        let assignedCount = 0;
+        const warnings = [];
+
+        // Count current assignments for each panel to ensure even distribution
+        const panelCounts = {};
+        for (const p of panels) {
+            const count = await Team.countDocuments({ panel: p._id });
+            panelCounts[p._id.toString()] = count;
+        }
+
+        for (const team of teams) {
+            // Sort panels by least assigned teams
+            const sortedPanels = [...panels].sort((a, b) => panelCounts[a._id.toString()] - panelCounts[b._id.toString()]);
+            
+            let selectedPanel = null;
+            let conflictPanel = null;
+            let guideId = team.guidePreference ? team.guidePreference._id.toString() : null;
+
+            for (const panel of sortedPanels) {
+                // Check if guide is in the panel
+                let hasConflict = false;
+                if (guideId) {
+                    if (panel.coordinator && panel.coordinator.toString() === guideId) hasConflict = true;
+                    if (panel.assistantCoordinators && panel.assistantCoordinators.some(ac => ac.toString() === guideId)) hasConflict = true;
+                    if (panel.members && panel.members.some(m => m.toString() === guideId)) hasConflict = true;
+                }
+
+                if (!hasConflict) {
+                    selectedPanel = panel;
+                    break;
+                } else if (!conflictPanel) {
+                    // Remember the first panel with conflict as a fallback
+                    conflictPanel = panel;
+                }
+            }
+
+            // If all panels have conflicts, pick the one with the least teams (the fallback)
+            if (!selectedPanel && conflictPanel) {
+                selectedPanel = conflictPanel;
+                const guideName = team.guidePreference ? team.guidePreference.name : 'Unknown Guide';
+                warnings.push(`Warning: Team ${team.teamName} has been assigned to Panel ${selectedPanel.name}, which contains their Guide (${guideName}) as a panel member.`);
+            } else if (!selectedPanel && sortedPanels.length > 0) {
+                selectedPanel = sortedPanels[0];
+            }
+
+            if (selectedPanel) {
+                team.panel = selectedPanel._id;
+                team.coordinator = selectedPanel.coordinator;
+                await team.save();
+                
+                // Also update TeamPanelAssignment model
+                const TeamPanelAssignment = require('../models/TeamPanelAssignment');
+                await TeamPanelAssignment.findOneAndUpdate(
+                    { panel: selectedPanel._id },
+                    { $addToSet: { teams: team._id } },
+                    { upsert: true }
+                );
+
+                panelCounts[selectedPanel._id.toString()]++;
+                assignedCount++;
+            }
+        }
+
+        res.json({
+            message: `Successfully assigned panels to ${assignedCount} teams.`,
+            assignedCount,
+            warnings
+        });
+
+    } catch (error) {
+        console.error('Error auto-assigning panels:', error);
+        res.status(500).json({ message: 'Server error during auto-assignment' });
     }
 };

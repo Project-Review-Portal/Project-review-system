@@ -12,27 +12,49 @@ const { getReviewSettings } = require('../utils/reviewSettings');
 // Get all panels
 exports.getAllPanels = async (req, res) => {
     try {
-        // Populate members to get user details including username, role, and memberType
+        // 1. Fetch panels and fully populate relational documents
         const panels = await Panel.find()
             .populate({
                 path: 'members',
-                select: 'username role memberType name' // Added 'name' here
+                select: 'username role memberType name'
             })
             .populate({
                 path: 'coordinator',
                 select: 'username name'
+            })
+            .populate({
+                path: 'assistantCoordinators',
+                select: 'username name role memberType' // Fixes the missing name string issue
             });
 
-            panels.sort((a, b) => {                             //this sorting part can be commented
-                let numA = Number(a.name.split(' ')[1])         //once when panel names are no longer dummy like (panel 1, panel 2, ...)
-                let numB = Number(b.name.split(' ')[1])
-                return numA - numB;
+        // 2. Sort the panels numerically by name
+        panels.sort((a, b) => {
+            let numA = Number(a.name.split(' ')[1]);
+            let numB = Number(b.name.split(' ')[1]);
+            return numA - numB;
+        });
+
+        // 3. Look up team count assignments from TeamPanelAssignment
+        const panelsWithTeamCount = await Promise.all(
+            panels.map(async (panel) => {
+                // Find the assignment document matching this specific panel ID
+                const assignment = await TeamPanelAssignment.findOne({ panel: panel._id });
+                
+                // If a record exists, use the length of its teams array; otherwise default to 0
+                const teamCount = assignment && Array.isArray(assignment.teams) 
+                    ? assignment.teams.length 
+                    : 0;
+
+                return {
+                    ...panel.toObject(),
+                    assignedTeamsCount: teamCount // Accessible on the frontend via panel.assignedTeamsCount
+                };
             })
+        );
 
-
-        res.json(panels);
+        res.json(panelsWithTeamCount);
     } catch (error) {
-        console.error('Error fetching panels:', error);
+        console.error('Error fetching panels with assignment metrics:', error);
         res.status(500).json({ message: 'Server error' });
     }
 };
@@ -40,9 +62,10 @@ exports.getAllPanels = async (req, res) => {
 // Create a new panel
 exports.createPanel = async (req, res) => {
     try {
-        const { members, coordinator } = req.body;
+        const { members, coordinator, assistantCoordinators } = req.body;
         console.log('Received members for createPanel:', members);
         console.log('Received coordinator for createPanel:', coordinator);
+        console.log('Received assistantCoordinators for createPanel:', assistantCoordinators);
 
         // Validate members: must have at least one member
         if (!members || members.length === 0) {
@@ -57,11 +80,7 @@ exports.createPanel = async (req, res) => {
         if (externalMembers.length > 1) {
             return res.status(400).json({ message: 'A panel can have at most one external member.' });
         }
-        // Coordinator must not be in members
-        if (members.includes(coordinator)) {
-            return res.status(400).json({ message: 'Coordinator cannot be a panel member.' });
-        }
-        
+        // Coordinator can now be in members. No longer restricted.
         // Validate that coordinator is internal faculty
         const coordinatorDetails = await User.findById(coordinator);
         if (!coordinatorDetails || coordinatorDetails.memberType !== 'internal') {
@@ -70,7 +89,8 @@ exports.createPanel = async (req, res) => {
         // Generate panel name based on current count
 
         // Counting and adding 1 to the panelName does not work all time
-        const existingPanelNames = await Panel.find({},{_id:0, name: 1})
+        const existingPanelNames = await Panel.find({},{_id:0, name: 1}).sort({name:1})
+        // console.log(existingPanelNames);
         let numberTracker = 1;
         if (existingPanelNames){
             for(let x of existingPanelNames){
@@ -91,7 +111,8 @@ exports.createPanel = async (req, res) => {
         const newPanel = new Panel({
             name: newPanelName,
             members,
-            coordinator
+            coordinator,
+            assistantCoordinators: assistantCoordinators || []
         });
         await newPanel.save();
         res.status(201).json({ message: 'Panel created successfully!', panel: newPanel });
@@ -105,9 +126,10 @@ exports.createPanel = async (req, res) => {
 exports.updatePanel = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, members, coordinator } = req.body;
+        const { name, members, coordinator, assistantCoordinators } = req.body;
         console.log('Received members for updatePanel:', members);
         console.log('Received coordinator for updatePanel:', coordinator);
+        console.log('Received assistantCoordinators for updatePanel:', assistantCoordinators);
         // if members are being updated, validate them
         if (members) {
             const memberDetails = await User.find({ '_id': { $in: members } });
@@ -116,10 +138,7 @@ exports.updatePanel = async (req, res) => {
                 return res.status(400).json({ message: 'A panel can have at most one external member.' });
             }
         }
-        // Coordinator must not be in members
-        if (coordinator && members && members.includes(coordinator)) {
-            return res.status(400).json({ message: 'Coordinator cannot be a panel member.' });
-        }
+        // Coordinator can now be in members. No longer restricted.
         const panel = await Panel.findById(id);
         if (!panel) {
             return res.status(404).json({ message: 'Panel not found.' });
@@ -129,6 +148,9 @@ exports.updatePanel = async (req, res) => {
         }
         if (coordinator !== undefined) {
             panel.coordinator = coordinator;
+        }
+        if (assistantCoordinators !== undefined) {
+            panel.assistantCoordinators = assistantCoordinators;
         }
         await panel.save();
 
@@ -159,10 +181,7 @@ exports.deletePanel = async (req, res) => {
             return res.status(404).json({ message: 'Panel not found.' });
         }
 
-        await Panel.deleteOne({ _id: id }); // Use deleteOne or findByIdAndDelete
-        // cascading deletes to ensure data consistency
-        await Team.updateMany({ panel : id }, { $set: { panel : null}}) 
-        await TeamPanelAssignment.deleteMany({ panel : id })
+        await Panel.deleteOne({ _id: id });
 
         res.json({ message: 'Panel deleted successfully!' });
     } catch (error) {

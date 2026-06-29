@@ -30,13 +30,13 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['admin', 'student', 'guide', 'panel', 'coordinator'],
+        enum: ['admin', 'student', 'guide', 'panel', 'coordinator', 'assistant coordinator'],
         default: null
     },
     roles: [{
         role: {
             type: String,
-            enum: ['admin', 'student', 'guide', 'panel', 'coordinator'],
+            enum: ['admin', 'student', 'guide', 'panel', 'coordinator', 'assistant coordinator'],
             required: true
         },
         team: {
@@ -76,4 +76,3 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ email: 1 }, { unique: false });
 
 module.exports = mongoose.model('User', userSchema);
- 

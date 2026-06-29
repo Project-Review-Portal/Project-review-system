@@ -609,13 +609,18 @@ exports.requestLock = async (req, res) => {
             return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
         }
 
-        if (!team.isTeamComplete) {
-            return res.status(400).json({ message: 'You cannot request to lock the team until all members have accepted.' });
-        }
-
         if (team.isLocked) {
             return res.status(400).json({ message: 'The team is already locked.' });
         }
+
+        // Auto-reject any pending invitations since the team is now being locked
+        team.memberStatus.forEach(m => {
+            if (m.status === 'pending') {
+                m.status = 'rejected';
+            }
+        });
+        team.members = team.memberStatus.filter(m => m.status === 'accepted').map(m => m.user);
+        team.isTeamComplete = true; // Because no pending invites left
 
         team.lockRequested = true;
         // Reset lock approvals just in case

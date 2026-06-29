@@ -87,4 +87,8 @@ router.delete('/faculty', auth, authorize(['admin']), adminController.deleteAllF
 router.get('/reviews-viva-settings', auth, authorize(['admin']), adminController.getReviewsVivaSettings);
 router.post('/reviews-viva-settings', auth, authorize(['admin']), adminController.setReviewsVivaSettings);
 
-module.exports = router; 
+// Team Allocation
+router.put('/allocations/:teamId', auth, authorize(['admin']), adminController.updateTeamAllocation);
+router.post('/auto-assign-panels', auth, authorize(['admin']), adminController.autoAssignPanels);
+
+module.exports = router;  

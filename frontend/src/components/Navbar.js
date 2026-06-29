@@ -60,10 +60,8 @@ const Navbar = ({ user, onLogout }) => {
                     { label: 'Guide settings', path: '/admin-dashboard/guide-selection' },
                     { label: 'Team Size', path: '/admin-dashboard/settings' },
                     { label: 'Review Settings', path: '/admin-dashboard/reviews-viva-settings' },
-                    { label: 'Teams', path: '/admin-dashboard/teams' },
-                    { label: 'Guides', path: '/admin-dashboard/guide-assignment-summary' },
                     { label: 'Panels', path: '/admin-dashboard/panel-creation' },
-                    { label: 'Assignments', path: '/admin-dashboard/panel-assignment' },
+                    { label: 'Allocations', path: '/admin-dashboard/allocations' },
                     { label: 'Upload Attendance', path: '/admin-dashboard/upload-attendance' },
                     { label: 'Summary', path: '/admin-dashboard/view-attendance' },
                     { label: 'Schedules', path: '/admin-dashboard/manage-review-schedules' }

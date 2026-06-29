@@ -328,9 +328,9 @@ const TeamFormation = () => {
                 <div>
                     <button
                         type="submit"
-                        disabled={selectedMembers.length === 0 || invitations.length > 0}
+                        disabled={invitations.length > 0}
                         className={`px-4 py-2 text-sm font-medium rounded-md text-white ${
-                            selectedMembers.length === 0 || invitations.length > 0
+                            invitations.length > 0
                                 ? 'bg-gray-400 cursor-not-allowed'
                                 : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
                         }`}
