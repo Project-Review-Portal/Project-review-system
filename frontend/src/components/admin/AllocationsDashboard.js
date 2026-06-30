@@ -9,9 +9,9 @@ const AllocationsDashboard = () => {
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
     
-    // Auto-assign modal state
-    const [autoAssignModalOpen, setAutoAssignModalOpen] = useState(false);
-    const [autoAssignSummary, setAutoAssignSummary] = useState(null);
+    // Unified Modal state for auto-assign alerts and single-save capacity warnings
+    const [warningModalOpen, setWarningModalOpen] = useState(false);
+    const [warningModalSummary, setWarningModalSummary] = useState({ title: '', message: '', warnings: [] });
     const [autoAssigning, setAutoAssigning] = useState(false);
 
     // Store allocations as a map: { teamId: { guideId, panelId } }
@@ -81,7 +81,7 @@ const AllocationsDashboard = () => {
         setError('');
         try {
             const { guideId, panelId } = allocations[teamId];
-            await axios.put(`/api/admin/allocations/${teamId}`, {
+            const res = await axios.put(`/api/admin/allocations/${teamId}`, {
                 guideId: guideId || null,
                 panelId: panelId || null
             }, { headers });
@@ -95,17 +95,26 @@ const AllocationsDashboard = () => {
             const panelInfo = panels.find(p => p._id === panelId);
             const panelName = panelInfo ? panelInfo.name : 'No Panel';
 
-            // Custom UI toast message
-            setMessage(`Guide ${guideName} and Panel ${panelName} have been saved to team ${teamName}.`);
-            setTimeout(() => setMessage(''), 5000); // clear toast
+            // Check if backend returned any soft capacity warnings
+            if (res.data.warnings && res.data.warnings.length > 0) {
+                setWarningModalSummary({
+                    title: 'Allocation Saved with Warnings',
+                    message: `Guide ${guideName} and Panel ${panelName} have been assigned to team ${teamName}, but capacity conditions were breached.`,
+                    warnings: res.data.warnings
+                });
+                setWarningModalOpen(true);
+            } else {
+                // If clean execution, show standard toast message
+                setMessage(`Guide ${guideName} and Panel ${panelName} have been saved to team ${teamName}.`);
+                setTimeout(() => setMessage(''), 5000); 
+            }
             
-            // Update original to match current
+            // Update original states
             setOriginalAllocations(prev => ({
                 ...prev,
                 [teamId]: { ...allocations[teamId] }
             }));
             
-            // Refresh teams to get populated objects
             fetchData();
         } catch (err) {
             console.error('Error saving allocation:', err);
@@ -141,11 +150,12 @@ const AllocationsDashboard = () => {
         setError('');
         try {
             const res = await axios.post('/api/admin/auto-assign-panels', {}, { headers });
-            setAutoAssignSummary({
+            setWarningModalSummary({
+                title: 'Auto-Assignment Complete',
                 message: res.data.message,
                 warnings: res.data.warnings || []
             });
-            setAutoAssignModalOpen(true);
+            setWarningModalOpen(true);
             fetchData();
         } catch (err) {
             console.error('Error auto-assigning panels:', err);
@@ -161,7 +171,6 @@ const AllocationsDashboard = () => {
         return current && original && (current.guideId !== original.guideId || current.panelId !== original.panelId);
     };
 
-    // Tracking the cursor context positions
     const handleMouseEnterPanel = (e, panelId) => {
         const panelObj = panels.find(p => p._id === panelId);
         if (panelObj) {
@@ -172,8 +181,8 @@ const AllocationsDashboard = () => {
 
     const updateTooltipPosition = (e) => {
         setTooltipPos({
-            x: e.clientX + 15, // Offset slightly right from pointer
-            y: e.clientY + 15  // Offset slightly down from pointer
+            x: e.clientX + 15, 
+            y: e.clientY + 15  
         });
     };
 
@@ -250,7 +259,7 @@ const AllocationsDashboard = () => {
                                             value={currentAlloc.panelId}
                                             onChange={(e) => {
                                                 handleAllocationChange(team._id, 'panelId', e.target.value);
-                                                handleMouseLeavePanel(); // Reset tooltip tracking on change
+                                                handleMouseLeavePanel(); 
                                             }}
                                         >
                                             <option value="">No Panel</option>
@@ -302,7 +311,7 @@ const AllocationsDashboard = () => {
                 </div>
             )}
 
-            {/* Global Tooltip Element: Uses fixed positioning to break out of scroll containers entirely */}
+            {/* Global Tooltip Element */}
             {hoveredPanel && (
                 <div 
                     className="fixed z-50 w-64 p-3 bg-gray-800 text-white text-xs rounded shadow-xl pointer-events-none transition-all duration-75"
@@ -317,22 +326,22 @@ const AllocationsDashboard = () => {
                 </div>
             )}
 
-            {/* Auto-Assign Summary Modal */}
-            {autoAssignModalOpen && autoAssignSummary && (
+            {/* Unified Summary & Warning Notification Modal */}
+            {warningModalOpen && warningModalSummary && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full">
-                        <h3 className="text-xl font-bold mb-4">Auto-Assignment Complete</h3>
-                        <p className="text-gray-700 font-medium mb-4">{autoAssignSummary.message}</p>
+                        <h3 className="text-xl font-bold mb-4">{warningModalSummary.title}</h3>
+                        <p className="text-gray-700 font-medium mb-4">{warningModalSummary.message}</p>
                         
-                        {autoAssignSummary.warnings.length > 0 && (
+                        {warningModalSummary.warnings.length > 0 && (
                             <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 max-h-60 overflow-y-auto">
                                 <div className="flex">
                                     <div className="ml-3">
-                                        <h3 className="text-sm font-medium text-yellow-800">Conflicts Detected</h3>
+                                        <h3 className="text-sm font-medium text-yellow-800">Alert Notification</h3>
                                         <div className="mt-2 text-sm text-yellow-700">
                                             <ul className="list-disc pl-5 space-y-1">
-                                                {autoAssignSummary.warnings.map((w, idx) => (
-                                                    <li key={idx}>{w}</li>
+                                                {warningModalSummary.warnings.map((w, idx) => (
+                                                    <li key={idx} className="font-medium">{w}</li>
                                                 ))}
                                             </ul>
                                         </div>
@@ -343,7 +352,7 @@ const AllocationsDashboard = () => {
                         
                         <div className="flex justify-end mt-4">
                             <button 
-                                onClick={() => setAutoAssignModalOpen(false)}
+                                onClick={() => setWarningModalOpen(false)}
                                 className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
                             >
                                 Close

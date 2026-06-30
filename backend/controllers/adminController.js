@@ -2018,6 +2018,7 @@ exports.updateTeamAllocation = async (req, res) => {
         }
 
         let updated = false;
+        const warnings = [];
 
         // Update Guide
         if (guideId !== undefined) {
@@ -2029,6 +2030,36 @@ exports.updateTeamAllocation = async (req, res) => {
                 if (!guide || !guide.roles.some(r => r.role === 'guide')) {
                     return res.status(400).json({ message: 'Invalid guide ID or guide not found.' });
                 }
+
+                // --- Limit Check Logic with Distinct Warning Messages ---
+                const {
+                    buildDesignationLimitMap,
+                    getTeamCountsByGuideIds,
+                    resolveGuideLimitStatus
+                } = require('../utils/guideTeamLimit');
+
+                const limitMap = await buildDesignationLimitMap();
+                const countMap = await getTeamCountsByGuideIds([guide._id]);
+                const currentApprovedCount = countMap.get(guide._id.toString()) || 0;
+                const limitStatus = resolveGuideLimitStatus(guide, currentApprovedCount, limitMap);
+
+                if (limitStatus.teamLimit !== null) {
+                    const guideName = guide.name || 'Unknown Guide';
+                    
+                    if (currentApprovedCount > limitStatus.teamLimit) {
+                        // The guide was already past their capacity before assigning this team
+                        warnings.push(
+                            `Warning: Guide ${guideName} has already exceeded their team limit (${currentApprovedCount}/${limitStatus.teamLimit}).`
+                        );
+                    } else if (currentApprovedCount === limitStatus.teamLimit) {
+                        // The guide was exactly at capacity, and assigning this team pushes them over
+                        warnings.push(
+                            `Warning: Guide ${guideName} has reached their team limit (${currentApprovedCount}/${limitStatus.teamLimit}). Assigning this team will exceed it.`
+                        );
+                    }
+                }
+                // ---------------------------------------------------------------------
+
                 team.guidePreference = guideId;
                 team.status = 'approved';
             }
@@ -2055,7 +2086,12 @@ exports.updateTeamAllocation = async (req, res) => {
             await team.save();
         }
 
-        res.json({ message: 'Team allocation updated successfully!', team });
+        res.json({ 
+            message: 'Team allocation updated successfully!', 
+            team,
+            warnings 
+        });
+        
     } catch (error) {
         console.error('Error updating team allocation:', error);
         res.status(500).json({ message: 'Server error' });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 const MyTeam = () => {
@@ -18,22 +18,8 @@ const MyTeam = () => {
     const user = JSON.parse(localStorage.getItem('user'));
     const currentUserId = user?._id || user?.id;
 
-    useEffect(() => {
-        fetchMyTeam();
-    }, []);
-
-    useEffect(() => {
-        if (searchQuery.trim() === '') {
-            setFilteredStudents(availableStudents);
-        } else {
-            const filtered = availableStudents.filter(student =>
-                student.username.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-            setFilteredStudents(filtered);
-        }
-    }, [searchQuery, availableStudents]);
-
-    const fetchMyTeam = async () => {
+    // Memoize fetchMyTeam using useCallback to fix the dependency warning safely
+    const fetchMyTeam = useCallback(async () => {
         setLoading(true);
         setApiError('');
         setNoTeamFound(false);
@@ -83,7 +69,23 @@ const MyTeam = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, []); // Empty array because it only depends on component state setters
+
+    // Safely add fetchMyTeam to the dependency array now
+    useEffect(() => {
+        fetchMyTeam();
+    }, [fetchMyTeam]);
+
+    useEffect(() => {
+        if (searchQuery.trim() === '') {
+            setFilteredStudents(availableStudents);
+        } else {
+            const filtered = availableStudents.filter(student =>
+                student.username.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+            setFilteredStudents(filtered);
+        }
+    }, [searchQuery, availableStudents]);
 
     const handleInviteMember = async (studentId) => {
         setInviteError('');
@@ -106,7 +108,7 @@ const MyTeam = () => {
     const handleRemoveMember = async (studentId) => {
         setInviteError('');
         setInviteSuccess('');
-        if (!window.confirm('Are you sure you want to remove this member from the team?')) {
+        if (!window.confirm('Are you sure you want to remove or revoke this invitation?')) {
             return;
         }
         try {
@@ -116,7 +118,7 @@ const MyTeam = () => {
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setInviteSuccess('Member removed successfully!');
+            setInviteSuccess('Member/Invitation cleared successfully!');
             fetchMyTeam();
         } catch (err) {
             setInviteError(err.response?.data?.message || 'Failed to remove member.');
@@ -142,7 +144,13 @@ const MyTeam = () => {
     const handleRequestLock = async () => {
         setInviteError('');
         setInviteSuccess('');
-        if (!window.confirm('Are you sure you want to request to lock the team? Once locked, you cannot modify members.')) {
+        
+        const isSoloTeam = acceptedMembersOnly.length === 0;
+        const confirmationMessage = isSoloTeam
+            ? 'Are you sure you want to lock and finalize your solo team? You cannot add members after locking.'
+            : 'Are you sure you want to request to lock the team? Once locked, you cannot modify members.';
+
+        if (!window.confirm(confirmationMessage)) {
             return;
         }
         try {
@@ -150,10 +158,10 @@ const MyTeam = () => {
             const res = await axios.post('http://localhost:5000/api/teams/request-lock', {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setInviteSuccess(res.data.message || 'Lock request sent successfully!');
+            setInviteSuccess(res.data.message || 'Lock operation completed successfully!');
             fetchMyTeam();
         } catch (err) {
-            setInviteError(err.response?.data?.message || 'Failed to request lock.');
+            setInviteError(err.response?.data?.message || 'Failed to process lock request.');
         }
     };
 
@@ -215,11 +223,15 @@ const MyTeam = () => {
         ? team.memberStatus
         : team.members.map(m => ({ user: m, status: 'accepted' }));
 
-    const activeMembers = memberList.filter(m => m.status !== 'rejected');
+    const activeMembers = memberList.filter(m => m.status === 'accepted' || m.status === 'pending');
+    const acceptedMembersOnly = memberList.filter(m => m.status === 'accepted');
+    const pendingMembersOnly = memberList.filter(m => m.status === 'pending');
     const rejectedMembers = memberList.filter(m => m.status === 'rejected');
 
     const myStatus = team.memberStatus?.find(m => m.user?._id === currentUserId || m.user === currentUserId);
     const hasApprovedLock = myStatus?.lockApproved;
+
+    const canLockTeam = pendingMembersOnly.length === 0;
 
     return (
         <div className="bg-white p-6 rounded-lg shadow space-y-6">
@@ -231,14 +243,14 @@ const MyTeam = () => {
                             🔒 Team Locked
                         </span>
                     )}
-                    {!team.isLocked && !team.isTeamComplete && (
+                    {!team.isLocked && !canLockTeam && (
                         <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-bold rounded-full border border-yellow-200">
-                            Incomplete Team
+                            Has Pending Invites
                         </span>
                     )}
-                    {!team.isLocked && team.isTeamComplete && (
+                    {!team.isLocked && canLockTeam && (
                         <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-bold rounded-full border border-green-200">
-                            Complete Team
+                            {acceptedMembersOnly.length === 0 ? 'Solo Project Ready' : 'Ready to Lock'}
                         </span>
                     )}
                 </div>
@@ -248,7 +260,9 @@ const MyTeam = () => {
                 <h3 className="font-semibold text-lg">Team Name: {team.teamName}</h3>
             </div>
 
-            {/* Lock Status Section */}
+            {inviteError && <div className="text-sm text-red-600 bg-red-50 p-3 rounded border border-red-200">{inviteError}</div>}
+            {inviteSuccess && <div className="text-sm text-green-600 bg-green-50 p-3 rounded border border-green-200">{inviteSuccess}</div>}
+
             {team.isLocked && (
                 <div className="p-4 bg-green-50 border-l-4 border-green-500 text-green-800 rounded shadow-sm">
                     <h4 className="font-bold flex items-center gap-2">
@@ -289,26 +303,31 @@ const MyTeam = () => {
                 </div>
             )}
 
-            {!team.isLocked && !team.lockRequested && team.isTeamComplete && isLeader && (
+            {!team.isLocked && !team.lockRequested && isLeader && canLockTeam && (
                 <div className="p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-800 rounded shadow-sm space-y-2">
-                    <h4 className="font-bold">🔒 Lock Team</h4>
-                    <p className="text-sm">All invited members have accepted. You should lock the team to finalize it. Locking the team requires approval from all members.</p>
+                    <h4 className="font-bold">🔒 Finalize Team Setup</h4>
+                    <p className="text-sm">
+                        {acceptedMembersOnly.length === 0 
+                            ? "You don't have any accepted team members. Locking now will instantly finalize this as a Solo Project." 
+                            : "All invited members have accepted. Locking the team requires approval consensus from all members."
+                        }
+                    </p>
                     <button
                         onClick={handleRequestLock}
                         className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-semibold transition-colors"
                     >
-                        Request Team Lock
+                        {acceptedMembersOnly.length === 0 ? 'Lock Team Instantly' : 'Request Team Lock'}
                     </button>
                 </div>
             )}
 
-            {!team.isLocked && !team.isTeamComplete && (
-                <div className="p-3 bg-yellow-50 text-yellow-800 border-l-4 border-yellow-400 rounded text-sm">
-                    <strong>Status: Incomplete Team.</strong> Waiting for all invited members to accept their invitations before guide selection or team locking can be unlocked.
+            {!team.isLocked && !team.lockRequested && isLeader && !canLockTeam && (
+                <div className="p-4 bg-yellow-50 text-yellow-800 border-l-4 border-yellow-400 rounded text-sm space-y-1">
+                    <strong>⚠️ Lock Blocked:</strong> You have <b>{pendingMembersOnly.length} pending invitation(s)</b> out to other students.
+                    <p className="text-xs text-gray-600">You must wait for them to Accept/Decline, or click "Revoke Invite" below to clear the request before you can lock this team configuration.</p>
                 </div>
             )}
 
-            {/* Team Members List */}
             <div className="border p-4 rounded-lg space-y-3 bg-gray-50">
                 <h3 className="text-lg font-semibold text-gray-800">Team Members</h3>
                 <ul className="space-y-2">
@@ -322,9 +341,9 @@ const MyTeam = () => {
                             <div className="flex items-center space-x-3">
                                 <span className={`text-xs px-2 py-1 rounded font-semibold ${
                                     m.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                                    'bg-yellow-100 text-yellow-800'
+                                    'bg-yellow-100 text-yellow-800 shadow-sm'
                                 }`}>
-                                    {m.status.charAt(0).toUpperCase() + m.status.slice(1)}
+                                    {m.status === 'pending' ? '⏳ Pending Response' : 'Accepted'}
                                 </span>
                                 
                                 {team.lockRequested && m.status === 'accepted' && (
@@ -339,9 +358,9 @@ const MyTeam = () => {
                                     <button
                                         type="button"
                                         onClick={() => handleRemoveMember(m.user?._id)}
-                                        className="text-xs text-red-600 hover:text-red-800 font-semibold focus:outline-none"
+                                        className="text-xs text-red-600 hover:text-red-800 font-semibold focus:outline-none border border-transparent hover:border-red-200 px-1.5 py-0.5 rounded"
                                     >
-                                        Remove
+                                        {m.status === 'pending' ? 'Revoke Invite' : 'Remove'}
                                     </button>
                                 )}
                             </div>
@@ -350,7 +369,6 @@ const MyTeam = () => {
                 </ul>
             </div>
 
-            {/* Declined Invitations Section */}
             {rejectedMembers.length > 0 && (
                 <div className="border p-4 rounded-lg space-y-3 bg-red-50/50 border-red-100">
                     <h3 className="text-lg font-semibold text-red-800">Declined Invitations</h3>
@@ -378,12 +396,9 @@ const MyTeam = () => {
                 </div>
             )}
 
-            {/* Invite More Members Section */}
             {isLeader && !team.isLocked && activeMembers.length + 1 < maxTeamSize && (
                 <div className="border p-4 rounded-lg space-y-3">
                     <h3 className="text-lg font-semibold text-gray-800">Invite More Members ({activeMembers.length + 1}/{maxTeamSize})</h3>
-                    {inviteError && <div className="text-sm text-red-600 bg-red-50 p-2 rounded">{inviteError}</div>}
-                    {inviteSuccess && <div className="text-sm text-green-600 bg-green-50 p-2 rounded">{inviteSuccess}</div>}
                     <div className="flex space-x-2">
                         <input
                             type="text"
@@ -416,7 +431,6 @@ const MyTeam = () => {
                 </div>
             )}
 
-            {/* Guide Preferences */}
             {team.guidePreference && (
                 <div className="border p-4 rounded-lg">
                     <h3 className="text-xl font-semibold mb-3">Guide</h3>
@@ -431,7 +445,6 @@ const MyTeam = () => {
                 </div>
             )}
 
-            {/* Disband Team Button */}
             {isLeader && !team.isLocked && (
                 <div className="pt-4 border-t flex justify-end">
                     <button
