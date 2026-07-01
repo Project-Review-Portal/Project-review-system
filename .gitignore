@@ -50,3 +50,6 @@ ehthumbs.db
 # Test files
 testDocumentController.js
 testSimple.js 
+
+#text file
+ignore.txt

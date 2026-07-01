@@ -18,64 +18,62 @@ const Navbar = ({ user, onLogout }) => {
             case 'student':
                 return [
                     { label: 'Dashboard', path: '/student-dashboard' },
-                    { label: 'Guide Me', path: '/student-dashboard/guide-me' },
                     { label: 'Team Formation', path: '/student-dashboard/team' },
                     { label: 'My Team', path: '/student-dashboard/my-team' },
                     { label: 'Guide Requests', path: '/student-dashboard/guide-requests' },
                     { label: 'My Panel', path: '/student-dashboard/my-panel' },
                     { label: 'Review Schedules', path: '/student-dashboard/review-schedules' },
                     { label: 'Final Report', path: '/student-dashboard/final-report' },
-                    { label: 'Announcements', path: '/student-dashboard/coordinator-instructions' }
+                    { label: 'Announcements', path: '/student-dashboard/coordinator-instructions' },
+                    { label: 'Guide Me', path: '/student-dashboard/guide-me' }
                 ];
             case 'guide':
                 return [
                     { label: 'Dashboard', path: '/guide-dashboard' },
-                    { label: 'Guide Me', path: '/guide-dashboard/guide-me' },
                     { label: 'Requests', path: '/guide-dashboard/requests' },
                     { label: 'My Teams', path: '/guide-dashboard/my-teams' },
                     { label: 'Review Schedules', path: '/guide-dashboard/review-schedules' },
                     { label: 'Mark Teams', path: '/guide-dashboard/mark-teams' },
-                    { label: 'Final Reports', path: '/guide-dashboard/final-reports' }
+                    { label: 'Final Reports', path: '/guide-dashboard/final-reports' },
+                    { label: 'Guide Me', path: '/guide-dashboard/guide-me' }
                 ];
             case 'panel':
                 const panelNavItems = [
                     { label: 'Dashboard', path: '/panel-dashboard' },
-                    { label: 'Guide Me', path: '/panel-dashboard/guide-me' },
                     { label: 'Assigned Teams', path: '/panel-dashboard/assigned-teams' },
                     { label: 'Upload Attendance', path: '/panel-dashboard/upload-attendance' }
                 ];
-                 if (user.memberType === 'external') {
+                if (user.memberType === 'external') {
                     panelNavItems.push({ label: 'Schedules', path: '/panel-dashboard/review-schedules' });
                 }
                 if (user.memberType === 'internal') {
                     panelNavItems.push({ label: 'Schedules', path: '/panel-dashboard/review-schedules' });
                 }
                 panelNavItems.push({ label: 'Mark Teams', path: '/panel-dashboard/mark-teams' });
+                panelNavItems.push({ label: 'Guide Me', path: '/panel-dashboard/guide-me' });
                 return panelNavItems;
             case 'admin':
                 return [
                     { label: 'Dashboard', path: '/admin-dashboard' },
-                    { label: 'Guide Me', path: '/admin-dashboard/guide-me' },
                     { label: 'Registration', path: '/admin-dashboard/user-management' },
-                    { label: 'Guide settings', path: '/admin-dashboard/guide-selection' },
-                    { label: 'Team Size', path: '/admin-dashboard/settings' },
-                    { label: 'Review Settings', path: '/admin-dashboard/reviews-viva-settings' },
+                    { label: 'Admin Settings', path: '/admin-dashboard/admin-settings' },
                     { label: 'Panels', path: '/admin-dashboard/panel-creation' },
                     { label: 'Allocations', path: '/admin-dashboard/allocations' },
                     { label: 'Upload Attendance', path: '/admin-dashboard/upload-attendance' },
                     { label: 'Summary', path: '/admin-dashboard/view-attendance' },
-                    { label: 'Schedules', path: '/admin-dashboard/manage-review-schedules' }
+                    { label: 'Schedules', path: '/admin-dashboard/manage-review-schedules' },
+                    { label: 'Guide Me', path: '/admin-dashboard/guide-me' }
                 ];
             case 'coordinator':
                 return [
                     { label: 'Dashboard', path: '/coordinator-dashboard/dashboard' },
-                    { label: 'Guide Me', path: '/coordinator-dashboard/guide-me' },
                     { label: 'Assigned Teams', path: '/coordinator-dashboard/assigned-teams' },
                     { label: 'Upload Attendance', path: '/coordinator-dashboard/upload-attendance' },
                     { label: 'Review Schedule', path: '/coordinator-dashboard/review-schedule' },
                     { label: 'Viva Schedule', path: '/coordinator-dashboard/viva-schedule' },
                     { label: 'Letter Generation', path: '/coordinator-dashboard/letter-generation' },
-                    { label: 'Broadcasts', path: '/coordinator-dashboard/instruction-template' }
+                    { label: 'Broadcasts', path: '/coordinator-dashboard/instruction-template' },
+                    { label: 'Guide Me', path: '/coordinator-dashboard/guide-me' }
                 ];
             default:
                 return [];

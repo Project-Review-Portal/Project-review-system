@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
-import MaxTeamSizeSettings from './admin/MaxTeamSizeSettings';
+import AdminSettings from './admin/AdminSettings';
 import PanelManagement from './admin/PanelManagement';
-import GuideSelectionSettings from './admin/GuideSelectionSettings';
 import AdminViewAttendance from './admin/AdminViewAttendance';
 import AdminManageReviewSchedules from './admin/AdminManageReviewSchedules';
 import AdminViewAvailabilities from './admin/AdminViewAvailabilities';
 import UserManagement from './admin/UserManagement';
 import AllocationsDashboard from './admin/AllocationsDashboard';
-import ReviewsVivaSettings from './admin/ReviewsVivaSettings';
 import GuideMe from './GuideMe';
 import GuideUploadAttendance from './guide/GuideUploadAttendance';
 
@@ -32,14 +30,12 @@ const AdminDashboard = () => {
 
     const renderContent = () => {
         switch (location.pathname) {
-            case '/admin-dashboard/settings':
-                return <MaxTeamSizeSettings />;
+            case '/admin-dashboard/admin-settings':
+                return <AdminSettings />;
             case '/admin-dashboard/panel-creation':
                 return <PanelManagement />;
             case '/admin-dashboard/allocations':
                 return <AllocationsDashboard />;
-            case '/admin-dashboard/guide-selection':
-                return <GuideSelectionSettings />;
             case '/admin-dashboard/view-attendance':
                 return <AdminViewAttendance />;
             case '/admin-dashboard/upload-attendance':
@@ -50,8 +46,6 @@ const AdminDashboard = () => {
                 return <AdminViewAvailabilities />;
             case '/admin-dashboard/user-management':
                 return <UserManagement />;
-            case '/admin-dashboard/reviews-viva-settings':
-                return <ReviewsVivaSettings />;
             case '/admin-dashboard/guide-me':
                 return <GuideMe userRole={user.role} memberType={user.memberType} />;
             default:

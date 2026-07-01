@@ -626,105 +626,35 @@ exports.requestLock = async (req, res) => {
         const acceptedMembers = team.memberStatus.filter(m => m.status === 'accepted');
         team.members = acceptedMembers.map(m => m.user);
         team.isTeamComplete = true; 
+        team.isLocked = true;
+        team.lockRequested = false;
+        
+        // Reset lock approval consensus flags
+        team.memberStatus.forEach(m => {
+            if (m.status === 'accepted') {
+                m.lockApproved = true;
+            }
+        });
 
-        // Conditional Solo vs Group handling
-        if (acceptedMembers.length === 0) {
-            // No other accepted members, and zero pending members -> Lock solo instantly
-            team.isLocked = true;
-            team.lockRequested = false;
-            
-            await team.save();
-            return res.json({ 
-                message: 'Your solo team configuration has been finalized and locked successfully!', 
-                team 
-            });
-        } else {
-            // Group has accepted partners -> Start the collaborative voting loop
-            team.lockRequested = true;
-            
-            // Reset lock approval consensus flags
-            team.memberStatus.forEach(m => {
-                if (m.status === 'accepted') {
-                    m.lockApproved = false;
-                }
-            });
-
-            await team.save();
-            return res.json({ 
-                message: 'Lock request sent to team members successfully!', 
-                team 
-            });
-        }
+        await team.save();
+        return res.json({ 
+            message: 'Your team configuration has been finalized and locked successfully!', 
+            team 
+        });
     } catch (error) {
-        console.error('Error requesting team lock:', error);
-        res.status(500).json({ message: 'Error requesting team lock.' });
+        console.error('Error locking team:', error);
+        res.status(500).json({ message: 'Error locking team.' });
     }
 };
 
 // Cancel lock request (leader only)
 exports.cancelLockRequest = async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const team = await Team.findOne({ teamLeader: userId });
-        if (!team) {
-            return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
-        }
-
-        if (team.isLocked) {
-            return res.status(400).json({ message: 'Cannot cancel. The team is already locked.' });
-        }
-
-        team.lockRequested = false;
-        team.memberStatus.forEach(m => {
-            m.lockApproved = false;
-        });
-
-        await team.save();
-        res.json({ message: 'Lock request cancelled successfully!', team });
-    } catch (error) {
-        console.error('Error cancelling lock request:', error);
-        res.status(500).json({ message: 'Error cancelling lock request.' });
-    }
+    return res.status(400).json({ message: 'Team lock is immediate. There is no pending lock request to cancel.' });
 };
 
 // Approve lock request (member only)
 exports.approveLock = async (req, res) => {
-    try {
-        const userId = req.user.id;
-        
-        // Find team where user is an accepted member and lock is requested
-        const team = await Team.findOne({
-            members: userId,
-            lockRequested: true
-        });
-
-        if (!team) {
-            return res.status(404).json({ message: 'No active lock request found for your team.' });
-        }
-
-        if (team.isLocked) {
-            return res.status(400).json({ message: 'The team is already locked.' });
-        }
-
-        const memberIdx = team.memberStatus.findIndex(m => m.user.toString() === userId && m.status === 'accepted');
-        if (memberIdx === -1) {
-            return res.status(400).json({ message: 'Member not found or status not accepted.' });
-        }
-
-        team.memberStatus[memberIdx].lockApproved = true;
-
-        // Check if all accepted members have approved lock
-        const allApproved = team.memberStatus.filter(m => m.status === 'accepted').every(m => m.lockApproved === true);
-        if (allApproved) {
-            team.isLocked = true;
-        }
-
-        await team.save();
-        res.json({ message: 'Lock approved successfully!', team });
-    } catch (error) {
-        console.error('Error approving lock request:', error);
-        res.status(500).json({ message: 'Error approving lock request.' });
-    }
+    return res.status(400).json({ message: 'Team lock is immediate. Member approval is not required.' });
 };
 
 // Cancel guide request (leader only)

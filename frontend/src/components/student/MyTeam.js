@@ -148,7 +148,7 @@ const MyTeam = () => {
         const isSoloTeam = acceptedMembersOnly.length === 0;
         const confirmationMessage = isSoloTeam
             ? 'Are you sure you want to lock and finalize your solo team? You cannot add members after locking.'
-            : 'Are you sure you want to request to lock the team? Once locked, you cannot modify members.';
+            : 'Are you sure you want to lock the team? Once locked, you cannot modify members.';
 
         if (!window.confirm(confirmationMessage)) {
             return;
@@ -162,39 +162,6 @@ const MyTeam = () => {
             fetchMyTeam();
         } catch (err) {
             setInviteError(err.response?.data?.message || 'Failed to process lock request.');
-        }
-    };
-
-    const handleCancelLockRequest = async () => {
-        setInviteError('');
-        setInviteSuccess('');
-        if (!window.confirm('Are you sure you want to cancel the lock request?')) {
-            return;
-        }
-        try {
-            const token = localStorage.getItem('token');
-            const res = await axios.post('http://localhost:5000/api/teams/cancel-lock', {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setInviteSuccess(res.data.message || 'Lock request cancelled successfully!');
-            fetchMyTeam();
-        } catch (err) {
-            setInviteError(err.response?.data?.message || 'Failed to cancel lock request.');
-        }
-    };
-
-    const handleApproveLock = async () => {
-        setInviteError('');
-        setInviteSuccess('');
-        try {
-            const token = localStorage.getItem('token');
-            const res = await axios.post('http://localhost:5000/api/teams/approve-lock', {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setInviteSuccess(res.data.message || 'Lock approved successfully!');
-            fetchMyTeam();
-        } catch (err) {
-            setInviteError(err.response?.data?.message || 'Failed to approve lock request.');
         }
     };
 
@@ -227,9 +194,6 @@ const MyTeam = () => {
     const acceptedMembersOnly = memberList.filter(m => m.status === 'accepted');
     const pendingMembersOnly = memberList.filter(m => m.status === 'pending');
     const rejectedMembers = memberList.filter(m => m.status === 'rejected');
-
-    const myStatus = team.memberStatus?.find(m => m.user?._id === currentUserId || m.user === currentUserId);
-    const hasApprovedLock = myStatus?.lockApproved;
 
     const canLockTeam = pendingMembersOnly.length === 0;
 
@@ -272,51 +236,20 @@ const MyTeam = () => {
                 </div>
             )}
 
-            {!team.isLocked && team.lockRequested && (
-                <div className="p-4 bg-indigo-50 border-l-4 border-indigo-500 text-indigo-800 rounded shadow-sm space-y-3">
-                    <h4 className="font-bold">🔒 Lock Request Pending</h4>
-                    <p className="text-sm">The team leader has requested to lock the team to finalize it. All members must approve to lock the team.</p>
-                    
-                    {!isLeader && myStatus && myStatus.status === 'accepted' && !hasApprovedLock && (
-                        <button
-                            onClick={handleApproveLock}
-                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-semibold transition-colors"
-                        >
-                            Approve Lock Request
-                        </button>
-                    )}
-                    
-                    {!isLeader && myStatus && hasApprovedLock && (
-                        <div className="text-sm text-green-600 font-semibold flex items-center gap-1">
-                            <span>✓ You have approved this lock request. Waiting for other members.</span>
-                        </div>
-                    )}
-
-                    {isLeader && (
-                        <button
-                            onClick={handleCancelLockRequest}
-                            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold transition-colors"
-                        >
-                            Cancel Lock Request
-                        </button>
-                    )}
-                </div>
-            )}
-
-            {!team.isLocked && !team.lockRequested && isLeader && canLockTeam && (
+            {!team.isLocked && isLeader && canLockTeam && (
                 <div className="p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-800 rounded shadow-sm space-y-2">
                     <h4 className="font-bold">🔒 Finalize Team Setup</h4>
                     <p className="text-sm">
                         {acceptedMembersOnly.length === 0 
                             ? "You don't have any accepted team members. Locking now will instantly finalize this as a Solo Project." 
-                            : "All invited members have accepted. Locking the team requires approval consensus from all members."
+                            : "All invited members have accepted. You can lock and finalize this team setup. Once locked, no more members can be added or removed."
                         }
                     </p>
                     <button
                         onClick={handleRequestLock}
                         className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-semibold transition-colors"
                     >
-                        {acceptedMembersOnly.length === 0 ? 'Lock Team Instantly' : 'Request Team Lock'}
+                        {acceptedMembersOnly.length === 0 ? 'Lock Team Instantly' : 'Lock Team'}
                     </button>
                 </div>
             )}

@@ -7,6 +7,7 @@ const MaxTeamSizeSettings = () => {
     const [reviewPeriodEndDate, setReviewPeriodEndDate] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [message, setMessage] = useState(null);
 
     useEffect(() => {
         fetchSettings();
@@ -41,7 +42,7 @@ const MaxTeamSizeSettings = () => {
             await axios.post('/api/admin/team-size', { maxTeamSize }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            alert('Max team size updated successfully!');
+            setMessage('Max team size updated successfully!');
         } catch (err) {
             console.error('Error updating max team size:', err);
             setError('Failed to update max team size');
@@ -54,6 +55,17 @@ const MaxTeamSizeSettings = () => {
     return (
         <div className="bg-white p-6 rounded-lg shadow">
             <h2 className="text-2xl font-bold mb-6">Admin Settings</h2>
+
+            {message && (
+                <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
+                    {message}
+                </div>
+            )}
+            {error && (
+                <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+                    {error}
+                </div>
+            )}
 
             {/* Max Team Size Setting */}
             <div className="mb-8 p-4 border rounded-lg">
