@@ -82,7 +82,7 @@ const MaxTeamSizeSettings = () => {
 
 
 
-            /* For pg */ Likely to be removed
+           {/*   For pg ... Likely to be removed
 
             <div className="mb-8 p-4 border rounded-lg">
                 <h3 className="text-xl font-semibold mb-4">PG Team Size</h3>
@@ -114,7 +114,7 @@ const MaxTeamSizeSettings = () => {
                         Update Max Team Size
                     </button>
                 </form>
-            </div>
+            </div> */}
         </div>
     );
 };

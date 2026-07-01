@@ -2051,12 +2051,13 @@ exports.updateTeamAllocation = async (req, res) => {
                         warnings.push(
                             `Warning: Guide ${guideName} has already exceeded their team limit (${currentApprovedCount}/${limitStatus.teamLimit}).`
                         );
-                    } else if (currentApprovedCount === limitStatus.teamLimit) {
+                    } 
+                    /* else if (currentApprovedCount === limitStatus.teamLimit) {
                         // The guide was exactly at capacity, and assigning this team pushes them over
                         warnings.push(
                             `Warning: Guide ${guideName} has reached their team limit (${currentApprovedCount}/${limitStatus.teamLimit}). Assigning this team will exceed it.`
                         );
-                    }
+                    } */
                 }
                 // ---------------------------------------------------------------------
 
