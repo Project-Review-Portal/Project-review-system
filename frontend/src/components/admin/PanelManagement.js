@@ -174,13 +174,13 @@ const PanelManagement = () => {
     }
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow space-y-6">
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6">
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-semibold">Panel Management</h2>
+                <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Panel Management</h2>
                 {!showPanelForm && (
                     <button
                         onClick={() => { handleClearForm(); setShowPanelForm(true); }}
-                        className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        className="inline-flex justify-center py-2 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none shadow-md hover:shadow-lg transition duration-200"
                     >
                         Create New Panel
                     </button>
@@ -188,83 +188,94 @@ const PanelManagement = () => {
             </div>
             
             {message && (
-                <div className="p-3 bg-green-100 text-green-700 rounded">
+                <div className="p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl">
                     {message}
                 </div>
             )}
             {error && (
-                <div className="p-3 bg-red-100 text-red-700 rounded">
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl">
                     {error}
                 </div>
             )}
 
             {/* Master Panels Table View */}
-            <div className="border rounded-lg overflow-hidden shadow-sm bg-gray-50">
-                <div className="p-4 bg-white border-b">
-                    <h3 className="text-xl font-semibold text-gray-800">Existing System Panels</h3>
+            <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-md bg-white">
+                <div className="p-4 bg-slate-50 border-b border-slate-200">
+                    <h3 className="text-lg font-bold text-slate-800">Existing Panels</h3>
                 </div>
                 <div className="overflow-x-auto">
                     {panels.length === 0 ? (
                         <p className="text-gray-500 text-center py-6 bg-white">No panels created yet.</p>
                     ) : (
-                        <table className="min-w-full divide-y divide-gray-200 bg-white">
-                            <thead className="bg-gray-50">
+                        <table className="min-w-full divide-y divide-slate-200 bg-white">
+                            <thead className="bg-slate-100/80">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Panel Name</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Members</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Coordinator</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assistant Coordinators</th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Teams</th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200">Panel Name</th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200">Members</th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200">Coordinator</th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200">Assistant Coordinators</th>
+                                    <th className="px-6 py-4 text-center text-xs font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200">Assigned Teams</th>
+                                    <th className="px-6 py-4 text-center text-xs font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-200">
+                            <tbody className="divide-y divide-slate-200">
                                 {panels.map((panel) => (
-                                    <tr key={panel._id} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    <tr key={panel._id} className="hover:bg-slate-50/50">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900 border-b border-slate-200/60">
                                             {panel.name}
                                         </td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">
-                                            {panel.members && panel.members.map(m => `${m.name} (${m.memberType || 'Internal'})`).join(', ')}
+                                        <td className="px-6 py-4 text-sm text-slate-600 border-b border-slate-200/60">
+                                            {panel.members && panel.members.map(m => m.name).join(', ')}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                {panel.coordinator ? (typeof panel.coordinator === 'object' ? panel.coordinator.name : panel.coordinator) : 'None'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">
-                                            {panel.assistantCoordinators && panel.assistantCoordinators.length > 0 ? (
-                                                panel.assistantCoordinators
-                                                    .map(ac => {
-                                                        if (!ac) return null;
-                                                        return typeof ac === 'object' ? (ac.name || ac._id) : ac;
-                                                    })
-                                                    .filter(Boolean)
-                                                    .join(', ')
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-800 font-semibold border-b border-slate-200/60">
+                                            {panel.coordinator ? (
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                                                    <span>{typeof panel.coordinator === 'object' ? panel.coordinator.name : panel.coordinator}</span>
+                                                </div>
                                             ) : (
-                                                <span className="text-gray-400 italic">None Assigned</span>
+                                                <span className="text-slate-400 italic font-normal">None Assigned</span>
                                             )}
                                         </td>
-                                        {/* New Column Displaying Dynamic Team Counts from Junction Document */}
-                                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full ${
+                                        <td className="px-6 py-4 text-sm text-slate-600 border-b border-slate-200/60">
+                                            {panel.assistantCoordinators && panel.assistantCoordinators.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {panel.assistantCoordinators
+                                                        .map(ac => {
+                                                            if (!ac) return null;
+                                                            const name = typeof ac === 'object' ? (ac.name || ac._id) : ac;
+                                                            return (
+                                                                <span key={ac._id || ac} className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 border border-slate-200 text-slate-700">
+                                                                    {name}
+                                                                </span>
+                                                            );
+                                                        })
+                                                        .filter(Boolean)}
+                                                </div>
+                                            ) : (
+                                                <span className="text-slate-400 italic font-normal">None Assigned</span>
+                                            )}
+                                        </td>
+                                        {/* New Column Displaying Dynamic Team Counts Display */}
+                                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm border-b border-slate-200/60">
+                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold border ${
                                                 panel.assignedTeamsCount > 0 
-                                                    ? 'bg-indigo-100 text-indigo-800' 
-                                                    : 'bg-gray-100 text-gray-500 font-normal'
+                                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-150 shadow-sm' 
+                                                    : 'bg-slate-50 text-slate-400 border-slate-200'
                                             }`}>
                                                 {panel.assignedTeamsCount || 0} {panel.assignedTeamsCount === 1 ? 'Team' : 'Teams'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium space-x-2">
+                                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-semibold space-x-4 border-b border-slate-200/60">
                                             <button
                                                 onClick={() => handleEdit(panel)}
-                                                className="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md shadow-sm transition"
+                                                className="text-indigo-600 hover:text-indigo-900 transition-colors duration-150"
                                             >
                                                 Edit
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(panel._id)}
-                                                className="inline-flex items-center px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-md shadow-sm transition"
+                                                className="text-rose-600 hover:text-rose-900 transition-colors duration-150"
                                             >
                                                 Delete
                                             </button>

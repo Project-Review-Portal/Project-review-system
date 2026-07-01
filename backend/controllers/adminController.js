@@ -2069,6 +2069,10 @@ exports.updateTeamAllocation = async (req, res) => {
 
         // Update Panel
         if (panelId !== undefined) {
+            const TeamPanelAssignment = require('../models/TeamPanelAssignment');
+            // Pull the team from any existing panel assignments first
+            await TeamPanelAssignment.updateMany({}, { $pull: { teams: teamId } });
+
             if (panelId === null) {
                 team.panel = null;
                 team.coordinator = null;
@@ -2079,6 +2083,13 @@ exports.updateTeamAllocation = async (req, res) => {
                 }
                 team.panel = panelId;
                 team.coordinator = panel.coordinator;
+
+                // Push the team to the new panel assignment record
+                await TeamPanelAssignment.findOneAndUpdate(
+                    { panel: panelId },
+                    { $addToSet: { teams: teamId } },
+                    { upsert: true }
+                );
             }
             updated = true;
         }

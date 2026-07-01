@@ -538,16 +538,6 @@ exports.uploadAttendance = async (req, res) => {
         if (!team) {
             return res.status(404).json({ message: 'Team not found or not approved.' });
         }
-
-        // Check if attendance is locked
-        const existingAttendance = await Attendance.findOne({ team: teamId });
-        if (existingAttendance && existingAttendance.isLocked) {
-            // Only admin can edit a locked attendance
-            const isAdmin = role === 'admin' || subRoles.some(r => r.role === 'admin');
-            if (!isAdmin) {
-                return res.status(400).json({ message: 'Attendance is locked and cannot be modified.' });
-            }
-        }
         
         await Attendance.findOneAndUpdate(
             { team: teamId },

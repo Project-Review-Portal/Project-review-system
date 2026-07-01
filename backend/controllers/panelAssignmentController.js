@@ -290,6 +290,9 @@ exports.assignPanelToTeam = async (req, res) => {
          */
         
 
+        // Pull the team from any existing panel assignments first
+        await TeamPanelAssignment.updateMany({}, { $pull: { teams: teamId } });
+
         // Assign panel and coordinator to team
         team.panel = panelId;
         team.coordinator = panel.coordinator; // Assign the panel's coordinator to the team

@@ -77,48 +77,55 @@ const AllocationsDashboard = () => {
         }));
     };
 
-    const handleSave = async (teamId) => {
+    const handleSaveAll = async () => {
         setError('');
-        try {
-            const { guideId, panelId } = allocations[teamId];
-            const res = await axios.put(`/api/admin/allocations/${teamId}`, {
-                guideId: guideId || null,
-                panelId: panelId || null
-            }, { headers });
-            
-            const teamInfo = teams.find(t => t._id === teamId);
-            const teamName = teamInfo ? teamInfo.teamName : 'Unknown Team';
-            
-            const guideInfo = guides.find(g => g._id === guideId);
-            const guideName = guideInfo ? guideInfo.name : 'No Guide';
-            
-            const panelInfo = panels.find(p => p._id === panelId);
-            const panelName = panelInfo ? panelInfo.name : 'No Panel';
+        setMessage('');
+        const modifiedTeamIds = Object.keys(allocations).filter(teamId => hasChanges(teamId));
+        if (modifiedTeamIds.length === 0) return;
 
-            // Check if backend returned any soft capacity warnings
-            if (res.data.warnings && res.data.warnings.length > 0) {
+        try {
+            const results = await Promise.all(
+                modifiedTeamIds.map(async (teamId) => {
+                    const { guideId, panelId } = allocations[teamId];
+                    const res = await axios.put(`/api/admin/allocations/${teamId}`, {
+                        guideId: guideId || null,
+                        panelId: panelId || null
+                    }, { headers });
+
+                    const teamInfo = teams.find(t => t._id === teamId);
+                    return {
+                        teamName: teamInfo ? teamInfo.teamName : 'Unknown Team',
+                        warnings: res.data.warnings || []
+                    };
+                })
+            );
+
+            // Consolidate warnings
+            const allWarnings = [];
+            results.forEach(res => {
+                if (res.warnings && res.warnings.length > 0) {
+                    allWarnings.push(...res.warnings.map(w => `[${res.teamName}] ${w}`));
+                }
+            });
+
+            if (allWarnings.length > 0) {
                 setWarningModalSummary({
-                    title: 'Allocation Saved with Warnings',
-                    message: `Guide ${guideName} and Panel ${panelName} have been assigned to team ${teamName}, but capacity conditions were breached.`,
-                    warnings: res.data.warnings
+                    title: 'Allocations Saved with Warnings',
+                    message: 'All allocations have been successfully updated, but some capacity constraints were exceeded.',
+                    warnings: allWarnings
                 });
                 setWarningModalOpen(true);
             } else {
-                // If clean execution, show standard toast message
-                setMessage(`Guide ${guideName} and Panel ${panelName} have been saved to team ${teamName}.`);
-                setTimeout(() => setMessage(''), 5000); 
+                setMessage('All allocations saved successfully!');
+                setTimeout(() => setMessage(''), 5000);
             }
-            
-            // Update original states
-            setOriginalAllocations(prev => ({
-                ...prev,
-                [teamId]: { ...allocations[teamId] }
-            }));
-            
+
+            // Sync original allocations state
+            setOriginalAllocations(JSON.parse(JSON.stringify(allocations)));
             fetchData();
         } catch (err) {
-            console.error('Error saving allocation:', err);
-            setError(err.response?.data?.message || 'Failed to save allocation');
+            console.error('Error saving all allocations:', err);
+            setError(err.response?.data?.message || 'Failed to save all allocations');
         }
     };
 
@@ -198,46 +205,59 @@ const AllocationsDashboard = () => {
         <div className="bg-white p-6 rounded-lg shadow space-y-4 relative">
             <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-semibold">Allocations Dashboard</h2>
-                <button 
-                    onClick={handleAutoAssign} 
-                    disabled={autoAssigning}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded font-medium hover:bg-indigo-700 disabled:bg-indigo-400"
-                >
-                    {autoAssigning ? 'Assigning...' : 'Auto-Assign Panels'}
-                </button>
+                <div className="flex space-x-2">
+                    <button 
+                        onClick={handleSaveAll} 
+                        disabled={Object.keys(allocations).filter(teamId => hasChanges(teamId)).length === 0}
+                        className={`px-4 py-2 rounded font-medium transition duration-200 ${
+                            Object.keys(allocations).filter(teamId => hasChanges(teamId)).length > 0
+                                ? 'bg-green-600 hover:bg-green-700 text-white shadow-sm hover:shadow' 
+                                : 'bg-gray-150 text-gray-400 cursor-not-allowed'
+                        }`}
+                    >
+                        Save All Changes ({Object.keys(allocations).filter(teamId => hasChanges(teamId)).length})
+                    </button>
+                    <button 
+                        onClick={handleAutoAssign} 
+                        disabled={autoAssigning}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded font-medium hover:bg-indigo-700 disabled:bg-indigo-400"
+                    >
+                        {autoAssigning ? 'Assigning...' : 'Auto-Assign Panels'}
+                    </button>
+                </div>
             </div>
 
             {message && <div className="p-3 bg-green-100 text-green-700 rounded transition-all">{message}</div>}
             {error && <div className="p-3 bg-red-100 text-red-700 rounded">{error}</div>}
 
             {teams.length === 0 ? (
-                <p className="text-gray-500">No teams found.</p>
+                <p className="text-slate-500 font-medium">No teams found.</p>
             ) : (
-                <div className="overflow-x-auto">
-                    <table className="min-w-full border border-gray-200">
-                        <thead>
-                            <tr className="bg-gray-100 text-left">
-                                <th className="px-3 py-2 border">Team Name</th>
-                                <th className="px-3 py-2 border">Leader</th>
-                                <th className="px-3 py-2 border">Members</th>
-                                <th className="px-3 py-2 border">Guide</th>
-                                <th className="px-3 py-2 border">Panel</th>
-                                <th className="px-3 py-2 border">Actions</th>
+                <div className="overflow-x-auto border border-slate-200 rounded-2xl shadow-md bg-white">
+                    <table className="min-w-full divide-y divide-slate-200 bg-white">
+                        <thead className="bg-slate-100/80">
+                            <tr className="text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                <th className="px-4 py-3.5 border-b border-slate-200">Team Name</th>
+                                <th className="px-4 py-3.5 border-b border-slate-200">Leader</th>
+                                <th className="px-4 py-3.5 border-b border-slate-200">Members</th>
+                                <th className="px-4 py-3.5 border-b border-slate-200">Guide</th>
+                                <th className="px-4 py-3.5 border-b border-slate-200">Panel</th>
+                                <th className="px-4 py-3.5 text-center border-b border-slate-200">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-slate-200">
                             {teams.map(team => {
                                 const currentAlloc = allocations[team._id] || {};
                                 
                                 return (
-                                <tr key={team._id} className="hover:bg-gray-50">
-                                    <td className="px-3 py-2 border font-medium">{team.teamName}</td>
-                                    <td className="px-3 py-2 border">{team.teamLeader ? `${team.teamLeader.name}` : '—'}</td>
-                                    <td className="px-3 py-2 border">{(team.members || []).map(m => m.name).join(', ') || '—'}</td>
+                                <tr key={team._id} className="hover:bg-slate-50/50">
+                                    <td className="px-4 py-3.5 font-bold text-slate-900 border-b border-slate-200/60">{team.teamName}</td>
+                                    <td className="px-4 py-3.5 text-sm text-slate-800 border-b border-slate-200/60">{team.teamLeader ? `${team.teamLeader.name}` : '—'}</td>
+                                    <td className="px-4 py-3.5 text-sm text-slate-600 border-b border-slate-200/60">{(team.members || []).map(m => m.name).join(', ') || '—'}</td>
                                     
-                                    <td className="px-3 py-2 border">
+                                    <td className="px-4 py-3.5 border-b border-slate-200/60">
                                         <select 
-                                            className="w-full border rounded px-2 py-1"
+                                            className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                             value={currentAlloc.guideId}
                                             onChange={(e) => handleAllocationChange(team._id, 'guideId', e.target.value)}
                                         >
@@ -249,13 +269,13 @@ const AllocationsDashboard = () => {
                                     </td>
                                     
                                     <td 
-                                        className="px-3 py-2 border"
+                                        className="px-4 py-3.5 border-b border-slate-200/60"
                                         onMouseEnter={(e) => currentAlloc.panelId && handleMouseEnterPanel(e, currentAlloc.panelId)}
                                         onMouseMove={currentAlloc.panelId ? updateTooltipPosition : undefined}
                                         onMouseLeave={handleMouseLeavePanel}
                                     >
                                         <select 
-                                            className="w-full border rounded px-2 py-1"
+                                            className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                             value={currentAlloc.panelId}
                                             onChange={(e) => {
                                                 handleAllocationChange(team._id, 'panelId', e.target.value);
@@ -283,19 +303,30 @@ const AllocationsDashboard = () => {
                                         </select>
                                     </td>
                                     
-                                    <td className="px-3 py-2 border text-center">
-                                        <div className="flex space-x-2 justify-center items-center h-full">
+                                    <td className="px-4 py-3.5 border-b border-slate-200/60 text-center">
+                                        <div className="flex space-x-3 justify-center items-center h-full">
                                             {hasChanges(team._id) ? (
-                                                <>
-                                                    <button onClick={() => handleSave(team._id)} className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700">Save</button>
-                                                    <button onClick={() => handleCancel(team._id)} className="px-3 py-1 bg-gray-400 text-white rounded text-xs hover:bg-gray-500">Cancel</button>
-                                                </>
+                                                <div className="flex items-center space-x-2">
+                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-100 text-yellow-800 border border-yellow-200">
+                                                        Unsaved
+                                                    </span>
+                                                    <button 
+                                                        onClick={() => handleCancel(team._id)} 
+                                                        className="text-gray-500 hover:text-gray-700 text-xs font-semibold underline"
+                                                        title="Revert changes for this team"
+                                                    >
+                                                        Undo
+                                                    </button>
+                                                </div>
                                             ) : (
-                                                <span className="text-gray-400 text-xs italic px-3 py-1">Saved</span>
+                                                <span className="text-emerald-600 text-xs font-semibold px-3 py-1 flex items-center gap-1 justify-center">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                    Saved
+                                                </span>
                                             )}
                                             <button 
                                                 onClick={() => handleRemove(team._id)} 
-                                                className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                                                className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded"
                                                 title="Completely remove and delete team"
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
