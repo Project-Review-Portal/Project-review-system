@@ -30,6 +30,15 @@ const attendanceSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    reviewDates: [{
+        name: {
+            type: String,
+            required: true
+        },
+        date: {
+            type: Date
+        }
+    }],
     isLocked: {
         type: Boolean,
         default: false

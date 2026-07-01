@@ -4,6 +4,7 @@ import axios from 'axios';
 const GuideUploadAttendance = () => {
     const [assignedTeams, setAssignedTeams] = useState([]);
     const [attendanceData, setAttendanceData] = useState({}); // { studentId: { review1: bool, ... } }
+    const [reviewDates, setReviewDates] = useState({}); // { teamId: { review0: "YYYY-MM-DDTHH:mm", ... } }
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [reviewEvents, setReviewEvents] = useState(['review1', 'review2', 'review3', 'viva']);
@@ -45,7 +46,13 @@ const GuideUploadAttendance = () => {
             setAssignedTeams(teamsRes.data);
 
             const existingAttendanceRes = await axios.get('/api/guide/daily-attendance', { headers });
-            setAttendanceData(existingAttendanceRes.data);
+            if (existingAttendanceRes.data && existingAttendanceRes.data.attendanceData) {
+                setAttendanceData(existingAttendanceRes.data.attendanceData);
+                setReviewDates(existingAttendanceRes.data.reviewDates || {});
+            } else {
+                setAttendanceData(existingAttendanceRes.data || {});
+                setReviewDates({});
+            }
 
             setLoading(false);
         } catch (err) {
@@ -62,6 +69,16 @@ const GuideUploadAttendance = () => {
                 ...(prev[studentId] || {}),
                 [reviewEvent]: isPresent,
             },
+        }));
+    };
+
+    const handleReviewDateChange = (teamId, reviewEvent, dateValue) => {
+        setReviewDates(prev => ({
+            ...prev,
+            [teamId]: {
+                ...(prev[teamId] || {}),
+                [reviewEvent]: dateValue
+            }
         }));
     };
 
@@ -97,8 +114,18 @@ const GuideUploadAttendance = () => {
                 });
             });
             
+            // Map frontend dates to schema format
+            const formattedDates = Object.entries(reviewDates[teamId] || {}).map(([name, date]) => ({
+                name,
+                date: date || null
+            }));
+
             // Sends the restructured array matching Mongoose schema
-            await axios.post('/api/guide/upload-attendance', { teamId, studentAttendances }, { headers });
+            await axios.post('/api/guide/upload-attendance', { 
+                teamId, 
+                studentAttendances,
+                reviewDates: formattedDates
+            }, { headers });
             showNotification('Success', `Attendance for ${team.teamName} submitted successfully!`, 'success');
             fetchData();
         } catch (err) {
@@ -176,8 +203,14 @@ const GuideUploadAttendance = () => {
                                         <tr>
                                             <th className="py-3.5 px-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Student Name</th>
                                             {reviewEvents.map(event => (
-                                                <th key={event} className="py-3.5 px-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                                    {event.toUpperCase()} 
+                                                <th key={event} className="py-2.5 px-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-150">
+                                                    <div className="mb-1.5">{event.toUpperCase().replace('REVIEW', 'REVIEW ')}</div>
+                                                    <input
+                                                        type="datetime-local"
+                                                        value={reviewDates[team._id]?.[event] || ''}
+                                                        onChange={(e) => handleReviewDateChange(team._id, event, e.target.value)}
+                                                        className="block mx-auto p-1 text-[11px] font-normal border border-slate-200 rounded-lg text-slate-800 bg-white shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[140px]"
+                                                    />
                                                 </th>
                                             ))}
                                             <th className="py-3.5 px-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Attendance %</th>
@@ -187,7 +220,7 @@ const GuideUploadAttendance = () => {
                                         {/* Team Leader */}
                                         {team.teamLeader && (
                                             <tr key={team.teamLeader._id} className="hover:bg-slate-50/50 bg-indigo-50/30">
-                                                <td className="py-4 px-4 text-left text-sm text-slate-900 font-semibold">{team.teamLeader.name} <span className="ml-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">Leader</span></td>
+                                                <td className="py-4 px-4 text-left text-sm text-slate-900 font-semibold">{team.teamLeader.name}{/*  <span className="ml-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">Leader</span> */}</td>
                                                 {reviewEvents.map(event => {
                                                     const isPresent = attendanceData[team.teamLeader._id]?.[event] || false;
                                                     return (

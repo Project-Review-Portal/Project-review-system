@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Credits = () => {
+/* const Credits = () => {
     const teamMembers = [
         {
             name: "Roopa Varshni R",
@@ -64,6 +64,10 @@ const Credits = () => {
             </div>
         </div>
     );
-};
+}; */
+
+const Credits = () => {
+    return <></>
+}
 
 export default Credits; 

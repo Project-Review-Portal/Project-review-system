@@ -509,7 +509,27 @@ exports.getDailyAttendance = async (req, res) => {
             }
         }
 
-        res.json(formattedAttendance);
+        const formattedReviewDates = {};
+        for (const record of attendanceRecords) {
+            const teamIdStr = record.team.toString();
+            formattedReviewDates[teamIdStr] = {};
+            if (record.reviewDates && Array.isArray(record.reviewDates)) {
+                for (const rd of record.reviewDates) {
+                    if (rd.date) {
+                        const d = new Date(rd.date);
+                        const offset = d.getTimezoneOffset();
+                        const localTime = new Date(d.getTime() - (offset * 60 * 1000));
+                        const formatted = localTime.toISOString().slice(0, 16);
+                        formattedReviewDates[teamIdStr][rd.name] = formatted;
+                    }
+                }
+            }
+        }
+
+        res.json({
+            attendanceData: formattedAttendance,
+            reviewDates: formattedReviewDates
+        });
     } catch (error) {
         console.error('Error fetching attendance:', error);
         res.status(500).json({ message: 'Error fetching attendance' });
@@ -519,7 +539,7 @@ exports.getDailyAttendance = async (req, res) => {
 // Upload daily attendance
 exports.uploadAttendance = async (req, res) => {
     try {
-        const { teamId, studentAttendances } = req.body;
+        const { teamId, studentAttendances, reviewDates } = req.body;
         const userId = req.user.id;
         const role = req.user.role;
         const subRoles = req.user.roles || [];
@@ -544,6 +564,7 @@ exports.uploadAttendance = async (req, res) => {
             {
                 $set: {
                     studentAttendances: studentAttendances, 
+                    reviewDates: reviewDates || [],
                     guide: userId
                 }
             },
