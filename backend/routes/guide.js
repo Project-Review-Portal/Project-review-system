@@ -49,5 +49,5 @@ router.get('/marks', auth, authorize(['guide', 'admin']), guideController.getMar
 router.get('/reports', auth, authorize(['guide', 'admin']), guideController.getReportsForGuide);
 router.put('/reports/:reportId/approve', auth, authorize(['guide', 'admin']), guideController.approveReport);
 router.get('/reports/:reportId/download', auth, authorize(['guide', 'admin']), guideController.downloadReport);
-
+router.get('/capacity',auth,authorize(['guide']),guideController.getGuideCapacity);
 module.exports = router; 

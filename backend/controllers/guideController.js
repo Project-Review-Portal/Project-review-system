@@ -818,3 +818,37 @@ exports.downloadReport = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 }; 
+exports.getGuideCapacity = async (req, res) => {
+    try {
+        const guideId = req.user.id; 
+        const {
+            buildDesignationLimitMap,
+            getTeamCountsByGuideIds,
+            resolveGuideLimitStatus
+        } = require('../utils/guideTeamLimit');
+
+        // 1. Fetch the guide user object from the database
+        const guide = await User.findById(guideId);
+        if (!guide) {
+            return res.status(404).json({ message: 'Guide profile not found.' });
+        }
+        const designation = guide.designation || null;
+
+        // 2. Reuse your existing utility functions to compute limits
+        const limitMap = await buildDesignationLimitMap();
+        const countMap = await getTeamCountsByGuideIds([guide._id]);
+        
+        const currentApprovedCount = countMap.get(guide._id.toString()) || 0;
+        const limitStatus = resolveGuideLimitStatus(guide, currentApprovedCount, limitMap);
+
+        // 3. Return everything safely to the frontend container
+        return res.status(200).json({ 
+            designation: designation,
+            approvedCount: currentApprovedCount, 
+            maxTeams: limitStatus.teamLimit !== null ? limitStatus.teamLimit : 0
+        });
+    } catch (err) {
+        console.error('Error in getGuideCapacity:', err);
+        return res.status(500).json({ message: 'Server Error' });
+    }
+};
