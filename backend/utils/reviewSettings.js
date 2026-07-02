@@ -10,7 +10,7 @@ const getReviewSettings = async () => {
     const numReviews = (config && config.numReviews) ? config.numReviews : 3;
     const vivaRequired = config ? config.vivaRequired : true;
 
-    const validSlotTypes = ['review0'];
+    const validSlotTypes = [];
     for (let i = 1; i <= numReviews; i++) {
         validSlotTypes.push(`review${i}`);
     }
