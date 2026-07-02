@@ -566,7 +566,9 @@ exports.submitMarks = async (req, res) => {
             return res.status(400).json({ message: `Invalid or missing slotType. Expected one of ${validSlotTypes.join(', ')}.` });
         }
 
-
+        if (slotType === 'review0') {
+            return res.status(400).json({ message: 'Review 0 is attendance-only. No marks can be submitted for it.' });
+        }
 
         // External examiners can only mark Viva
         if (req.user.memberType === 'external' && slotType !== 'viva') {
