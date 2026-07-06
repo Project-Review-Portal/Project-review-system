@@ -9,8 +9,15 @@ const GuideRequestManagementForGuide = () => {
     const [guideSelectionDates, setGuideSelectionDates] = useState({ startDate: null, endDate: null });
     const [isRequestPeriodActive, setIsRequestPeriodActive] = useState(false);
 
+    // Track state values directly from your capacity endpoint
+    const [capacity, setCapacity] = useState({
+        designation: '',
+        approvedCount: 0,
+        maxTeams: 0
+    });
+
     useEffect(() => {
-        fetchGuideData(); // Renamed to fetch all guide-related data
+        fetchGuideData();
     }, []);
 
     const fetchGuideData = async () => {
@@ -26,7 +33,19 @@ const GuideRequestManagementForGuide = () => {
             }
             const headers = { Authorization: `Bearer ${token}` };
 
-            // Fetch guide selection dates from the new public endpoint
+            // 1. Fetch live metadata allocations from capacity route
+            try {
+                const capacityRes = await axios.get('http://localhost:5000/api/guide/capacity', { headers });
+                setCapacity({
+                    designation: capacityRes.data.designation,
+                    approvedCount: capacityRes.data.approvedCount,
+                    maxTeams: capacityRes.data.maxTeams
+                });
+            } catch (capErr) {
+                console.error('Error fetching backend capacity configuration:', capErr);
+            }
+
+            // Fetch guide selection dates
             const datesRes = await axios.get('http://localhost:5000/api/guide/selection-dates', { headers });
             const { startDate, endDate } = datesRes.data;
             setGuideSelectionDates({ startDate, endDate });
@@ -36,12 +55,12 @@ const GuideRequestManagementForGuide = () => {
             const activePeriod = now >= start && now <= end;
             setIsRequestPeriodActive(activePeriod);
 
-            // Fetch pending guide requests only if the period is active
+            // Fetch guide requests 
             if (activePeriod) {
                 const res = await axios.get('http://localhost:5000/api/guide/team-requests', { headers });
                 setRequests(res.data.filter(req => req.status === 'pending'));
             } else {
-                setRequests([]); // Clear requests if period is not active
+                setRequests([]); 
             }
         } catch (err) {
             console.error('Error fetching guide data:', err);
@@ -59,7 +78,7 @@ const GuideRequestManagementForGuide = () => {
             const headers = { Authorization: `Bearer ${token}` };
             await axios.post(`http://localhost:5000/api/guide/team-requests/${action}`, { teamId }, { headers });
             setMessage(`Request ${action === 'accept' ? 'accepted' : 'rejected'} successfully!`);
-            fetchGuideData(); // Re-fetch all data to update UI
+            fetchGuideData(); 
         } catch (err) {
             console.error(`Error ${action}ing request:`, err);
             setError(err.response?.data?.message || `Failed to ${action} request.`);
@@ -73,9 +92,48 @@ const GuideRequestManagementForGuide = () => {
     const hasNotStarted = guideSelectionDates.startDate && new Date() < new Date(guideSelectionDates.startDate);
     const hasEnded = guideSelectionDates.endDate && new Date() > new Date(guideSelectionDates.endDate);
 
+    // Derive remaining quota slots locally
+    const teamsLeft = Math.max(0, capacity.maxTeams - capacity.approvedCount);
+
     return (
         <div className="bg-white p-6 rounded-lg shadow space-y-6">
             <h2 className="text-2xl font-semibold mb-4">Team Requests</h2>
+
+            {/* CAPACITY CONTAINER & WARNING STATUS */}
+            <div className="space-y-3">
+                {/* 1. Main Professional Info Bar */}
+                <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-sm">
+                    <div>
+                        <h3 className="text-sm font-bold text-blue-900 uppercase tracking-wider">Allocation Status</h3>
+                        <p className="text-base font-medium text-gray-700 mt-1">
+                            As a <span className="font-semibold text-blue-700">{capacity.designation || 'Unassigned Role'}</span>, 
+                            you can approve <span className="font-bold text-indigo-700">{teamsLeft}</span> more {teamsLeft === 1 ? 'team' : 'teams'} (Quota: {capacity.approvedCount}/{capacity.maxTeams}).
+                        </p>
+                    </div>
+                    <div className={`${capacity.maxTeams === 0 ? 'bg-amber-600' : 'bg-blue-600'} text-white px-3 py-1.5 rounded-md text-sm font-bold shadow-sm whitespace-nowrap`}>
+                        {teamsLeft} Slots Available
+                    </div>
+                </div>
+
+                {/* 2. Error Message: Triggered when designation exists but quota returns 0 */}
+                {capacity.maxTeams === 0 && (
+                    <div className="p-3.5 bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-md font-medium flex items-start gap-2">
+                        <span className="text-base leading-none">⚠️</span> 
+                        <div>
+                            <span className="font-bold block mb-0.5">Quota Limit Configuration Missing</span>
+                            The designation <span className="font-semibold text-amber-700">"{capacity.designation || 'Unassigned'}"</span> has not been mapped to an approved allocation rule in the backend utility map. Please match the user profile spelling with system rules or notify your administrator.
+                        </div>
+                    </div>
+                )}
+
+                {/* 3. Soft Designation System Warning Callout (Fallback if string is completely empty) */}
+                {!capacity.designation && (
+                    <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded-md font-medium flex items-center">
+                        <span className="font-bold mr-1">⚠️ System Warning:</span> 
+                        No official academic designation detected on your profile. Quota defaults may be unapplied or restricted. Please contact your system admin.
+                    </div>
+                )}
+            </div>
 
             {message && (
                 <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
@@ -156,4 +214,4 @@ const GuideRequestManagementForGuide = () => {
     );
 };
 
-export default GuideRequestManagementForGuide; 
+export default GuideRequestManagementForGuide;
