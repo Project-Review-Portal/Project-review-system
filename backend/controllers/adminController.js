@@ -639,7 +639,8 @@ exports.getTeamPanelAssignments = async (req, res) => {
         const assignments = await Team.find({ panel: { $ne: null } })
             .populate('teamLeader', 'username name')
             .populate('guidePreference', 'username name')
-            .populate('panel', 'name members');
+            .populate('panel', 'name members')
+            .populate('vivaPanel', 'name members');
 
         res.json(assignments);
 
@@ -1129,6 +1130,13 @@ exports.getAllTeams = async (req, res) => {
             .populate('guidePreference', 'username name')
             .populate({
                 path: 'panel',
+                populate: {
+                    path: 'members',
+                    select: 'username name memberType'
+                }
+            })
+            .populate({
+                path: 'vivaPanel',
                 populate: {
                     path: 'members',
                     select: 'username name memberType'
@@ -2010,7 +2018,7 @@ exports.setReviewsVivaSettings = async (req, res) => {
 exports.updateTeamAllocation = async (req, res) => {
     try {
         const { teamId } = req.params;
-        const { guideId, panelId } = req.body;
+        const { guideId, panelId, vivaPanelId } = req.body;
 
         const team = await Team.findById(teamId);
         if (!team) {
@@ -2067,7 +2075,7 @@ exports.updateTeamAllocation = async (req, res) => {
             updated = true;
         }
 
-        // Update Panel
+        // Update Panel (Review Panel)
         if (panelId !== undefined) {
             const TeamPanelAssignment = require('../models/TeamPanelAssignment');
             // Pull the team from any existing panel assignments first
@@ -2094,6 +2102,20 @@ exports.updateTeamAllocation = async (req, res) => {
             updated = true;
         }
 
+        // Update Viva Panel
+        if (vivaPanelId !== undefined) {
+            if (vivaPanelId === null) {
+                team.vivaPanel = null;
+            } else {
+                const vivaPanel = await Panel.findById(vivaPanelId);
+                if (!vivaPanel) {
+                    return res.status(404).json({ message: 'Viva Panel not found.' });
+                }
+                team.vivaPanel = vivaPanelId;
+            }
+            updated = true;
+        }
+
         if (updated) {
             await team.save();
         }
@@ -2113,11 +2135,19 @@ exports.updateTeamAllocation = async (req, res) => {
 // Auto-assign panels to teams
 exports.autoAssignPanels = async (req, res) => {
     try {
-        const teams = await Team.find({ panel: null, status: 'approved' }).populate('guidePreference');
-        const panels = await Panel.find();
+        const { panelType } = req.body;
+        const isViva = panelType === 'viva';
+        const teamField = isViva ? 'vivaPanel' : 'panel';
+        const panelFilter = { panelType: isViva ? 'viva' : 'review' };
+        const typeLabel = isViva ? 'Viva Panel' : 'Panel';
+
+        // Find teams that don't have this type of panel assigned
+        const teamQuery = { [teamField]: null, status: 'approved' };
+        const teams = await Team.find(teamQuery).populate('guidePreference');
+        const panels = await Panel.find(panelFilter);
         
         if (panels.length === 0) {
-            return res.status(400).json({ message: 'No panels exist to assign.' });
+            return res.status(400).json({ message: `No ${typeLabel}s exist to assign.` });
         }
 
         let assignedCount = 0;
@@ -2126,7 +2156,7 @@ exports.autoAssignPanels = async (req, res) => {
         // Count current assignments for each panel to ensure even distribution
         const panelCounts = {};
         for (const p of panels) {
-            const count = await Team.countDocuments({ panel: p._id });
+            const count = await Team.countDocuments({ [teamField]: p._id });
             panelCounts[p._id.toString()] = count;
         }
 
@@ -2160,23 +2190,27 @@ exports.autoAssignPanels = async (req, res) => {
             if (!selectedPanel && conflictPanel) {
                 selectedPanel = conflictPanel;
                 const guideName = team.guidePreference ? team.guidePreference.name : 'Unknown Guide';
-                warnings.push(`Warning: Team ${team.teamName} has been assigned to Panel ${selectedPanel.name}, which contains their Guide (${guideName}) as a panel member.`);
+                warnings.push(`Warning: Team ${team.teamName} has been assigned to ${typeLabel} ${selectedPanel.name}, which contains their Guide (${guideName}) as a panel member.`);
             } else if (!selectedPanel && sortedPanels.length > 0) {
                 selectedPanel = sortedPanels[0];
             }
 
             if (selectedPanel) {
-                team.panel = selectedPanel._id;
-                team.coordinator = selectedPanel.coordinator;
+                team[teamField] = selectedPanel._id;
+                if (!isViva) {
+                    team.coordinator = selectedPanel.coordinator;
+                }
                 await team.save();
                 
-                // Also update TeamPanelAssignment model
-                const TeamPanelAssignment = require('../models/TeamPanelAssignment');
-                await TeamPanelAssignment.findOneAndUpdate(
-                    { panel: selectedPanel._id },
-                    { $addToSet: { teams: team._id } },
-                    { upsert: true }
-                );
+                // Also update TeamPanelAssignment model (for review panels only)
+                if (!isViva) {
+                    const TeamPanelAssignment = require('../models/TeamPanelAssignment');
+                    await TeamPanelAssignment.findOneAndUpdate(
+                        { panel: selectedPanel._id },
+                        { $addToSet: { teams: team._id } },
+                        { upsert: true }
+                    );
+                }
 
                 panelCounts[selectedPanel._id.toString()]++;
                 assignedCount++;
@@ -2184,7 +2218,7 @@ exports.autoAssignPanels = async (req, res) => {
         }
 
         res.json({
-            message: `Successfully assigned panels to ${assignedCount} teams.`,
+            message: `Successfully assigned ${typeLabel}s to ${assignedCount} teams.`,
             assignedCount,
             warnings
         });
@@ -2192,5 +2226,74 @@ exports.autoAssignPanels = async (req, res) => {
     } catch (error) {
         console.error('Error auto-assigning panels:', error);
         res.status(500).json({ message: 'Server error during auto-assignment' });
+    }
+};
+
+// Auto-assign guides to unassigned teams (for allocations dashboard)
+exports.autoAssignGuidesFromAllocations = async (req, res) => {
+    try {
+        const unassignedTeams = await Team.find({
+            $or: [
+                { guidePreference: null },
+                { status: 'pending' },
+                { status: 'rejected' }
+            ]
+        }).select('_id');
+
+        if (unassignedTeams.length === 0) {
+            return res.json({ message: 'No unassigned teams found to auto-assign guides.', assignedCount: 0, warnings: [] });
+        }
+
+        // Get all guides sorted by their current team count (ascending)
+        const guidesByTeamCount = await exports.getGuidesWithTeamCounts(
+            { ...req, originalUrl: '' }, // override originalUrl to trigger internal return
+            res, 
+            true
+        );
+
+        if (!guidesByTeamCount || guidesByTeamCount.length === 0) {
+            return res.status(404).json({ message: 'No guides available for assignment.' });
+        }
+
+        let assignedCount = 0;
+        const warnings = [];
+
+        for (const team of unassignedTeams) {
+            const currentTeam = await Team.findById(team._id).select('rejectedGuides');
+            const teamRejectedGuides = currentTeam ? currentTeam.rejectedGuides.map(id => id.toString()) : [];
+
+            const eligibleGuide = guidesByTeamCount.find(guide => {
+                const isRejectedByTeam = teamRejectedGuides.includes(guide._id.toString());
+                if (isRejectedByTeam) return false;
+                if (guide.teamLimit !== null && guide.teamCount >= guide.teamLimit) return false;
+                return true;
+            });
+
+            if (eligibleGuide) {
+                await Team.findByIdAndUpdate(team._id, {
+                    guidePreference: eligibleGuide._id,
+                    status: 'approved'
+                });
+                assignedCount++;
+
+                const updatedGuideIndex = guidesByTeamCount.findIndex(g => g._id.toString() === eligibleGuide._id.toString());
+                if (updatedGuideIndex !== -1) {
+                    guidesByTeamCount[updatedGuideIndex].teamCount++;
+                }
+                guidesByTeamCount.sort((a, b) => a.teamCount - b.teamCount);
+            } else {
+                warnings.push(`No eligible guide found for team ${team._id}.`);
+            }
+        }
+
+        res.json({ 
+            message: `Successfully assigned guides to ${assignedCount} teams.`, 
+            assignedCount,
+            warnings 
+        });
+
+    } catch (error) {
+        console.error('Error auto-assigning guides:', error);
+        res.status(500).json({ message: 'Server error during guide auto-assignment' });
     }
 };

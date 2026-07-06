@@ -4,7 +4,8 @@ import axios from 'axios';
 const AllocationsDashboard = () => {
     const [teams, setTeams] = useState([]);
     const [guides, setGuides] = useState([]);
-    const [panels, setPanels] = useState([]);
+    const [reviewPanels, setReviewPanels] = useState([]);
+    const [vivaPanels, setVivaPanels] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
@@ -46,14 +47,17 @@ const AllocationsDashboard = () => {
             );
             setGuides(internalGuides);
 
-            setPanels(panelsRes.data || []);
+            const allPanels = panelsRes.data || [];
+            setReviewPanels(allPanels.filter(p => p.panelType !== 'viva'));
+            setVivaPanels(allPanels.filter(p => p.panelType === 'viva'));
 
             // Initialize allocations state
             const initAllocations = {};
             allTeams.forEach(team => {
                 initAllocations[team._id] = {
                     guideId: team.guidePreference ? team.guidePreference._id || team.guidePreference : '',
-                    panelId: team.panel ? team.panel._id || team.panel : ''
+                    panelId: team.panel ? team.panel._id || team.panel : '',
+                    vivaPanelId: team.vivaPanel ? team.vivaPanel._id || team.vivaPanel : ''
                 };
             });
             setAllocations(initAllocations);
@@ -86,10 +90,11 @@ const AllocationsDashboard = () => {
         try {
             const results = await Promise.all(
                 modifiedTeamIds.map(async (teamId) => {
-                    const { guideId, panelId } = allocations[teamId];
+                    const { guideId, panelId, vivaPanelId } = allocations[teamId];
                     const res = await axios.put(`/api/admin/allocations/${teamId}`, {
                         guideId: guideId || null,
-                        panelId: panelId || null
+                        panelId: panelId || null,
+                        vivaPanelId: vivaPanelId || null
                     }, { headers });
 
                     const teamInfo = teams.find(t => t._id === teamId);
@@ -152,13 +157,33 @@ const AllocationsDashboard = () => {
         }
     };
 
-    const handleAutoAssign = async () => {
+    const handleAutoAssignGuides = async () => {
         setAutoAssigning(true);
         setError('');
         try {
-            const res = await axios.post('/api/admin/auto-assign-panels', {}, { headers });
+            const res = await axios.post('/api/admin/auto-assign-guides', {}, { headers });
             setWarningModalSummary({
-                title: 'Auto-Assignment Complete',
+                title: 'Guide Auto-Assignment Complete',
+                message: res.data.message,
+                warnings: res.data.warnings || []
+            });
+            setWarningModalOpen(true);
+            fetchData();
+        } catch (err) {
+            console.error('Error auto-assigning guides:', err);
+            setError(err.response?.data?.message || 'Failed to auto-assign guides.');
+        } finally {
+            setAutoAssigning(false);
+        }
+    };
+
+    const handleAutoAssign = async (type = 'review') => {
+        setAutoAssigning(true);
+        setError('');
+        try {
+            const res = await axios.post('/api/admin/auto-assign-panels', { panelType: type }, { headers });
+            setWarningModalSummary({
+                title: `${type === 'viva' ? 'Viva Panel' : 'Review Panel'} Auto-Assignment Complete`,
                 message: res.data.message,
                 warnings: res.data.warnings || []
             });
@@ -175,11 +200,12 @@ const AllocationsDashboard = () => {
     const hasChanges = (teamId) => {
         const current = allocations[teamId];
         const original = originalAllocations[teamId];
-        return current && original && (current.guideId !== original.guideId || current.panelId !== original.panelId);
+        return current && original && (current.guideId !== original.guideId || current.panelId !== original.panelId || current.vivaPanelId !== original.vivaPanelId);
     };
 
-    const handleMouseEnterPanel = (e, panelId) => {
-        const panelObj = panels.find(p => p._id === panelId);
+    const handleMouseEnterPanel = (e, panelId, type) => {
+        const allPanels = type === 'viva' ? vivaPanels : reviewPanels;
+        const panelObj = allPanels.find(p => p._id === panelId);
         if (panelObj) {
             setHoveredPanel(panelObj);
             updateTooltipPosition(e);
@@ -217,13 +243,6 @@ const AllocationsDashboard = () => {
                     >
                         Save All Changes ({Object.keys(allocations).filter(teamId => hasChanges(teamId)).length})
                     </button>
-                    <button 
-                        onClick={handleAutoAssign} 
-                        disabled={autoAssigning}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded font-medium hover:bg-indigo-700 disabled:bg-indigo-400"
-                    >
-                        {autoAssigning ? 'Assigning...' : 'Auto-Assign Panels'}
-                    </button>
                 </div>
             </div>
 
@@ -240,8 +259,24 @@ const AllocationsDashboard = () => {
                                 <th className="px-4 py-3.5 border-b border-slate-200">Team Name</th>
                                 <th className="px-4 py-3.5 border-b border-slate-200">Leader</th>
                                 <th className="px-4 py-3.5 border-b border-slate-200">Members</th>
-                                <th className="px-4 py-3.5 border-b border-slate-200">Guide</th>
-                                <th className="px-4 py-3.5 border-b border-slate-200">Panel</th>
+                                <th className="px-4 py-3.5 border-b border-slate-200">
+                                    <div className="flex flex-col space-y-1">
+                                        <span>Guide</span>
+                                        <button onClick={handleAutoAssignGuides} disabled={autoAssigning} className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200 disabled:opacity-50 w-fit">Auto Assign</button>
+                                    </div>
+                                </th>
+                                <th className="px-4 py-3.5 border-b border-slate-200">
+                                    <div className="flex flex-col space-y-1">
+                                        <span>Review Panel</span>
+                                        <button onClick={() => handleAutoAssign('review')} disabled={autoAssigning} className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200 disabled:opacity-50 w-fit">Auto Assign</button>
+                                    </div>
+                                </th>
+                                <th className="px-4 py-3.5 border-b border-slate-200">
+                                    <div className="flex flex-col space-y-1">
+                                        <span>Viva Panel</span>
+                                        <button onClick={() => handleAutoAssign('viva')} disabled={autoAssigning} className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200 disabled:opacity-50 w-fit">Auto Assign</button>
+                                    </div>
+                                </th>
                                 <th className="px-4 py-3.5 text-center border-b border-slate-200">Actions</th>
                             </tr>
                         </thead>
@@ -270,7 +305,7 @@ const AllocationsDashboard = () => {
                                     
                                     <td 
                                         className="px-4 py-3.5 border-b border-slate-200/60"
-                                        onMouseEnter={(e) => currentAlloc.panelId && handleMouseEnterPanel(e, currentAlloc.panelId)}
+                                        onMouseEnter={(e) => currentAlloc.panelId && handleMouseEnterPanel(e, currentAlloc.panelId, 'review')}
                                         onMouseMove={currentAlloc.panelId ? updateTooltipPosition : undefined}
                                         onMouseLeave={handleMouseLeavePanel}
                                     >
@@ -283,7 +318,42 @@ const AllocationsDashboard = () => {
                                             }}
                                         >
                                             <option value="">No Panel</option>
-                                            {panels.map(p => {
+                                            {reviewPanels.map(p => {
+                                                const coordName = p.coordinator ? p.coordinator.name : 'None';
+                                                const membersList = p.members && p.members.length > 0 
+                                                    ? p.members.map(m => m.name).join(', ') 
+                                                    : 'None';
+                                                const nativeTooltip = `Coordinator: ${coordName}\nMembers: ${membersList}`;
+
+                                                return (
+                                                    <option 
+                                                        key={p._id} 
+                                                        value={p._id}
+                                                        title={nativeTooltip}
+                                                    >
+                                                        {p.name}
+                                                    </option>
+                                                );
+                                            })}
+                                        </select>
+                                    </td>
+                                    
+                                    <td 
+                                        className="px-4 py-3.5 border-b border-slate-200/60"
+                                        onMouseEnter={(e) => currentAlloc.vivaPanelId && handleMouseEnterPanel(e, currentAlloc.vivaPanelId, 'viva')}
+                                        onMouseMove={currentAlloc.vivaPanelId ? updateTooltipPosition : undefined}
+                                        onMouseLeave={handleMouseLeavePanel}
+                                    >
+                                        <select 
+                                            className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            value={currentAlloc.vivaPanelId}
+                                            onChange={(e) => {
+                                                handleAllocationChange(team._id, 'vivaPanelId', e.target.value);
+                                                handleMouseLeavePanel(); 
+                                            }}
+                                        >
+                                            <option value="">No Viva Panel</option>
+                                            {vivaPanels.map(p => {
                                                 const coordName = p.coordinator ? p.coordinator.name : 'None';
                                                 const membersList = p.members && p.members.length > 0 
                                                     ? p.members.map(m => m.name).join(', ') 

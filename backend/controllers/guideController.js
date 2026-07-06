@@ -208,6 +208,11 @@ exports.getApprovedTeams = async (req, res) => {
             path: 'panel',
             select: 'name members',
             model: 'Panel'
+        })
+        .populate({
+            path: 'vivaPanel',
+            select: 'name members',
+            model: 'Panel'
         });
 
         console.log('Found teams:', teams.length);

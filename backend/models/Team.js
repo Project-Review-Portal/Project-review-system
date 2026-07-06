@@ -54,6 +54,10 @@ const teamSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Panel'
     },
+    vivaPanel: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Panel'
+    },
     coordinator: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

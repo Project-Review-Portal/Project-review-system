@@ -12,8 +12,14 @@ const { getReviewSettings } = require('../utils/reviewSettings');
 // Get all panels
 exports.getAllPanels = async (req, res) => {
     try {
+        // Support filtering by panelType query param
+        const filter = {};
+        if (req.query.panelType && ['review', 'viva'].includes(req.query.panelType)) {
+            filter.panelType = req.query.panelType;
+        }
+
         // 1. Fetch panels and fully populate relational documents
-        const panels = await Panel.find()
+        const panels = await Panel.find(filter)
             .populate({
                 path: 'members',
                 select: 'username role memberType name'
@@ -29,21 +35,27 @@ exports.getAllPanels = async (req, res) => {
 
         // 2. Sort the panels numerically by name
         panels.sort((a, b) => {
-            let numA = Number(a.name.split(' ')[1]);
-            let numB = Number(b.name.split(' ')[1]);
-            return numA - numB;
+            // Extract number from name like "Panel 1" or "Viva Panel 1"
+            const extractNum = (name) => {
+                const match = name.match(/(\d+)/);
+                return match ? Number(match[1]) : 0;
+            };
+            return extractNum(a.name) - extractNum(b.name);
         });
 
-        // 3. Look up team count assignments from TeamPanelAssignment
+        // 3. Look up team count assignments from TeamPanelAssignment (for review) or Team (for viva)
+        const Team = require('../models/Team');
         const panelsWithTeamCount = await Promise.all(
             panels.map(async (panel) => {
-                // Find the assignment document matching this specific panel ID
-                const assignment = await TeamPanelAssignment.findOne({ panel: panel._id });
-                
-                // If a record exists, use the length of its teams array; otherwise default to 0
-                const teamCount = assignment && Array.isArray(assignment.teams) 
-                    ? assignment.teams.length 
-                    : 0;
+                let teamCount = 0;
+                if (panel.panelType === 'viva') {
+                    teamCount = await Team.countDocuments({ vivaPanel: panel._id });
+                } else {
+                    const assignment = await TeamPanelAssignment.findOne({ panel: panel._id });
+                    teamCount = assignment && Array.isArray(assignment.teams) 
+                        ? assignment.teams.length 
+                        : 0;
+                }
 
                 return {
                     ...panel.toObject(),
@@ -62,10 +74,12 @@ exports.getAllPanels = async (req, res) => {
 // Create a new panel
 exports.createPanel = async (req, res) => {
     try {
-        const { members, coordinator, assistantCoordinators } = req.body;
+        const { members, coordinator, assistantCoordinators, panelType } = req.body;
+        const resolvedPanelType = panelType === 'viva' ? 'viva' : 'review';
         console.log('Received members for createPanel:', members);
         console.log('Received coordinator for createPanel:', coordinator);
         console.log('Received assistantCoordinators for createPanel:', assistantCoordinators);
+        console.log('Received panelType for createPanel:', resolvedPanelType);
 
         // Validate members: must have at least one member
         if (!members || members.length === 0) {
@@ -86,30 +100,30 @@ exports.createPanel = async (req, res) => {
         if (!coordinatorDetails || coordinatorDetails.memberType !== 'internal') {
             return res.status(400).json({ message: 'Coordinator must be an internal faculty member.' });
         }
-        // Generate panel name based on current count
-
-        // Counting and adding 1 to the panelName does not work all time
-        const existingPanelNames = await Panel.find({},{_id:0, name: 1}).sort({name:1})
-        // console.log(existingPanelNames);
+        // Generate panel name based on current count for this panelType
+        const namePrefix = resolvedPanelType === 'viva' ? 'Viva Panel' : 'Panel';
+        const existingPanelNames = await Panel.find({ panelType: resolvedPanelType }, { _id: 0, name: 1 });
+        const usedNumbers = existingPanelNames
+            .map(x => {
+                const match = x.name.match(/(\d+)/);
+                return match ? Number(match[1]) : 0;
+            })
+            .filter(n => n > 0)
+            .sort((a, b) => a - b);
+            
         let numberTracker = 1;
-        if (existingPanelNames){
-            for(let x of existingPanelNames){
-                if( numberTracker != Number(x.name.split(' ')[1]))
-                    break;
+        for (const num of usedNumbers) {
+            if (num === numberTracker) {
                 numberTracker++;
             }
         }
         
         const panelCount = numberTracker;
-        // const panelCount = numberTracker
-        // console.log("----------------")
-        // console.log('number tracker is ', numberTracker)
-        
-        // const panelCount = await Panel.countDocuments({});
 
-        const newPanelName = `Panel ${panelCount}`;
+        const newPanelName = `${namePrefix} ${panelCount}`;
         const newPanel = new Panel({
             name: newPanelName,
+            panelType: resolvedPanelType,
             members,
             coordinator,
             assistantCoordinators: assistantCoordinators || []
@@ -373,7 +387,8 @@ exports.getAssignedTeamsForPanel = async (req, res) => {
                 .populate('teamLeader', 'username name')
                 .populate('members', 'username name')
                 .populate('guidePreference', 'username name')
-                .populate('panel', 'name');
+                .populate('panel', 'name')
+                .populate('vivaPanel', 'name');
 
             const panelIdToName = new Map(panels.map(p => [p._id.toString(), p.name]));
             assignedTeams = teams.map(team => ({
@@ -392,7 +407,8 @@ exports.getAssignedTeamsForPanel = async (req, res) => {
                 .populate('teamLeader', 'username name')
                 .populate('members', 'username name')
                 .populate('guidePreference', 'username name')
-                .populate('panel', 'name');
+                .populate('panel', 'name')
+                .populate('vivaPanel', 'name');
             assignedTeams = teams.map(team => ({
                 ...team.toObject(),
                 panelName: panel.name
@@ -405,7 +421,8 @@ exports.getAssignedTeamsForPanel = async (req, res) => {
                 .populate('teamLeader', 'username name')
                 .populate('members', 'username name')
                 .populate('guidePreference', 'username name')
-                .populate('panel', 'name');
+                .populate('panel', 'name')
+                .populate('vivaPanel', 'name');
             
             assignedTeams = teams.map(team => ({
                 ...team.toObject(),
@@ -424,7 +441,8 @@ exports.getAssignedTeamsForPanel = async (req, res) => {
                     .populate('teamLeader', 'username name')
                     .populate('members', 'username name')
                     .populate('guidePreference', 'username name')
-                    .populate('panel', 'name members coordinator');
+                    .populate('panel', 'name members coordinator')
+                    .populate('vivaPanel', 'name members coordinator');
                 if (team) {
                     // Ensure the current user is allowed to see this team as panel member or coordinator
                     const isPanelMember = team.panel && Array.isArray(team.panel.members) && team.panel.members.some(m => m._id?.toString() === userId.toString());

@@ -178,7 +178,8 @@ const ManualPanelAssignment = () => {
                                             <p><span className="font-medium">Team Leader:</span> {team.teamLeader?.name} ({team.teamLeader?.username})</p>
                                             <p><span className="font-medium">Members:</span> {team.members.map(m => m.name).join(', ')}</p>
                                             <p><span className="font-medium">Guide:</span> {team.guidePreference ? team.guidePreference.name : 'Not assigned'}</p>
-                                            <p><span className="font-medium">Panel:</span> {team.panel ? team.panel.name : 'Not assigned'}</p>
+                                            <p><span className="font-medium">Review Panel:</span> {team.panel ? team.panel.name : 'Not assigned'}</p>
+                                            <p><span className="font-medium">Viva Panel:</span> {team.vivaPanel ? team.vivaPanel.name : 'Not assigned'}</p>
                                         </div>
                                     </div>
                                     <div className="ml-4">

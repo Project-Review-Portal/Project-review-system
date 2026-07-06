@@ -60,8 +60,13 @@ const GuideMyTeams = () => {
                             </div>
 
                             <div className="mb-4">
-                                <h4 className="font-medium mb-2">Panel:</h4>
+                                <h4 className="font-medium mb-2">Review Panel:</h4>
                                 <p className="text-gray-700">{team.panel?.name || 'Not assigned'}</p>
+                            </div>
+
+                            <div className="mb-4">
+                                <h4 className="font-medium mb-2">Viva Panel:</h4>
+                                <p className="text-gray-700">{team.vivaPanel?.name || 'Not assigned'}</p>
                             </div>
 
                             <div className="mb-4">

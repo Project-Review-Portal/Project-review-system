@@ -59,7 +59,8 @@ const AdminTeams = () => {
                                 <th className="px-3 py-2 border">Leader</th>
                                 <th className="px-3 py-2 border">Members</th>
                                 <th className="px-3 py-2 border">Guide</th>
-                                <th className="px-3 py-2 border">Panel</th>
+                                <th className="px-3 py-2 border">Review Panel</th>
+                                <th className="px-3 py-2 border">Viva Panel</th>
                                 <th className="px-3 py-2 border">Actions</th>
                             </tr>
                         </thead>
@@ -80,6 +81,7 @@ const AdminTeams = () => {
                                             : '—'
                                     }</td>
                                     <td className="px-3 py-2 border">{team.panel ? team.panel.name : '—'}</td>
+                                    <td className="px-3 py-2 border">{team.vivaPanel ? team.vivaPanel.name : '—'}</td>
                                     <td className="px-3 py-2 border">
                                         <button onClick={() => deleteTeam(team._id)} className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
                                     </td>

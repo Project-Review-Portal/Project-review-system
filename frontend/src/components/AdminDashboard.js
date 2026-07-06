@@ -32,8 +32,10 @@ const AdminDashboard = () => {
         switch (location.pathname) {
             case '/admin-dashboard/admin-settings':
                 return <AdminSettings />;
-            case '/admin-dashboard/panel-creation':
-                return <PanelManagement />;
+            case '/admin-dashboard/review-panels':
+                return <PanelManagement key="review" panelType="review" />;
+            case '/admin-dashboard/viva-panels':
+                return <PanelManagement key="viva" panelType="viva" />;
             case '/admin-dashboard/allocations':
                 return <AllocationsDashboard />;
             case '/admin-dashboard/view-attendance':
@@ -78,7 +80,7 @@ const AdminDashboard = () => {
         <div className="min-h-screen bg-gray-50">
             <Navbar user={user} onLogout={handleLogout} />
             <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-                <div className="px-4 py-6 sm:px-0">
+                <div key={location.pathname} className="px-4 py-6 sm:px-0">
                     {renderContent()}
                 </div>
             </div>

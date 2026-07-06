@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const PanelManagement = () => {
+const PanelManagement = ({ panelType = 'review' }) => {
     const [panels, setPanels] = useState([]);
     const [allFaculty, setAllFaculty] = useState([]); // All potential faculty (guides, panel members)
     const [availableFacultyForSelection, setAvailableFacultyForSelection] = useState([]); // For add/remove lists
@@ -17,7 +17,8 @@ const PanelManagement = () => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [panelType]);
 
     // Effect to update available/selected faculty lists when allFaculty or selectedMembersForForm changes
     useEffect(() => {
@@ -47,8 +48,8 @@ const PanelManagement = () => {
 
             const headers = { Authorization: `Bearer ${token}` };
 
-            // Fetch all panels
-            const panelsRes = await axios.get('http://localhost:5000/api/panels', { headers });
+            // Fetch all panels of the specific type
+            const panelsRes = await axios.get(`http://localhost:5000/api/panels?panelType=${panelType}`, { headers });
             setPanels(panelsRes.data);
 
             // Fetch all faculty (guides and panel members)
@@ -93,7 +94,8 @@ const PanelManagement = () => {
         const panelData = {
             members: selectedMembersForForm.map(m => m._id),
             coordinator: selectedCoordinator,
-            assistantCoordinators: selectedAssistantCoordinators
+            assistantCoordinators: selectedAssistantCoordinators,
+            panelType
         };
 
         if (panelData.members.length === 0) {
@@ -175,14 +177,16 @@ const PanelManagement = () => {
 
     return (
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6">
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Panel Management</h2>
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">
+                    {panelType === 'viva' ? 'Viva Panel Management' : 'Review Panel Management'}
+                </h2>
                 {!showPanelForm && (
                     <button
                         onClick={() => { handleClearForm(); setShowPanelForm(true); }}
-                        className="inline-flex justify-center py-2 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none shadow-md hover:shadow-lg transition duration-200"
+                        className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
                     >
-                        Create New Panel
+                        {panelType === 'viva' ? 'Create New Viva Panel' : 'Create New Review Panel'}
                     </button>
                 )}
             </div>
@@ -293,7 +297,7 @@ const PanelManagement = () => {
                 <div id="panel-form-section" className="border-2 border-indigo-100 p-6 rounded-lg bg-indigo-50/30 transition-all duration-300">
                     <div className="flex justify-between items-center mb-4 border-b pb-2 border-indigo-100">
                         <h3 className="text-xl font-semibold text-indigo-900">
-                            {editingPanelId ? `Modifying Panel Configuration (${panels.find(p => p._id === editingPanelId)?.name})` : 'Configure New Panel Structure'}
+                            {editingPanelId ? `Modifying ${panelType === 'viva' ? 'Viva Panel' : 'Review Panel'} Configuration (${panels.find(p => p._id === editingPanelId)?.name})` : `Configure New ${panelType === 'viva' ? 'Viva Panel' : 'Review Panel'} Structure`}
                         </h3>
                         <button 
                             type="button" 

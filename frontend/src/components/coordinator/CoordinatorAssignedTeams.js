@@ -43,7 +43,8 @@ const CoordinatorAssignedTeams = () => {
                         <div key={team._id} className="border p-4 rounded-lg shadow-sm">
                             <h3 className="font-semibold text-lg mb-2">Team: {team.teamName}</h3>
                             <p className="text-gray-700">Team Leader: {team.teamLeader?.name || 'N/A'} ({team.teamLeader?.username || 'N/A'})</p>
-                            <p className="text-gray-700">Panel: {team.panel?.name || 'Not Assigned'}</p>
+                            <p className="text-gray-700">Review Panel: {team.panel?.name || 'Not Assigned'}</p>
+                            <p className="text-gray-700">Viva Panel: {team.vivaPanel?.name || 'Not Assigned'}</p>
                             <p className="text-gray-700">Guide: {team.guidePreference?.name || 'Not Assigned'}</p>
                             <div className="mt-2">
                                 <p className="font-medium">Members:</p>

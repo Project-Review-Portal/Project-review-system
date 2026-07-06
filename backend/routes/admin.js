@@ -90,5 +90,6 @@ router.post('/reviews-viva-settings', auth, authorize(['admin']), adminControlle
 // Team Allocation
 router.put('/allocations/:teamId', auth, authorize(['admin']), adminController.updateTeamAllocation);
 router.post('/auto-assign-panels', auth, authorize(['admin']), adminController.autoAssignPanels);
+router.post('/auto-assign-guides', auth, authorize(['admin']), adminController.autoAssignGuidesFromAllocations);
 
 module.exports = router;  

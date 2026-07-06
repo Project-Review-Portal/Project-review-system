@@ -23,7 +23,7 @@ const PanelMarking = () => {
             const headers = { Authorization: `Bearer ${token}` };
 
             const settingsRes = await axios.get('/api/auth/review-settings', { headers });
-            const validSlots = settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva'];
+            const validSlots = (settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva']).filter(s => s !== 'review0');
             
             const dynamicSlots = isExternal ? validSlots.filter(s => s === 'viva') : validSlots;
             setAllowedSlots(dynamicSlots);
