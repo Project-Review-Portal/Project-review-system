@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const AdminManageReviewSchedules = () => {
+const AdminManageReviewSchedules = ({ programme }) => {
     const [panels, setPanels] = useState([]);
     const [teams, setTeams] = useState([]);
     const [availabilities, setAvailabilities] = useState([]);
@@ -28,11 +28,12 @@ const AdminManageReviewSchedules = () => {
     const fetchData = async () => {
         try {
             const token = localStorage.getItem('token');
+            const progParam = programme ? `?programme=${encodeURIComponent(programme)}` : '';
             const [panelsRes, teamsRes, availabilitiesRes, schedulesRes, reviewPeriodRes, settingsRes] = await Promise.all([
-                axios.get('/api/admin/panels-with-members', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('/api/admin/teams', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('/api/admin/availabilities', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('/api/admin/review-schedules', { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get(`/api/admin/panels-with-members${progParam}`, { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get(`/api/admin/teams${progParam}`, { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get(`/api/admin/availabilities${progParam}`, { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get(`/api/admin/review-schedules${progParam}`, { headers: { Authorization: `Bearer ${token}` } }),
                 axios.get('/api/admin/review-period-dates', { headers: { Authorization: `Bearer ${token}` } }),
                 axios.get('/api/auth/review-settings', { headers: { Authorization: `Bearer ${token}` } })
             ]);
@@ -81,7 +82,7 @@ const AdminManageReviewSchedules = () => {
         setIsGeneratingSchedule(true);
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.post('/api/admin/generate-schedules', {}, {
+            const response = await axios.post('/api/admin/generate-schedules', { programme: programme || 'UG' }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setSuccessMessage(response.data.message);

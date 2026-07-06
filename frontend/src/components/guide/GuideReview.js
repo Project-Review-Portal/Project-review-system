@@ -54,7 +54,11 @@ const GuideReview = () => {
                         return (
                             <div key={schedule._id} className="border rounded-lg p-4 bg-gray-50 hover:shadow-lg transition-shadow">
                                 <h4 className="text-lg font-semibold mb-2 text-indigo-600">{displayName} {schedule.type ? `(${schedule.type})` : ''}</h4>
-                                <p className="text-sm text-gray-700"><span className="font-semibold">Team:</span> {schedule.team?.teamName || 'N/A'}{studentNames}</p>
+                                <p className="text-sm text-gray-700"><span className="font-semibold">Team:</span> {schedule.team?.teamName || 'N/A'}{studentNames}
+                                    {schedule.team?.programme && (
+                                        <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-indigo-100 text-indigo-700">{schedule.team.programme}</span>
+                                    )}
+                                </p>
                                 <p className="text-sm text-gray-700">
                                     <span className="font-semibold">Panel:</span> {schedule.panel?.name || 'N/A'}
                                 </p>

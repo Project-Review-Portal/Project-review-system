@@ -109,8 +109,13 @@ const GuideRequestManagementForGuide = () => {
                         <ul className="space-y-4">
                             {requests.map(request => (
                                 <li key={request._id} className="border p-4 rounded-md bg-gray-50">
-                                    <div className="font-medium text-lg mb-2">Team: {request.teamName}</div>
-                                    
+                                    <div className="font-medium text-lg mb-2 flex items-center gap-2">
+                                        Team: {request.teamName}
+                                        <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                                            {request.programme || 'UG'}
+                                        </span>
+                                    </div>
+
                                     <div className="mb-4">
                                         <h4 className="font-medium mb-2">Team Leader:</h4>
                                         <p className="text-gray-700">{request.teamLeader.name} ({request.teamLeader.username})</p>

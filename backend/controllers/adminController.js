@@ -262,13 +262,17 @@ exports.ensureTeamFormationOpen = async (req, res) => {
 // Get teams with no guide assigned
 exports.getUnassignedTeams = async (req, res) => {
     try {
-        const unassignedTeams = await Team.find({
+        const query = {
             $or: [
                 { guidePreference: null },
                 { status: 'pending' },
                 { status: 'rejected' }
             ]
-        }).populate('teamLeader', 'username name').populate('members', 'username name');
+        };
+        if (req.query.programme) query.programme = req.query.programme;
+        const unassignedTeams = await Team.find(query)
+            .populate('teamLeader', 'username name')
+            .populate('members', 'username name');
 
         res.json(unassignedTeams);
     } catch (error) {
@@ -1044,7 +1048,9 @@ exports.getDailyAttendanceRecords = async (req, res) => {
         const { validSlotTypes } = await getReviewSettings();
         const totalEvents = validSlotTypes.length || 1;
 
-        const teams = await Team.find({})
+        const teamFilter = {};
+        if (req.query.programme) teamFilter.programme = req.query.programme;
+        const teams = await Team.find(teamFilter)
             .populate('teamLeader', 'name')
             .populate('members', 'name')
             .populate('guidePreference', 'name')
@@ -1124,7 +1130,9 @@ exports.getDailyAttendanceRecords = async (req, res) => {
 // Admin: Get all teams
 exports.getAllTeams = async (req, res) => {
     try {
-        const teams = await Team.find()
+        const filter = {};
+        if (req.query.programme) filter.programme = req.query.programme;
+        const teams = await Team.find(filter)
             .populate('teamLeader', 'username name')
             .populate('members', 'username name')
             .populate('guidePreference', 'username name')
@@ -1470,7 +1478,8 @@ exports.uploadFaculty = async (req, res) => {
 // Upload students from CSV (add email support; keep username = regno)
 exports.uploadStudents = async (req, res) => {
     try {
-        const { studentData } = req.body;
+        const { studentData, programme } = req.body;
+        const targetProgramme = (programme && programme.trim()) ? programme.trim() : 'UG';
         let count = 0;
 
         if (!Array.isArray(studentData)) {
@@ -1490,7 +1499,12 @@ exports.uploadStudents = async (req, res) => {
             // Check if user already exists
             const existingUser = await User.findOne({ username: regno });
             if (existingUser) {
-                continue; // Skip if user already exists
+                // Update programme if it changed
+                if (existingUser.programme !== targetProgramme) {
+                    existingUser.programme = targetProgramme;
+                    await existingUser.save();
+                }
+                continue;
             }
 
             // Hash password (default student password: <regno>@cs)
@@ -1505,6 +1519,7 @@ exports.uploadStudents = async (req, res) => {
                 password: hashedPassword,
                 role: 'student',
                 roles: [{ role: 'student', team: null }],
+                programme: targetProgramme,
                 mustChangePassword: true
             });
 
@@ -1727,10 +1742,10 @@ exports.getUnassignedCoordinators = async (req, res) => {
 // Get all students
 exports.getAllStudents = async (req, res) => {
     try {
+        const query = { 'roles.role': 'student' };
+        if (req.query.programme) query.programme = req.query.programme;
         // Ensure email is returned for students so frontend can show the registered email (if any)
-        const students = await User.find({
-                'roles.role': 'student'
-            }, 'username name roles email');
+        const students = await User.find(query, 'username name roles email programme');
         res.json(students);
     } catch (error) {
         console.error('Error fetching students:', error);

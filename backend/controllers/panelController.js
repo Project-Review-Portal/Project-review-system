@@ -17,6 +17,9 @@ exports.getAllPanels = async (req, res) => {
         if (req.query.panelType && ['review', 'viva'].includes(req.query.panelType)) {
             filter.panelType = req.query.panelType;
         }
+        if (req.query.programme) {
+            filter.programme = req.query.programme;
+        }
 
         // 1. Fetch panels and fully populate relational documents
         const panels = await Panel.find(filter)
@@ -74,8 +77,9 @@ exports.getAllPanels = async (req, res) => {
 // Create a new panel
 exports.createPanel = async (req, res) => {
     try {
-        const { members, coordinator, assistantCoordinators, panelType } = req.body;
+        const { members, coordinator, assistantCoordinators, panelType, programme } = req.body;
         const resolvedPanelType = panelType === 'viva' ? 'viva' : 'review';
+        const targetProgramme = programme || 'UG';
         console.log('Received members for createPanel:', members);
         console.log('Received coordinator for createPanel:', coordinator);
         console.log('Received assistantCoordinators for createPanel:', assistantCoordinators);
@@ -100,9 +104,9 @@ exports.createPanel = async (req, res) => {
         if (!coordinatorDetails || coordinatorDetails.memberType !== 'internal') {
             return res.status(400).json({ message: 'Coordinator must be an internal faculty member.' });
         }
-        // Generate panel name based on current count for this panelType
+        // Generate panel name based on current count for this panelType and programme
         const namePrefix = resolvedPanelType === 'viva' ? 'Viva Panel' : 'Panel';
-        const existingPanelNames = await Panel.find({ panelType: resolvedPanelType }, { _id: 0, name: 1 });
+        const existingPanelNames = await Panel.find({ panelType: resolvedPanelType, programme: targetProgramme }, { _id: 0, name: 1 });
         const usedNumbers = existingPanelNames
             .map(x => {
                 const match = x.name.match(/(\d+)/);
@@ -126,7 +130,8 @@ exports.createPanel = async (req, res) => {
             panelType: resolvedPanelType,
             members,
             coordinator,
-            assistantCoordinators: assistantCoordinators || []
+            assistantCoordinators: assistantCoordinators || [],
+            programme: targetProgramme
         });
         await newPanel.save();
         res.status(201).json({ message: 'Panel created successfully!', panel: newPanel });
@@ -246,7 +251,7 @@ exports.getPanelReviewSchedules = async (req, res) => {
             })
             .populate({
                 path: 'team',
-                select: 'teamName teamLeader members guidePreference',
+                select: 'teamName teamLeader members guidePreference programme',
                 populate: [
                     { path: 'teamLeader', select: 'name username' },
                     { path: 'members', select: 'name username' },
@@ -296,7 +301,7 @@ exports.getPanelReviewSchedules = async (req, res) => {
             })
             .populate({
                 path: 'team',
-                select: 'teamName teamLeader members',
+                select: 'teamName teamLeader members programme',
                 populate: [
                     { path: 'teamLeader', select: 'name username' },
                     { path: 'members', select: 'name username' }

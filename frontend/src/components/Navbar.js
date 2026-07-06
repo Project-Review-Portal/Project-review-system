@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom'; // required for displaying activ
 import { useNavigate } from 'react-router-dom';
 
 
-const Navbar = ({ user, onLogout }) => {
+const Navbar = ({ user, onLogout, activeProgramme }) => {
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -53,17 +53,19 @@ const Navbar = ({ user, onLogout }) => {
                 panelNavItems.push({ label: 'Guide Me', path: '/panel-dashboard/guide-me' });
                 return panelNavItems;
             case 'admin':
+                if (!activeProgramme) return []; // Hidden on home screen via parent, but extra safeguard
+                const prefix = `/admin-dashboard/programme/${encodeURIComponent(activeProgramme)}`;
                 return [
-                    { label: 'Dashboard', path: '/admin-dashboard' },
-                    { label: 'Registration', path: '/admin-dashboard/user-management' },
-                    { label: 'Admin Settings', path: '/admin-dashboard/admin-settings' },
-                    { label: 'Review Panels', path: '/admin-dashboard/review-panels' },
-                    { label: 'Viva Panels', path: '/admin-dashboard/viva-panels' },
-                    { label: 'Allocations', path: '/admin-dashboard/allocations' },
-                    { label: 'Upload Attendance', path: '/admin-dashboard/upload-attendance' },
-                    { label: 'Summary', path: '/admin-dashboard/view-attendance' },
-                    { label: 'Schedules', path: '/admin-dashboard/manage-review-schedules' },
-                    { label: 'Guide Me', path: '/admin-dashboard/guide-me' }
+                    { label: 'Guide Me', path: `${prefix}/guide-me` },
+                    { label: 'Registration', path: `${prefix}/user-management` },
+                    { label: 'Settings', path: `${prefix}/admin-settings` },
+                    { label: 'Review Panels', path: `${prefix}/review-panels` },
+                    { label: 'Viva Panels', path: `${prefix}/viva-panels` },
+                    { label: 'Allocations', path: `${prefix}/allocations` },
+                    { label: 'Upload Attendance', path: `${prefix}/upload-attendance` },
+                    { label: 'Summary', path: `${prefix}/view-attendance` },
+                    { label: 'Schedules', path: `${prefix}/manage-review-schedules` },
+                    { label: 'Availabilities', path: `${prefix}/view-availabilities` }
                 ];
             case 'coordinator':
                 return [
@@ -125,6 +127,15 @@ const Navbar = ({ user, onLogout }) => {
                                 className="bg-indigo-500 text-white px-2 py-2 rounded-md text-xs sm:text-sm font-medium hover:bg-indigo-600 whitespace-nowrap"
                             >
                                 Switch Role
+                            </button>
+                        )}
+
+                        {user.role === 'admin' && (
+                            <button
+                                onClick={() => navigate('/admin-dashboard')}
+                                className="bg-indigo-500 text-white px-2 py-2 rounded-md text-xs sm:text-sm font-medium hover:bg-indigo-600 whitespace-nowrap mr-2"
+                            >
+                                Control Panel
                             </button>
                         )}
                         

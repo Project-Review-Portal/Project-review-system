@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const GuideUploadAttendance = () => {
+const GuideUploadAttendance = ({ programme }) => {
     const [assignedTeams, setAssignedTeams] = useState([]);
+    const [userRole, setUserRole] = useState(null);
     const [attendanceData, setAttendanceData] = useState({}); // { studentId: { review1: bool, ... } }
     const [reviewDates, setReviewDates] = useState({}); // { teamId: { review0: "YYYY-MM-DDTHH:mm", ... } }
     const [loading, setLoading] = useState(true);
@@ -30,8 +31,10 @@ const GuideUploadAttendance = () => {
     };
 
     useEffect(() => {
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        setUserRole(storedUser.role);
         fetchData();
-    }, []);
+    }, [programme]);
 
     const fetchData = async () => {
         try {
@@ -43,7 +46,11 @@ const GuideUploadAttendance = () => {
             setReviewEvents(validSlots);
 
             const teamsRes = await axios.get('/api/guide/assigned-teams', { headers });
-            setAssignedTeams(teamsRes.data);
+            let fetchedTeams = teamsRes.data;
+            if (programme) {
+                fetchedTeams = fetchedTeams.filter(t => t.programme === programme);
+            }
+            setAssignedTeams(fetchedTeams);
 
             const existingAttendanceRes = await axios.get('/api/guide/daily-attendance', { headers });
             if (existingAttendanceRes.data && existingAttendanceRes.data.attendanceData) {
@@ -80,6 +87,32 @@ const GuideUploadAttendance = () => {
                 [reviewEvent]: dateValue
             }
         }));
+    };
+
+    const handleLockAttendance = async (teamId) => {
+        if (!window.confirm('Are you sure you want to lock attendance? Once locked, it cannot be modified by guides.')) return;
+        try {
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+            await axios.post('/api/guide/lock-attendance', { teamId }, { headers });
+            showNotification('Success', 'Attendance locked successfully!', 'success');
+            fetchData();
+        } catch (err) {
+            showNotification('Error', err.response?.data?.message || 'Failed to lock attendance', 'error');
+        }
+    };
+
+    const handleUnlockAttendance = async (teamId) => {
+        if (!window.confirm('Are you sure you want to unlock attendance?')) return;
+        try {
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+            await axios.post('/api/guide/unlock-attendance', { teamId }, { headers });
+            showNotification('Success', 'Attendance unlocked successfully!', 'success');
+            fetchData();
+        } catch (err) {
+            showNotification('Error', err.response?.data?.message || 'Failed to unlock attendance', 'error');
+        }
     };
 
     const handleSubmitAttendance = async (teamId) => {
@@ -194,6 +227,12 @@ const GuideUploadAttendance = () => {
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4 border-b border-slate-100 pb-4">
                                 <div className="flex items-center gap-3">
                                     <h3 className="text-2xl font-bold text-slate-800">{team.teamName}</h3>
+                                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                                        {team.programme || 'UG'}
+                                    </span>
+                                    {team.isAttendanceLocked && (
+                                        <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-rose-100 text-rose-700">🔒 Locked</span>
+                                    )}
                                 </div>
                             </div>
                             
@@ -209,7 +248,8 @@ const GuideUploadAttendance = () => {
                                                         type="datetime-local"
                                                         value={reviewDates[team._id]?.[event] || ''}
                                                         onChange={(e) => handleReviewDateChange(team._id, event, e.target.value)}
-                                                        className="block mx-auto p-1 text-[11px] font-normal border border-slate-200 rounded-lg text-slate-800 bg-white shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[140px]"
+                                                        disabled={team.isAttendanceLocked}
+                                                        className={`block mx-auto p-1 text-[11px] font-normal border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[140px] ${team.isAttendanceLocked ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'text-slate-800 bg-white'}`}
                                                     />
                                                 </th>
                                             ))}
@@ -228,8 +268,9 @@ const GuideUploadAttendance = () => {
                                                             <input
                                                                 type="checkbox"
                                                                 checked={isPresent}
+                                                                disabled={team.isAttendanceLocked}
                                                                 onChange={(e) => handleAttendanceChange(team.teamLeader._id, event, e.target.checked)}
-                                                                className="form-checkbox h-5 w-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 transition duration-200"
+                                                                className={`form-checkbox h-5 w-5 rounded border-slate-300 focus:ring-indigo-500 transition duration-200 ${team.isAttendanceLocked ? 'text-indigo-400 bg-slate-100 cursor-not-allowed' : 'text-indigo-600'}`}
                                                             />
                                                         </td>
                                                     );
@@ -250,8 +291,9 @@ const GuideUploadAttendance = () => {
                                                             <input
                                                                 type="checkbox"
                                                                 checked={isPresent}
+                                                                disabled={team.isAttendanceLocked}
                                                                 onChange={(e) => handleAttendanceChange(member._id, event, e.target.checked)}
-                                                                className="form-checkbox h-5 w-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 transition duration-200"
+                                                                className={`form-checkbox h-5 w-5 rounded border-slate-300 focus:ring-indigo-500 transition duration-200 ${team.isAttendanceLocked ? 'text-indigo-400 bg-slate-100 cursor-not-allowed' : 'text-indigo-600'}`}
                                                             />
                                                         </td>
                                                     );
@@ -265,13 +307,39 @@ const GuideUploadAttendance = () => {
                                 </table>
                             </div>
                             
-                            <div className="mt-4">
+                            <div className="mt-4 flex flex-col sm:flex-row gap-4">
                                 <button
                                     onClick={() => handleSubmitAttendance(team._id)}
-                                    className="w-full px-5 py-3.5 rounded-xl font-bold tracking-wide transition-all duration-300 shadow-md bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-700 hover:to-violet-700 hover:shadow-lg hover:scale-[1.01]"
+                                    disabled={team.isAttendanceLocked}
+                                    className={`w-full px-5 py-3.5 rounded-xl font-bold tracking-wide transition-all duration-300 shadow-md ${
+                                        team.isAttendanceLocked
+                                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                            : 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-700 hover:to-violet-700 hover:shadow-lg hover:scale-[1.01]'
+                                    }`}
                                 >
-                                    Submit Attendance for {team.teamName}
+                                    {team.isAttendanceLocked ? `Attendance Locked for ${team.teamName}` : `Submit Attendance for ${team.teamName}`}
                                 </button>
+                                
+                                {/* Lock/Unlock Buttons */}
+                                {(userRole === 'admin' || userRole === 'coordinator') && (
+                                    team.isAttendanceLocked ? (
+                                        userRole === 'admin' && (
+                                            <button
+                                                onClick={() => handleUnlockAttendance(team._id)}
+                                                className="w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold bg-amber-500 text-white hover:bg-amber-600 shadow-md transition-all duration-300 whitespace-nowrap"
+                                            >
+                                                Unlock
+                                            </button>
+                                        )
+                                    ) : (
+                                        <button
+                                            onClick={() => handleLockAttendance(team._id)}
+                                            className="w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold bg-rose-500 text-white hover:bg-rose-600 shadow-md transition-all duration-300 whitespace-nowrap"
+                                        >
+                                            Lock
+                                        </button>
+                                    )
+                                )}
                             </div>
                         </div>
                     ))}

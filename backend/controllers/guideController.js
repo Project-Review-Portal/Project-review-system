@@ -378,7 +378,7 @@ exports.getGuideReviewSchedules = async (req, res) => {
         })
         .populate({
             path: 'team',
-            select: 'teamName teamLeader members guidePreference',
+            select: 'teamName teamLeader members guidePreference programme',
             populate: [
                 { path: 'teamLeader', select: 'name username' },
                 { path: 'members', select: 'name username' },

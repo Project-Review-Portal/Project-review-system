@@ -78,7 +78,7 @@ const PanelAssignedReviews = () => {
     return (
         <div className="bg-white p-6 rounded-lg shadow">
             <h2 className="text-xl font-semibold mb-4">My Assigned Reviews</h2>
-            
+
             {schedules.length === 0 ? (
                 <div className="text-center py-8">
                     <p className="text-gray-600">No reviews assigned yet.</p>
@@ -96,55 +96,59 @@ const PanelAssignedReviews = () => {
                             duration = sch.duration || 0;
                         }
                         return (
-                        <div key={sch._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                            <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                    {/* Use server-provided slotLabel when available */}
-                                    <h3 className="text-lg font-medium text-gray-900">
-                                        {sch.slotLabel || (() => {
-                                            const rawType = (sch.slotType || sch.type || '').toString().toLowerCase();
-                                            if (rawType === 'viva') return 'Viva';
-                                            if (rawType.startsWith('review')) {
-                                                return `Review ${rawType.replace('review', '')}`;
-                                            }
-                                            if (sch.name) {
-                                                const n = sch.name.toLowerCase();
-                                                if (n.includes('viva')) return 'Viva';
-                                                const match = n.match(/review\s*(\d+)/);
-                                                if (match) return `Review ${match[1]}`;
-                                            }
-                                            return sch.slotType || 'Review';
-                                        })()}
-                                    </h3>
-                                    <div className="mt-2 space-y-1">
-                                        <p className="text-sm text-gray-600"><span className="font-medium">Team:</span> {sch.team?.teamName || 'N/A'}</p>
-                                        <p className="text-sm text-gray-600"><span className="font-medium">Panel:</span> {sch.panel?.name || 'N/A'}</p>
-                                        <p className="text-sm text-gray-600"><span className="font-medium">Time:</span> {formatDateTime(sch.startTime)} - {formatDateTime(sch.endTime)}</p>
-                                        <p className="text-sm text-gray-600"><span className="font-medium">Duration:</span> {duration ? `${duration} minutes` : 'N/A'}</p>
+                            <div key={sch._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                                <div className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                        {/* Use server-provided slotLabel when available */}
+                                        <h3 className="text-lg font-medium text-gray-900">
+                                            {sch.slotLabel || (() => {
+                                                const rawType = (sch.slotType || sch.type || '').toString().toLowerCase();
+                                                if (rawType === 'viva') return 'Viva';
+                                                if (rawType.startsWith('review')) {
+                                                    return `Review ${rawType.replace('review', '')}`;
+                                                }
+                                                if (sch.name) {
+                                                    const n = sch.name.toLowerCase();
+                                                    if (n.includes('viva')) return 'Viva';
+                                                    const match = n.match(/review\s*(\d+)/);
+                                                    if (match) return `Review ${match[1]}`;
+                                                }
+                                                return sch.slotType || 'Review';
+                                            })()}
+                                        </h3>
+                                        <div className="mt-2 space-y-1">
+                                            <p className="text-sm text-gray-600"><span className="font-medium">Team:</span> {sch.team?.teamName || 'N/A'}
+                                                {sch.team?.programme && (
+                                                    <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-indigo-100 text-indigo-700">{sch.team.programme}</span>
+                                                )}
+                                            </p>
+                                            <p className="text-sm text-gray-600"><span className="font-medium">Panel:</span> {sch.panel?.name || 'N/A'}</p>
+                                            <p className="text-sm text-gray-600"><span className="font-medium">Time:</span> {formatDateTime(sch.startTime)} - {formatDateTime(sch.endTime)}</p>
+                                            <p className="text-sm text-gray-600"><span className="font-medium">Duration:</span> {duration ? `${duration} minutes` : 'N/A'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex space-x-2">
+                                        <button onClick={() => toggleExpanded(sch._id)} className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">{expandedId === sch._id ? 'Hide Details' : 'View Details'}</button>
                                     </div>
                                 </div>
-                                <div className="flex space-x-2">
-                                    <button onClick={() => toggleExpanded(sch._id)} className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">{expandedId === sch._id ? 'Hide Details' : 'View Details'}</button>
-                                </div>
+
+                                {expandedId === sch._id && (
+                                    <div className="mt-4 p-4 bg-gray-50 rounded-md">
+                                        <h4 className="font-medium text-gray-900 mb-2">Team Details</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                            <div>
+                                                <p className="text-gray-600"><span className="font-medium">Team:</span> {sch.team?.teamName || 'N/A'} ({sch.team?._id})</p>
+                                                <p className="text-gray-600"><span className="font-medium">Start:</span> {formatDateTime(sch.startTime)}</p>
+                                                <p className="text-gray-600"><span className="font-medium">End:</span> {formatDateTime(sch.endTime)}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-600"><span className="font-medium">Panel:</span> {sch.panel?.name || 'N/A'}</p>
+                                                <p className="text-gray-600"><span className="font-medium">Type:</span> {sch.slotType}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            
-                            {expandedId === sch._id && (
-                                <div className="mt-4 p-4 bg-gray-50 rounded-md">
-                                    <h4 className="font-medium text-gray-900 mb-2">Team Details</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                        <div>
-                                            <p className="text-gray-600"><span className="font-medium">Team:</span> {sch.team?.teamName || 'N/A'} ({sch.team?._id})</p>
-                                            <p className="text-gray-600"><span className="font-medium">Start:</span> {formatDateTime(sch.startTime)}</p>
-                                            <p className="text-gray-600"><span className="font-medium">End:</span> {formatDateTime(sch.endTime)}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-gray-600"><span className="font-medium">Panel:</span> {sch.panel?.name || 'N/A'}</p>
-                                            <p className="text-gray-600"><span className="font-medium">Type:</span> {sch.slotType}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
                         );
                     })}
                 </div>

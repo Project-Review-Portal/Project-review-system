@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const UserManagement = () => {
+const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
     const [facultyFile, setFacultyFile] = useState(null);
     const [studentFile, setStudentFile] = useState(null);
     const [facultyData, setFacultyData] = useState([]);
@@ -382,7 +382,8 @@ const UserManagement = () => {
         try {
             // Include email for students and also provide username if backend expects it
             const payload = studentData.map(s => ({ ...s, username: s.regno, email: s.email_id }));
-            const response = await axios.post('/api/admin/upload-students', { studentData: payload }, { headers });
+            // Pass the programme context so backend tags students correctly
+            const response = await axios.post('/api/admin/upload-students', { studentData: payload, programme: programme || 'UG' }, { headers });
             setMessage(`Successfully uploaded ${response.data.count} students`);
             setMessageType('success');
             // Refresh list from server so the page shows the new students
@@ -526,7 +527,8 @@ const UserManagement = () => {
     const fetchStudentList = async () => {
         setLoading(true);
         try {
-            const response = await axios.get('/api/admin/student-list', { headers });
+            const progParam = programme ? `?programme=${encodeURIComponent(programme)}` : '';
+            const response = await axios.get(`/api/admin/student-list${progParam}`, { headers });
             setStudentData(response.data.map(s => ({ 
                 regno: s.username, 
                 name: s.name,
@@ -550,11 +552,14 @@ const UserManagement = () => {
 
     return (
         <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-2xl font-bold mb-6">User Management</h2>
+            <h2 className="text-2xl font-bold mb-6">
+                {studentsOnly ? `Student Management — ${programme || 'UG'}` : 'User Management'}
+            </h2>
             
             {/* General message alert replaced with sticky toasts */}
 
-            {/* Faculty Management */}
+            {/* Faculty + Designation Limits — hidden in studentsOnly mode */}
+            {!studentsOnly && (<>
             <div className="mb-8">
                 <h3 className="text-xl font-semibold mb-4">Faculty Management</h3>
                 
@@ -872,10 +877,15 @@ const UserManagement = () => {
                     </div>
                 )}
             </div>
+            {/* End: Faculty + Designation Limits section */}
+            </>)}
 
-            {/* Student Management */}
+            {/* Student Management — hidden in globalOnly mode */}
+            {!globalOnly && (
             <div className="mb-8">
-                <h3 className="text-xl font-semibold mb-4">Student Management</h3>
+                <h3 className="text-xl font-semibold mb-4">
+                    Student Management {programme ? <span className="text-sm font-normal text-indigo-600 ml-2">({programme})</span> : ''}
+                </h3>
                 
                 <div className="mb-4">
                     <button
@@ -1020,6 +1030,7 @@ const UserManagement = () => {
                     </div>
                 )}
             </div>
+            )}
 
             {/* Sticky Notification Container */}
             <div className="fixed top-6 right-6 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none">

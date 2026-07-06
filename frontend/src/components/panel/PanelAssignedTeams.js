@@ -13,19 +13,19 @@ const PanelAssignedTeams = () => {
     const fetchAssignedTeams = async () => {
         try {
             const token = localStorage.getItem('token');
-            
+
             // Debug logging
             console.log('🔍 Frontend Debug - Token from localStorage:', token ? 'Present' : 'Missing');
             console.log('🔍 Frontend Debug - Token length:', token ? token.length : 0);
             console.log('🔍 Frontend Debug - User object from context:', JSON.parse(localStorage.getItem('user') || '{}'));
-            
+
             if (!token) {
                 console.error('❌ No token found in localStorage');
                 setError('Authentication token not found. Please login again.');
                 setLoading(false);
                 return;
             }
-            
+
             // Check if token is expired
             try {
                 const tokenPayload = JSON.parse(atob(token.split('.')[1]));
@@ -45,13 +45,13 @@ const PanelAssignedTeams = () => {
                 setLoading(false);
                 return;
             }
-            
+
             // First, let's debug the token
             console.log('🔍 Testing token with debug endpoint...');
             console.log('🔍 Full token:', token);
             try {
                 const debugResponse = await axios.get('http://localhost:5000/api/panels/debug-token', {
-                    headers: { 
+                    headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     }
@@ -61,15 +61,15 @@ const PanelAssignedTeams = () => {
                 console.error('❌ Token debug failed:', debugError.response?.status, debugError.response?.data);
                 console.error('❌ Full debug error:', debugError);
             }
-            
+
             console.log('🚀 Making request to /api/panels/assigned-teams');
             const response = await axios.get('http://localhost:5000/api/panels/assigned-teams', {
-                headers: { 
+                headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 }
             });
-            
+
             console.log('✅ Success! Response:', response.status, response.data);
             setAssignedTeams(response.data);
             setLoading(false);
@@ -95,7 +95,12 @@ const PanelAssignedTeams = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {assignedTeams.map(team => (
                         <div key={team._id} className="border p-4 rounded-lg shadow-sm">
-                            <h3 className="font-semibold text-lg mb-2">Team: {team.teamName}</h3>
+                            <div className="flex items-center gap-2 mb-2">
+                                <h3 className="font-semibold text-lg">Team: {team.teamName}</h3>
+                                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                                    {team.programme || 'UG'}
+                                </span>
+                            </div>
                             <p className="text-gray-700">Team Leader: {team.teamLeader?.name || 'N/A'} ({team.teamLeader?.username || 'N/A'})</p>
                             <p className="text-gray-700">Review Panel: {team.panel?.name || 'Not Assigned'}</p>
                             <p className="text-gray-700">Viva Panel: {team.vivaPanel?.name || 'Not Assigned'}</p>

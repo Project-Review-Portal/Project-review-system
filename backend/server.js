@@ -46,6 +46,7 @@ const signatureRoutes = require('./routes/signatures');
 const documentRoutes = require('./routes/simpleDocument'); // Using simple version for testing
 // const internalExaminerRoutes = require('./routes/internalExaminer'); // Temporarily disabled
 const externalExaminerRoutes = require('./routes/externalExaminer');
+const programmeRoutes = require('./routes/programme');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
@@ -58,6 +59,7 @@ app.use('/api/signatures', signatureRoutes);
 app.use('/api/documents', documentRoutes);
 // app.use('/api/internal-examiner', internalExaminerRoutes); // Temporarily disabled
 app.use('/api/external-examiner', externalExaminerRoutes);
+app.use('/api/programmes', programmeRoutes);
 
 // Serve static files
 app.use('/uploads', express.static('uploads'));

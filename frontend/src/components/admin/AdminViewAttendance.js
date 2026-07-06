@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const AdminViewAttendance = () => {
+const AdminViewAttendance = ({ programme }) => {
     const [studentData, setStudentData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -17,7 +17,8 @@ const AdminViewAttendance = () => {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
 
-            const response = await axios.get('/api/admin/daily-attendance-records', { headers });
+            const progParam = programme ? `?programme=${encodeURIComponent(programme)}` : '';
+            const response = await axios.get(`/api/admin/daily-attendance-records${progParam}`, { headers });
             setStudentData(response.data);
             setLoading(false);
         } catch (err) {

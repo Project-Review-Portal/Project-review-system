@@ -24,11 +24,16 @@ exports.getAvailableStudents = async (req, res) => {
         // Ensure current user is also excluded from available students
         teamMemberIds = [...new Set([...teamMemberIds.filter(Boolean).map(id => id.toString()), currentUserId.toString()])];
         
-        // Find students who are not in any team (neither as leader nor member) and not the current user
+        // Fetch current user to get their programme
+        const currentUser = await User.findById(currentUserId);
+        const userProgramme = currentUser ? (currentUser.programme || 'UG') : 'UG';
+
+        // Find students who are not in any team (neither as leader nor member) and not the current user, and are in the SAME programme
         const availableStudents = await User.find({
             'roles.role': 'student',
+            programme: userProgramme,
             _id: { $nin: teamMemberIds }
-        }).select('username _id name');
+        }).select('username _id name programme');
 
         console.log('Available students found:', availableStudents.length); // Debug log
         res.json(availableStudents);
@@ -127,7 +132,10 @@ exports.createTeam = async (req, res) => {
         // Get the count of existing teams to generate the next sequential team name
         // const maxTeamNumber = await Team.find({}, {teamName : 1});
 
-        const existingTeamNames = await Team.find({},{_id:0, teamName: 1})
+        const leader = await User.findById(teamLeaderId);
+        const leaderProgramme = leader.programme || 'UG';
+
+        const existingTeamNames = await Team.find({programme: leaderProgramme},{_id:0, teamName: 1})
         let numberTracker = 1;
         if (existingTeamNames){
             for(let x of existingTeamNames){
@@ -143,6 +151,7 @@ exports.createTeam = async (req, res) => {
         const team = new Team({
             teamName: newTeamName, // Automatically generated team name
             teamLeader: teamLeaderId,
+            programme: leaderProgramme,
             members: [], // Keep empty until invitations are accepted
             memberStatus : members.map((m) => {
                 return {
@@ -318,7 +327,7 @@ exports.getTeamsByIds = async (req, res) => {
         const idsParam = req.query.ids;
         if (!idsParam) return res.status(400).json({ message: 'ids query parameter required' });
         const ids = idsParam.split(',').map(id => id.trim()).filter(Boolean);
-        const teams = await Team.find({ _id: { $in: ids } }).select('_id teamName');
+        const teams = await Team.find({ _id: { $in: ids } }).select('_id teamName programme');
         res.json(teams);
     } catch (error) {
         console.error('Error in getTeamsByIds:', error);

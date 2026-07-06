@@ -69,6 +69,10 @@ const userSchema = new mongoose.Schema({
     reviewPeriodEndDate: {
         type: Date,
         default: null
+    },
+    programme: {
+        type: String,
+        default: 'UG'   // 'UG', 'M.E. Big Data', etc.
     }
 });
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
-const AllocationsDashboard = () => {
+const AllocationsDashboard = ({ programme }) => {
     const [teams, setTeams] = useState([]);
     const [guides, setGuides] = useState([]);
     const [reviewPanels, setReviewPanels] = useState([]);
@@ -33,8 +33,9 @@ const AllocationsDashboard = () => {
         setLoading(true);
         setError('');
         try {
+            const progParam = programme ? `?programme=${encodeURIComponent(programme)}` : '';
             const [teamsRes, facultyRes, panelsRes] = await Promise.all([
-                axios.get('/api/admin/teams', { headers }),
+                axios.get(`/api/admin/teams${progParam}`, { headers }),
                 axios.get('/api/auth/faculty', { headers }),
                 axios.get('/api/panels', { headers })
             ]);

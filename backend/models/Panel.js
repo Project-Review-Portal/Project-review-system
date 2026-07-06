@@ -28,11 +28,15 @@ const panelSchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now
+    },
+    programme: {
+        type: String,
+        default: 'UG'
     }
 });
 
-// Compound unique index: name must be unique within each panelType
-panelSchema.index({ name: 1, panelType: 1 }, { unique: true });
+// Compound unique index: name must be unique within each panelType and programme
+panelSchema.index({ name: 1, panelType: 1, programme: 1 }, { unique: true });
 
 // Cascade deletion logic for Panel
 panelSchema.pre('findOneAndDelete', async function(next) {

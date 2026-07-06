@@ -93,7 +93,12 @@ const GuideMarking = () => {
 
             {teams.map(team => (
                 <div key={team._id} className="p-6 bg-white rounded-lg shadow">
-                    <h3 className="text-xl font-semibold mb-4">{team.teamName}</h3>
+                    <div className="flex items-center gap-3 mb-4">
+                        <h3 className="text-xl font-semibold">{team.teamName}</h3>
+                        <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                            {team.programme || 'UG'}
+                        </span>
+                    </div>
                     <div className="overflow-x-auto">
                         <table className="min-w-full">
                             <thead>

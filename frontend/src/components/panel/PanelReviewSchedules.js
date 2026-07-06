@@ -148,7 +148,11 @@ const PanelReviewSchedules = () => {
                             return (
                                 <div key={schedule._id} className="border rounded-lg p-4 bg-gray-50">
                                     <h4 className="text-lg font-semibold mb-2">{displayName} — {slotLabel}</h4>
-                                    <p className="text-sm text-gray-600">Team: {schedule.team?.teamName || 'N/A'}{studentNames}</p>
+                                    <p className="text-sm text-gray-600">Team: {schedule.team?.teamName || 'N/A'}{studentNames}
+                                        {schedule.team?.programme && (
+                                            <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-indigo-100 text-indigo-700">{schedule.team.programme}</span>
+                                        )}
+                                    </p>
                                     <p className="text-sm text-gray-600">Panel: {schedule.panel?.name || 'N/A'}</p>
                                     {panelMembers && (
                                         <p className="text-sm text-gray-600">Panel Members: {panelMembers}</p>

@@ -62,11 +62,11 @@ const RoleSelection = () => {
         const fetchNames = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`http://localhost:5000/api/teams/by-ids?ids=${idsParam}`, { headers: { Authorization: `Bearer ${token}` } });
+                const res = await fetch(`/api/teams/by-ids?ids=${idsParam}`, { headers: { Authorization: `Bearer ${token}` } });
                 if (!res.ok) return;
                 const data = await res.json();
                 const map = {};
-                data.forEach(t => { map[t._id] = t.teamName; });
+                data.forEach(t => { map[t._id] = `${t.programme ? t.programme + ' ' : ''}${t.teamName}`; });
                 setTeamNames(map);
             } catch (e) {
                 console.warn('Failed to fetch team names', e);

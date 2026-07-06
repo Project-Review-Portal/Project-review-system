@@ -3,8 +3,7 @@ const mongoose = require('mongoose');
 const teamSchema = new mongoose.Schema({
     teamName: {
         type: String,
-        required: true,
-        unique: true
+        required: true
     },
     teamLeader: {
         type: mongoose.Schema.Types.ObjectId,
@@ -71,8 +70,16 @@ const teamSchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now
+    },
+    programme: {
+        type: String,
+        default: 'UG'   // 'UG', 'M.E. Big Data', etc.
     }
 });
+
+// Ensure team names are unique per programme
+teamSchema.index({ teamName: 1, programme: 1 }, { unique: true });
+
 // Cascade deletion logic for Team
 teamSchema.pre('findOneAndDelete', async function(next) {
     const teamId = this.getQuery()._id;
