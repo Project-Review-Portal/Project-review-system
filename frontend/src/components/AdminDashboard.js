@@ -5,7 +5,6 @@ import AdminSettings from './admin/AdminSettings';
 import PanelManagement from './admin/PanelManagement';
 import AdminViewAttendance from './admin/AdminViewAttendance';
 import AdminManageReviewSchedules from './admin/AdminManageReviewSchedules';
-import AdminViewAvailabilities from './admin/AdminViewAvailabilities';
 import UserManagement from './admin/UserManagement';
 import AllocationsDashboard from './admin/AllocationsDashboard';
 import GuideMe from './GuideMe';
@@ -65,7 +64,6 @@ const AdminDashboard = () => {
 
                         {/* Shared admin routes (not programme-scoped) */}
                         <Route path="admin-settings" element={<AdminSettings />} />
-                        <Route path="view-availabilities" element={<AdminViewAvailabilities />} />
                         <Route path="guide-me" element={user ? <GuideMe userRole={user.role} memberType={user.memberType} /> : null} />
 
                         {/* Legacy routes — kept for backward compatibility */}

@@ -14,7 +14,7 @@ const rulesByRole = {
   guide: [
     'You can only approve or reject guide requests during the guide selection period.',
     'You are responsible for reviewing and approving teams that request you as a guide.',
-    'Submit your availability for review periods as required.',
+
     'Mark and upload attendance for your assigned teams.',
     'You cannot change team compositions; only approve or reject requests.'
   ],

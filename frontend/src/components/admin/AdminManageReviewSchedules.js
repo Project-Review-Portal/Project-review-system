@@ -4,7 +4,6 @@ import axios from 'axios';
 const AdminManageReviewSchedules = ({ programme }) => {
     const [panels, setPanels] = useState([]);
     const [teams, setTeams] = useState([]);
-    const [availabilities, setAvailabilities] = useState([]);
     const [reviewPeriodStart, setReviewPeriodStart] = useState('');
     const [reviewPeriodEnd, setReviewPeriodEnd] = useState('');
     const [loading, setLoading] = useState(true);
@@ -29,23 +28,19 @@ const AdminManageReviewSchedules = ({ programme }) => {
         try {
             const token = localStorage.getItem('token');
             const progParam = programme ? `?programme=${encodeURIComponent(programme)}` : '';
-            const [panelsRes, teamsRes, availabilitiesRes, schedulesRes, reviewPeriodRes, settingsRes] = await Promise.all([
+            const [panelsRes, teamsRes, schedulesRes, reviewPeriodRes, settingsRes] = await Promise.all([
                 axios.get(`/api/admin/panels-with-members${progParam}`, { headers: { Authorization: `Bearer ${token}` } }),
                 axios.get(`/api/admin/teams${progParam}`, { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get(`/api/admin/availabilities${progParam}`, { headers: { Authorization: `Bearer ${token}` } }),
                 axios.get(`/api/admin/review-schedules${progParam}`, { headers: { Authorization: `Bearer ${token}` } }),
                 axios.get('/api/admin/review-period-dates', { headers: { Authorization: `Bearer ${token}` } }),
                 axios.get('/api/auth/review-settings', { headers: { Authorization: `Bearer ${token}` } })
             ]);
 
-            console.log('Raw Availabilities Data:', availabilitiesRes.data);
             console.log('Raw Teams Data:', teamsRes.data);
             console.log('Raw Panels Data:', panelsRes.data);
 
             setPanels(panelsRes.data);
             setTeams(teamsRes.data);
-            setAvailabilities(availabilitiesRes.data);
-            setSchedules(schedulesRes.data);
             setCurrentReviewPeriodStart(reviewPeriodRes.data.startDate || '');
             setCurrentReviewPeriodEnd(reviewPeriodRes.data.endDate || '');
             setSlotTypes(settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva']);
@@ -111,145 +106,8 @@ const AdminManageReviewSchedules = ({ programme }) => {
         }
     };
 
-    // Group availabilities by team
-    const groupAvailabilitiesByTeam = () => {
-        const teamGroups = {};
-
-        // First, create entries for all teams and populate assigned guide and panel members
-        teams.forEach(team => {
-            console.log('Processing team:', team.teamName, 'Panel:', team.panel);
-            teamGroups[team._id] = {
-                teamName: team.teamName,
-                teamId: team._id,
-                panelId: team.panel?._id,
-                guide: team.guidePreference ? { user: team.guidePreference, availableSlots: [] } : null,
-                panelMembers: (() => {
-                    const uniquePanelMembersMap = new Map();
-                    if (team.panel && team.panel.members) {
-                        team.panel.members
-                            .forEach(member => {
-                                if (!uniquePanelMembersMap.has(member._id.toString())) {
-                                    uniquePanelMembersMap.set(member._id.toString(), {
-                                        user: member,
-                                        availableSlots: [],
-                                        isInternal: member.memberType === 'internal'
-                                    });
-                                }
-                            });
-                    }
-                    return Array.from(uniquePanelMembersMap.values());
-                })()
-            };
-        });
-
-        // Then, populate with submitted availabilities where available
-        availabilities.forEach(availability => {
-            console.log('Processing availability:', availability);
-            if (!availability.user || !availability.user._id) {
-                console.warn('Skipping availability record with missing user or user._id:', availability);
-                return;
-            }
-            const userId = availability.user._id.toString();
-            
-            if (availability.userRole === 'panel') {
-                for (const teamId in teamGroups) {
-                    const panelMemberEntry = teamGroups[teamId].panelMembers.find(pm => 
-                        pm.user && pm.user._id?.toString() === userId
-                    );
-                    if (panelMemberEntry) {
-                        // Aggregate slots, then deduplicate later
-                        panelMemberEntry.availableSlots.push(...availability.availableSlots.map(slot => {
-                            let transformedSlot;
-                            if (typeof slot === 'string') {
-                                transformedSlot = { startTime: new Date(slot).toISOString(), endTime: new Date(slot).toISOString() };
-                            } else if (slot.startTime && slot.endTime) {
-                                transformedSlot = { startTime: new Date(slot.startTime).toISOString(), endTime: new Date(slot.endTime).toISOString() };
-                            } else {
-                                transformedSlot = slot; // Fallback if unexpected format
-                            }
-                            return transformedSlot;
-                        }));
-                    }
-                }
-            } else if (availability.userRole === 'guide') {
-                for (const teamId in teamGroups) {
-                    const guideEntry = teamGroups[teamId].guide;
-                    if (guideEntry && guideEntry.user && guideEntry.user._id?.toString() === userId) {
-                        // Aggregate slots, then deduplicate later
-                        guideEntry.availableSlots.push(...availability.availableSlots.map(slot => {
-                            let transformedSlot;
-                            if (typeof slot === 'string') {
-                                transformedSlot = { startTime: new Date(slot).toISOString(), endTime: new Date(slot).toISOString() };
-                            } else if (slot.startTime && slot.endTime) {
-                                transformedSlot = { startTime: new Date(slot.startTime).toISOString(), endTime: new Date(slot.endTime).toISOString() };
-                            } else {
-                                transformedSlot = slot; // Fallback if unexpected format
-                            }
-                            return transformedSlot;
-                        }));
-                    }
-                }
-            }
-        });
-
-        // Final deduplication of availableSlots for all panel members and guides
-        Object.values(teamGroups).forEach(group => {
-            if (group.guide && group.guide.availableSlots.length > 0) {
-                const uniqueGuideSlotsMap = new Map();
-                group.guide.availableSlots.forEach(slot => {
-                    // Ensure slot has startTime and endTime before creating key
-                    const key = slot.startTime && slot.endTime ? `${slot.startTime}-${slot.endTime}` : null;
-                    if (key) {
-                        uniqueGuideSlotsMap.set(key, slot);
-                    }
-                });
-                group.guide.availableSlots = Array.from(uniqueGuideSlotsMap.values()).map(slot => ({
-                    startTime: new Date(slot.startTime),
-                    endTime: new Date(slot.endTime)
-                }));
-            }
-
-            group.panelMembers.forEach(pm => {
-                if (pm.availableSlots.length > 0) {
-                    const uniquePmSlotsMap = new Map();
-                    pm.availableSlots.forEach(slot => {
-                        // Ensure slot has startTime and endTime before creating key
-                        const key = slot.startTime && slot.endTime ? `${slot.startTime}-${slot.endTime}` : null;
-                        if (key) {
-                            uniquePmSlotsMap.set(key, slot);
-                        }
-                    });
-                    pm.availableSlots = Array.from(uniquePmSlotsMap.values()).map(slot => ({
-                        startTime: new Date(slot.startTime),
-                        endTime: new Date(slot.endTime)
-                    }));
-                }
-            });
-        });
-
-        console.log('Final team groups:', teamGroups);
-        return Object.values(teamGroups);
-    };
-
-    const handleCreateSlotForTeam = async (teamId) => {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await axios.post('/api/admin/generate-slot-for-team', { teamId }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setSuccessMessage(response.data.message);
-            fetchData(); // Refresh data to show new schedule
-            setTimeout(() => setSuccessMessage(''), 3000);
-        } catch (err) {
-            console.error('Error generating slot for team:', err);
-            setError(err.response?.data?.message || 'Failed to generate slot for team');
-        }
-    };
-
     if (loading) return <div className="text-center p-4">Loading data...</div>;
     if (error) return <div className="text-red-500 p-4">{error}</div>;
-
-    const teamGroups = groupAvailabilitiesByTeam();
 
     return (
         <div className="bg-white p-6 rounded-lg shadow">

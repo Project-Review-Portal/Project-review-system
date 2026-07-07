@@ -4,7 +4,6 @@ const User = require('../models/User');
 const TimeTable = require('../models/TimeTable');
 const Attendance = require('../models/Attendance');
 const Team = require('../models/Team');
-const Availability = require('../models/Availability');
 const Config = require('../models/Config');
 const Mark = require('../models/Mark');
 const InstructionTemplate = require('../models/InstructionTemplate'); 
@@ -495,71 +494,7 @@ exports.debugAssignedData = async (req, res) => {
     }
 };
 
-// Get panel member's availability
-exports.getPanelAvailability = async (req, res) => {
-    try {
-        const panelMemberId = req.user.id;
-        let availability = await Availability.findOne({ user: panelMemberId, userRole: 'panel' });
 
-        if (!availability) {
-            // If no availability document exists, return the review period dates from the user's profile
-            return res.json({
-                availableSlots: [],
-                reviewPeriodStartDate: req.user.reviewPeriodStartDate || null,
-                reviewPeriodEndDate: req.user.reviewPeriodEndDate || null,
-            });
-        }
-        res.json(availability);
-    } catch (error) {
-        console.error('Error fetching panel member availability:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
-};
-
-exports.submitPanelAvailability = async (req, res) => {
-    try {
-        const panelMemberId = req.user.id;
-        const { availableSlots } = req.body;
-
-        console.log('Debug: req.user.reviewPeriodStartDate', req.user.reviewPeriodStartDate);
-        console.log('Debug: req.user.reviewPeriodEndDate', req.user.reviewPeriodEndDate);
-
-        // Ensure review period dates are present in req.user
-        if (!req.user.reviewPeriodStartDate || !req.user.reviewPeriodEndDate) {
-            return res.status(400).json({
-                message: 'Global review period not set by admin. Please ask an admin to set it.'
-            });
-        }
-
-        // Validate availableSlots array structure if needed
-        if (!Array.isArray(availableSlots)) {
-            return res.status(400).json({ message: 'Available slots must be an array.' });
-        }
-
-        let availability = await Availability.findOne({ user: panelMemberId, userRole: 'panel' });
-
-        if (!availability) {
-            availability = new Availability({
-                user: panelMemberId,
-                userRole: 'panel',
-                availableSlots: availableSlots,
-                reviewPeriodStartDate: req.user.reviewPeriodStartDate,
-                reviewPeriodEndDate: req.user.reviewPeriodEndDate
-            });
-        } else {
-            availability.availableSlots = availableSlots;
-            availability.reviewPeriodStartDate = req.user.reviewPeriodStartDate;
-            availability.reviewPeriodEndDate = req.user.reviewPeriodEndDate;
-        }
-
-        await availability.save();
-        res.json({ message: 'Availability submitted successfully!', availability });
-
-    } catch (error) {
-        console.error('Error submitting panel member availability:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
-};
 
 // Get global review period dates for public view
 exports.getReviewPeriodDatesPublic = async (req, res) => {

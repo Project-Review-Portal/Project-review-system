@@ -40,9 +40,6 @@ router.get('/panels-with-members', auth, authorize(['admin']), adminController.g
 router.get('/teams', auth, authorize(['admin']), adminController.getAllTeams);
 router.delete('/teams/:teamId', auth, authorize(['admin']), adminController.deleteTeam);
 
-// New route for fetching all user availabilities (guide and panel)
-router.get('/availabilities', auth, authorize(['admin']), adminController.getAllAvailabilities);
-
 // New route for schedule generation
 router.post('/generate-schedules', auth, authorize(['admin']), adminController.generateSchedules);
 

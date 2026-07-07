@@ -2,7 +2,6 @@ const Team = require('../models/Team');
 const User = require('../models/User');
 const Panel = require('../models/Panel');
 const TimeTable = require('../models/TimeTable');
-const Availability = require('../models/Availability');
 const Config = require('../models/Config');
 const Attendance = require('../models/Attendance');
 const Mark = require('../models/Mark');
@@ -264,36 +263,6 @@ exports.requestTimeTable = async (req, res) => {
     }
 };
 
-// Get guide's availability
-exports.getGuideAvailability = async (req, res) => {
-    try {
-        const guideId = req.user.id;
-        let availability = await Availability.findOne({ user: guideId, userRole: 'guide' });
-        
-        // Get global review period from Config
-        const config = await Config.findOne();
-        
-        if (!availability) {
-            // If no availability document exists, return the review period dates from the global config
-            return res.json({
-                availableSlots: [],
-                reviewPeriodStartDate: config ? config.reviewPeriodStartDate : null,
-                reviewPeriodEndDate: config ? config.reviewPeriodEndDate : null,
-            });
-        }
-        
-        // Add the global review period dates to the response
-        availability = availability.toObject();
-        availability.reviewPeriodStartDate = config ? config.reviewPeriodStartDate : null;
-        availability.reviewPeriodEndDate = config ? config.reviewPeriodEndDate : null;
-        
-        res.json(availability);
-    } catch (error) {
-        console.error('Error fetching guide availability:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
-};
-
 // Get guide selection dates for public view
 exports.getGuideSelectionDatesPublic = async (req, res) => {
     try {
@@ -307,52 +276,6 @@ exports.getGuideSelectionDatesPublic = async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching public guide selection dates:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
-};
-
-// Submit or update guide's availability
-exports.submitGuideAvailability = async (req, res) => {
-    try {
-        const guideId = req.user.id;
-        const { availableSlots } = req.body;
-
-        // Get global review period from Config
-        const config = await Config.findOne();
-
-        // Ensure review period dates are present in config
-        if (!config || !config.reviewPeriodStartDate || !config.reviewPeriodEndDate) {
-            return res.status(400).json({
-                message: 'Global review period not set by admin. Please ask an admin to set it.'
-            });
-        }
-
-        // Validate availableSlots array structure if needed
-        if (!Array.isArray(availableSlots)) {
-            return res.status(400).json({ message: 'Available slots must be an array.' });
-        }
-
-        let availability = await Availability.findOne({ user: guideId, userRole: 'guide' });
-
-        if (!availability) {
-            availability = new Availability({
-                user: guideId,
-                userRole: 'guide',
-                availableSlots: availableSlots,
-                reviewPeriodStartDate: config.reviewPeriodStartDate,
-                reviewPeriodEndDate: config.reviewPeriodEndDate
-            });
-        } else {
-            availability.availableSlots = availableSlots;
-            availability.reviewPeriodStartDate = config.reviewPeriodStartDate;
-            availability.reviewPeriodEndDate = config.reviewPeriodEndDate;
-        }
-
-        await availability.save();
-        res.json({ message: 'Availability submitted successfully!', availability });
-
-    } catch (error) {
-        console.error('Error submitting guide availability:', error);
         res.status(500).json({ message: 'Server error' });
     }
 };

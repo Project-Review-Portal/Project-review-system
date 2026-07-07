@@ -4,14 +4,8 @@ import axios from 'axios';
 const PanelReviewSchedules = () => {
     const [user, setUser] = useState(null);
     const [reviewSchedules, setReviewSchedules] = useState([]);
-    const [reviewPeriodStartDate, setReviewPeriodStartDate] = useState('');
-    const [reviewPeriodEndDate, setReviewPeriodEndDate] = useState('');
-    const [availableSlots, setAvailableSlots] = useState([]);
-    const [newSlotStartTime, setNewSlotStartTime] = useState('');
-    const [newSlotEndTime, setNewSlotEndTime] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [successMessage, setSuccessMessage] = useState('');
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
@@ -24,15 +18,11 @@ const PanelReviewSchedules = () => {
     const fetchData = async () => {
         try {
             const token = localStorage.getItem('token');
-            const [schedulesRes, userRes, availabilityRes] = await Promise.all([
+            const [schedulesRes, userRes] = await Promise.all([
                 axios.get('/api/panels/review-schedules', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('/api/auth/profile', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('/api/panels/availability', { headers: { Authorization: `Bearer ${token}` } })
+                axios.get('/api/auth/profile', { headers: { Authorization: `Bearer ${token}` } })
             ]);
             setReviewSchedules(schedulesRes.data);
-            setReviewPeriodStartDate(userRes.data.reviewPeriodStartDate || '');
-            setReviewPeriodEndDate(userRes.data.reviewPeriodEndDate || '');
-            setAvailableSlots(availabilityRes.data.availableSlots || []);
             setLoading(false);
         } catch (err) {
             console.error('Error fetching data:', err);
@@ -41,40 +31,7 @@ const PanelReviewSchedules = () => {
         }
     };
 
-    const handleAddSlot = () => {
-        if (newSlotStartTime && newSlotEndTime) {
-            const newStart = new Date(newSlotStartTime);
-            const newEnd = new Date(newSlotEndTime);
-            const periodStart = new Date(reviewPeriodStartDate);
-            const periodEnd = new Date(reviewPeriodEndDate);
 
-            if (newStart < periodStart || newEnd > periodEnd || newStart >= newEnd) {
-                alert('Availability slot must be within the global review period and start time must be before end time.');
-                return;
-            }
-            setAvailableSlots([...availableSlots, { startTime: newStart, endTime: newEnd }]);
-            setNewSlotStartTime('');
-            setNewSlotEndTime('');
-        }
-    };
-
-    const handleRemoveSlot = (index) => {
-        setAvailableSlots(availableSlots.filter((_, i) => i !== index));
-    };
-
-    const handleSubmitAvailability = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            await axios.post('/api/panels/availability', { availableSlots }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setSuccessMessage('Availability submitted successfully!');
-            setTimeout(() => setSuccessMessage(''), 3000);
-        } catch (err) {
-            console.error('Error submitting availability:', err);
-            setError('Failed to submit availability');
-        }
-    };
 
     if (loading) return <div className="text-center p-4">Loading review schedules...</div>;
     if (error) return <div className="text-red-500 p-4">{error}</div>;

@@ -5,7 +5,6 @@ import PanelManagement from './PanelManagement';
 import AllocationsDashboard from './AllocationsDashboard';
 import AdminViewAttendance from './AdminViewAttendance';
 import AdminManageReviewSchedules from './AdminManageReviewSchedules';
-import AdminViewAvailabilities from './AdminViewAvailabilities';
 import UserManagement from './UserManagement';
 import GuideUploadAttendance from '../guide/GuideUploadAttendance';
 
@@ -48,8 +47,7 @@ const ProgrammeDashboard = () => {
                 return <AdminViewAttendance programme={decodedProgramme} />;
             case 'manage-review-schedules':
                 return <AdminManageReviewSchedules programme={decodedProgramme} />;
-            case 'view-availabilities':
-                return <AdminViewAvailabilities />;
+
             default:
                 return (
                     <div className="bg-white p-6 rounded-lg shadow mt-4">

@@ -64,8 +64,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     { label: 'Allocations', path: `${prefix}/allocations` },
                     { label: 'Upload Attendance', path: `${prefix}/upload-attendance` },
                     { label: 'Summary', path: `${prefix}/view-attendance` },
-                    { label: 'Schedules', path: `${prefix}/manage-review-schedules` },
-                    { label: 'Availabilities', path: `${prefix}/view-availabilities` }
+                    { label: 'Schedules', path: `${prefix}/manage-review-schedules` }
                 ];
             case 'coordinator':
                 return [

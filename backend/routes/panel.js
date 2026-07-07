@@ -64,9 +64,7 @@ router.get('/debug-token', (req, res) => {
 // Review schedules for panel members (allow panel, guide, and admin)
 router.get('/review-schedules', auth, authorize(['panel', 'guide', 'admin']), panelController.getPanelReviewSchedules);
 
-// Availability routes for panel members (allow panel, guide, and admin)
-router.get('/availability', auth, authorize(['panel', 'guide', 'admin']), panelController.getPanelAvailability);
-router.post('/availability', auth, authorize(['panel', 'guide', 'admin']), panelController.submitPanelAvailability);
+
 
 // New route for fetching public review period dates
 router.get('/review-period-dates', auth, panelController.getReviewPeriodDatesPublic);

@@ -5,7 +5,6 @@ const User = require('../models/User');
 const Panel = require('../models/Panel');
 const TimeTable = require('../models/TimeTable');
 const Attendance = require('../models/Attendance');
-const Availability = require('../models/Availability');
 const Mark = require('../models/Mark');
 const { getReviewSettings } = require('../utils/reviewSettings');
 
@@ -71,24 +70,6 @@ const createDateWithTime = (date, timeStr) => {
     const newDate = new Date(date);
     newDate.setUTCHours(hours, minutes, 0, 0);
     return newDate;
-};
-
-// Helper to check if a user is available in a given period on a specific date
-const isUserAvailableInPeriod = (userAvailabilitySlots, startTime, endTime) => {
-    if (!userAvailabilitySlots || !Array.isArray(userAvailabilitySlots) || userAvailabilitySlots.length === 0) {
-        return false;
-    }
-
-    const proposedStart = startTime instanceof Date ? startTime : new Date(startTime);
-    const proposedEnd = endTime instanceof Date ? endTime : new Date(endTime);
-
-    return userAvailabilitySlots.some(slot => {
-        const slotStart = new Date(slot.startTime);
-        const slotEnd = new Date(slot.endTime);
-        console.log(`Checking overlap: Proposed [${proposedStart.toISOString()}-${proposedEnd.toISOString()}] vs Availability [${slotStart.toISOString()}-${slotEnd.toISOString()}]`);
-        console.log(`Timestamps: Proposed [${proposedStart.getTime()}-${proposedEnd.getTime()}] vs Availability [${slotStart.getTime()}-${slotEnd.getTime()}]`);
-        return doSlotsOverlap(proposedStart, proposedEnd, slotStart, slotEnd);
-    });
 };
 
 // Helper to check for clashes with existing TimeTable entries for a given user
@@ -875,22 +856,7 @@ exports.sendScheduleNotification = async (req, res) => {
     }
 };
 
-// Admin: Get All Availabilities for Admin View
-exports.getAllAvailabilities = async (req, res) => {
-    try {
-        const availabilities = await Availability.find()
-            .populate('user', 'name username role') // Populate user details
-            .sort({ userRole: 1, 'user.username': 1 });
-
-        res.json(availabilities);
-
-    } catch (error) {
-        console.error('Error fetching all availabilities:', error);
-        res.status(500).json({ message: 'Error fetching all availabilities' });
-    }
-};
-
-// Admin: Add new user for admin side
+// Admin: Send schedule notification
 exports.addUser = async (req, res) => {
     const { username, password, role, name, memberType } = req.body;
 
@@ -973,20 +939,6 @@ exports.deleteUser = async (req, res) => {
 
             // 2) Remove this faculty from any panel memberships and coordinator positions
             try { await Panel.updateMany({ members: userObjectId }, { $pull: { members: userObjectId } }); } catch (e) {}
-            try { await Panel.updateMany({ coordinator: userObjectId }, { $set: { coordinator: null } }); } catch (e) {}
-
-            // 3) Delete availability records for this faculty
-            try { await Availability.deleteMany({ user: userObjectId }); } catch (e) {}
-
-            // 4) Delete marks given by this faculty
-            try { await Mark.deleteMany({ markedBy: userObjectId }); } catch (e) {}
-
-            // 5) Update attendance records to remove this faculty as guide
-            try { await Attendance.updateMany({ guide: userObjectId }, { $set: { guide: null } }); } catch (e) {}
-
-            // 6) Update final reports to remove this faculty as approver
-            try { const FinalReport = require('../models/FinalReport'); await FinalReport.updateMany({ approvedBy: userObjectId }, { $set: { approvedBy: null } }); } catch (e) {}
-
             // 7) Update time table entries to remove this faculty as slot assigner
             try { await TimeTable.updateMany({ slotAssignedBy: userObjectId }, { $set: { slotAssignedBy: null } }); } catch (e) {}
 
@@ -1013,9 +965,6 @@ exports.deleteUser = async (req, res) => {
             try { await Mark.deleteMany({ student: userObjectId }); } catch (e) {}
             try { await Attendance.updateMany({}, { $pull: { 'studentAttendances': { student: userObjectId } } }); } catch (e) {}
 
-        } else {
-            // Handle other user types (admin, etc.) - minimal cleanup
-            try { await Availability.deleteMany({ user: userObjectId }); } catch (e) {}
         }
 
         // Finally delete the user
@@ -1205,10 +1154,6 @@ exports.generateSchedules = async (req, res) => {
             .populate('guidePreference', 'username')
             .populate('panel', 'name');
 
-        // Get all panel members' availabilities
-        const panelAvailabilities = await Availability.find({ userRole: 'panel' })
-            .populate('user', 'username');
-
         // Get review period dates
         const config = await Config.findOne();
         if (!config || !config.reviewPeriodStartDate || !config.reviewPeriodEndDate) {
@@ -1221,42 +1166,30 @@ exports.generateSchedules = async (req, res) => {
         // Generate schedules for each team
         const generatedSchedules = [];
         for (const team of teams) {
-            // Find available panel members for this team
-            const availablePanelMembers = panelAvailabilities.filter(avail => 
-                avail.user._id.toString() !== team.guidePreference?._id.toString()
-            );
-
             // Try to find a suitable time slot
+            let scheduled = false;
             for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
                 // Skip weekends
                 if (date.getDay() === 0 || date.getDay() === 6) continue;
 
                 for (const period of dailyPeriods) {
-                    const startTime = createDateWithTime(date, period.start);
-                    const endTime = createDateWithTime(date, period.end);
+                    // Create schedule for this team
+                    const schedule = new TimeTable({
+                        team: team._id,
+                        panel: team.panel,
+                        date: date,
+                        period: `${period.start}-${period.end}`,
+                        isNotified: false,
+                        slotType: targetSlot,
+                        name: `${targetSlot} for ${team.teamName || team._id}`
+                    });
 
-                    // Check if any panel members are available
-                    const availableMembers = availablePanelMembers.filter(avail => 
-                        isUserAvailableInPeriod(avail.slots, startTime, endTime)
-                    );
-
-                    if (availableMembers.length > 0) {
-                        // Create schedule for this team
-                        const schedule = new TimeTable({
-                            team: team._id,
-                            panel: team.panel,
-                            date: date,
-                            period: `${period.start}-${period.end}`,
-                            isNotified: false,
-                            slotType: targetSlot,
-                            name: `${targetSlot} for ${team.teamName || team._id}`
-                        });
-
-                        await schedule.save();
-                        generatedSchedules.push(schedule);
-                        break; // Move to next team
-                    }
+                    await schedule.save();
+                    generatedSchedules.push(schedule);
+                    scheduled = true;
+                    break; // Move to next team
                 }
+                if (scheduled) break;
             }
         }
 
@@ -1294,10 +1227,6 @@ exports.generateSlotForTeam = async (req, res) => {
             return res.status(400).json({ message: prereq.message });
         }
 
-        // Get panel members' availabilities
-        const panelAvailabilities = await Availability.find({ userRole: 'panel' })
-            .populate('user', 'username');
-
         // Get review period dates
         const config = await Config.findOne();
         if (!config || !config.reviewPeriodStartDate || !config.reviewPeriodEndDate) {
@@ -1307,43 +1236,28 @@ exports.generateSlotForTeam = async (req, res) => {
         const startDate = new Date(config.reviewPeriodStartDate);
         const endDate = new Date(config.reviewPeriodEndDate);
 
-        // Find available panel members for this team
-        const availablePanelMembers = panelAvailabilities.filter(avail => 
-            avail.user._id.toString() !== team.guidePreference?._id.toString()
-        );
-
         // Try to find a suitable time slot
         for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
             // Skip weekends
             if (date.getDay() === 0 || date.getDay() === 6) continue;
 
             for (const period of dailyPeriods) {
-                const startTime = createDateWithTime(date, period.start);
-                const endTime = createDateWithTime(date, period.end);
-
-                // Check if any panel members are available
-                const availableMembers = availablePanelMembers.filter(avail => 
-                    isUserAvailableInPeriod(avail.slots, startTime, endTime)
-                );
-
-                if (availableMembers.length > 0) {
-                    // Create schedule for this team
-                    const schedule = new TimeTable({
+                // Create schedule for this team
+                const schedule = new TimeTable({
                     team: team._id,
-                        panel: team.panel,
-                        date: date,
-                        period: `${period.start}-${period.end}`,
-                        isNotified: false,
-                        slotType: targetSlot,
-                        name: `${targetSlot} for ${team.teamName || team._id}`
-                    });
+                    panel: team.panel,
+                    date: date,
+                    period: `${period.start}-${period.end}`,
+                    isNotified: false,
+                    slotType: targetSlot,
+                    name: `${targetSlot} for ${team.teamName || team._id}`
+                });
 
-                    await schedule.save();
-                    return res.json({ 
-                        message: 'Schedule generated successfully',
-                        schedule
-                    });
-                }
+                await schedule.save();
+                return res.json({ 
+                    message: 'Schedule generated successfully',
+                    schedule
+                });
             }
         }
 

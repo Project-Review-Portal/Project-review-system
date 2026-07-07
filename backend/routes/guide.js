@@ -13,9 +13,7 @@ router.post('/team-requests/reject', auth, authorize(['guide', 'admin']), guideC
 router.get('/approved-teams', auth, authorize(['guide', 'admin']), guideController.getApprovedTeams);
 router.post('/request-timetable', auth, authorize(['guide', 'admin']), guideController.requestTimeTable);
 
-// Availability routes (allow both guide and admin)
-router.get('/availability', auth, authorize(['guide', 'admin']), guideController.getGuideAvailability);
-router.post('/availability', auth, authorize(['guide', 'admin']), guideController.submitGuideAvailability);
+
 
 // New route to get review schedules for a guide (allow both guide and admin)
 router.get('/review-schedules', auth, authorize(['guide', 'admin']), guideController.getGuideReviewSchedules);
