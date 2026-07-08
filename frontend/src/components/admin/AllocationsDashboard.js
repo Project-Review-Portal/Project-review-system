@@ -314,12 +314,16 @@ const AllocationsDashboard = ({ programme }) => {
                                             className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                             value={currentAlloc.panelId}
                                             onChange={(e) => {
-                                                handleAllocationChange(team._id, 'panelId', e.target.value);
-                                                handleMouseLeavePanel(); 
+                                                const val = e.target.value;
+                                                handleAllocationChange(team._id, 'panelId', val);
+                                                handleMouseLeavePanel();
+                                                if (val && !currentAlloc.guideId) {
+                                                    alert(`Warning: You are assigning a review panel to team "${team.teamName || team.teamId}", but no guide is assigned to this team.`);
+                                                }
                                             }}
                                         >
                                             <option value="">No Panel</option>
-                                            {reviewPanels.map(p => {
+                                            {reviewPanels.filter(p => (p.programme || 'UG').trim().toLowerCase() === (team.programme || 'UG').trim().toLowerCase()).map(p => {
                                                 const coordName = p.coordinator ? p.coordinator.name : 'None';
                                                 const membersList = p.members && p.members.length > 0 
                                                     ? p.members.map(m => m.name).join(', ') 
@@ -349,12 +353,16 @@ const AllocationsDashboard = ({ programme }) => {
                                             className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                             value={currentAlloc.vivaPanelId}
                                             onChange={(e) => {
-                                                handleAllocationChange(team._id, 'vivaPanelId', e.target.value);
-                                                handleMouseLeavePanel(); 
+                                                const val = e.target.value;
+                                                handleAllocationChange(team._id, 'vivaPanelId', val);
+                                                handleMouseLeavePanel();
+                                                if (val && !currentAlloc.guideId) {
+                                                    alert(`Warning: You are assigning a viva panel to team "${team.teamName || team.teamId}", but no guide is assigned to this team.`);
+                                                }
                                             }}
                                         >
                                             <option value="">No Viva Panel</option>
-                                            {vivaPanels.map(p => {
+                                            {vivaPanels.filter(p => (p.programme || 'UG').trim().toLowerCase() === (team.programme || 'UG').trim().toLowerCase()).map(p => {
                                                 const coordName = p.coordinator ? p.coordinator.name : 'None';
                                                 const membersList = p.members && p.members.length > 0 
                                                     ? p.members.map(m => m.name).join(', ') 

@@ -2027,6 +2027,13 @@ exports.updateTeamAllocation = async (req, res) => {
                     { $addToSet: { teams: teamId } },
                     { upsert: true }
                 );
+
+                // Warn if no guide is assigned to this team
+                if (!team.guidePreference) {
+                    warnings.push(
+                        `Warning: Review panel "${panel.name}" assigned, but no guide is assigned to this team.`
+                    );
+                }
             }
             updated = true;
         }
@@ -2041,6 +2048,13 @@ exports.updateTeamAllocation = async (req, res) => {
                     return res.status(404).json({ message: 'Viva Panel not found.' });
                 }
                 team.vivaPanel = vivaPanelId;
+
+                // Warn if no guide is assigned to this team
+                if (!team.guidePreference) {
+                    warnings.push(
+                        `Warning: Viva panel "${vivaPanel.name}" assigned, but no guide is assigned to this team.`
+                    );
+                }
             }
             updated = true;
         }
