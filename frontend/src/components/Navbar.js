@@ -117,7 +117,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
 
                     {/* Right side - User info and buttons */}
                     <div className="flex items-center space-x-2">
-                        <span className="text-white text-xs lg:text-sm hidden sm:block truncate max-w-32">Welcome!</span>
+                        {/* <span className="text-white text-xs lg:text-sm hidden sm:block truncate max-w-32">Welcome!</span> */}
                         
                         {/* Switch Role button for faculty users with multiple roles */}
                         {['guide', 'panel', 'coordinator'].includes(user.role) && user.roles && user.roles.length > 1 && (
