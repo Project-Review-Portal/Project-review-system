@@ -3,6 +3,7 @@ import axios from 'axios';
 
 const MaxTeamSizeSettings = () => {
     const [maxTeamSize, setMaxTeamSize] = useState(4);
+    const [currentMaxTeamSize, setCurrentMaxTeamSize] = useState(4); // tracks the last saved value
     const [reviewPeriodStartDate, setReviewPeriodStartDate] = useState('');
     const [reviewPeriodEndDate, setReviewPeriodEndDate] = useState('');
     const [loading, setLoading] = useState(true);
@@ -21,6 +22,7 @@ const MaxTeamSizeSettings = () => {
                 axios.get('/api/admin/review-period-dates', { headers: { Authorization: `Bearer ${token}` } })
             ]);
             setMaxTeamSize(teamSizeRes.data.maxTeamSize);
+            setCurrentMaxTeamSize(Number(teamSizeRes.data.maxTeamSize)); // sync the saved baseline
             if (reviewPeriodRes.data.startDate) {
                 setReviewPeriodStartDate(new Date(reviewPeriodRes.data.startDate).toISOString().slice(0, 16));
             }
@@ -37,12 +39,34 @@ const MaxTeamSizeSettings = () => {
 
     const handleSetMaxTeamSize = async (e) => {
         e.preventDefault();
+        const newMax = Number(maxTeamSize);
+
+        // Warn admin before decreasing — teams may be permanently disbanded
+        if (newMax < currentMaxTeamSize) {
+            const confirmed = window.confirm(
+                `You are reducing the max team size from ${currentMaxTeamSize} to ${newMax}.\n\n` +
+                `Teams with more than ${newMax} members (including the leader) will be PERMANENTLY DISBANDED and all their data removed.\n\n` +
+                `Teams with ${newMax} or fewer members will be automatically unlocked.\n\nProceed?`
+            );
+            if (!confirmed) return;
+        }
+
         try {
             const token = localStorage.getItem('token');
-            await axios.post('/api/admin/team-size', { maxTeamSize }, {
+            const res = await axios.post('/api/admin/team-size', { maxTeamSize: newMax }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setMessage('Max team size updated successfully!');
+
+            const { disbandedCount, unlockedCount } = res.data;
+            let msg = 'Max team size updated successfully!';
+            if (disbandedCount > 0 || unlockedCount > 0) {
+                const parts = [];
+                if (disbandedCount > 0) parts.push(`${disbandedCount} team(s) disbanded`);
+                if (unlockedCount > 0) parts.push(`${unlockedCount} team(s) unlocked`);
+                msg += ` (${parts.join(', ')})`;
+            }
+            setMessage(msg);
+            setCurrentMaxTeamSize(newMax);
         } catch (err) {
             console.error('Error updating max team size:', err);
             setError('Failed to update max team size');

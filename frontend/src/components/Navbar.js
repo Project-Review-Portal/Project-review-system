@@ -56,7 +56,6 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                 if (!activeProgramme) return []; // Hidden on home screen via parent, but extra safeguard
                 const prefix = `/admin-dashboard/programme/${encodeURIComponent(activeProgramme)}`;
                 return [
-                    { label: 'Guide Me', path: `${prefix}/guide-me` },
                     { label: 'Registration', path: `${prefix}/user-management` },
                     { label: 'Settings', path: `${prefix}/admin-settings` },
                     { label: 'Review Panels', path: `${prefix}/review-panels` },
@@ -64,7 +63,8 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     { label: 'Allocations', path: `${prefix}/allocations` },
                     { label: 'Upload Attendance', path: `${prefix}/upload-attendance` },
                     { label: 'Summary', path: `${prefix}/view-attendance` },
-                    { label: 'Schedules', path: `${prefix}/manage-review-schedules` }
+                    { label: 'Schedules', path: `${prefix}/manage-review-schedules` },
+                    { label: 'Guide Me', path: `${prefix}/guide-me` }
                 ];
             case 'coordinator':
                 return [

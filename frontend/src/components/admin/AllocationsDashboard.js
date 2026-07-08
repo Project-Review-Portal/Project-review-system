@@ -52,13 +52,29 @@ const AllocationsDashboard = ({ programme }) => {
             setReviewPanels(allPanels.filter(p => p.panelType !== 'viva'));
             setVivaPanels(allPanels.filter(p => p.panelType === 'viva'));
 
-            // Initialize allocations state
+            // Initialize allocations state - validate references against available dropdown options
             const initAllocations = {};
             allTeams.forEach(team => {
+                const teamProg = (team.programme || 'UG').trim().toLowerCase();
+                
+                // 1. Validate Guide: must exist in internalGuides
+                const guideVal = team.guidePreference ? team.guidePreference._id || team.guidePreference : '';
+                const hasValidGuide = guideVal && internalGuides.some(g => String(g._id) === String(guideVal));
+
+                // 2. Validate Review Panel: must exist in filtered reviewPanels for this programme
+                const panelVal = team.panel ? team.panel._id || team.panel : '';
+                const progReviewPanels = allPanels.filter(p => p.panelType !== 'viva' && (p.programme || 'UG').trim().toLowerCase() === teamProg);
+                const hasValidReviewPanel = panelVal && progReviewPanels.some(p => String(p._id) === String(panelVal));
+
+                // 3. Validate Viva Panel: must exist in filtered vivaPanels for this programme
+                const vivaVal = team.vivaPanel ? team.vivaPanel._id || team.vivaPanel : '';
+                const progVivaPanels = allPanels.filter(p => p.panelType === 'viva' && (p.programme || 'UG').trim().toLowerCase() === teamProg);
+                const hasValidVivaPanel = vivaVal && progVivaPanels.some(p => String(p._id) === String(vivaVal));
+
                 initAllocations[team._id] = {
-                    guideId: team.guidePreference ? team.guidePreference._id || team.guidePreference : '',
-                    panelId: team.panel ? team.panel._id || team.panel : '',
-                    vivaPanelId: team.vivaPanel ? team.vivaPanel._id || team.vivaPanel : ''
+                    guideId: hasValidGuide ? String(guideVal) : '',
+                    panelId: hasValidReviewPanel ? String(panelVal) : '',
+                    vivaPanelId: hasValidVivaPanel ? String(vivaVal) : ''
                 };
             });
             setAllocations(initAllocations);
@@ -162,7 +178,7 @@ const AllocationsDashboard = ({ programme }) => {
         setAutoAssigning(true);
         setError('');
         try {
-            const res = await axios.post('/api/admin/auto-assign-guides', {}, { headers });
+            const res = await axios.post('/api/admin/auto-assign-guides', { programme }, { headers });
             setWarningModalSummary({
                 title: 'Guide Auto-Assignment Complete',
                 message: res.data.message,
@@ -182,7 +198,7 @@ const AllocationsDashboard = ({ programme }) => {
         setAutoAssigning(true);
         setError('');
         try {
-            const res = await axios.post('/api/admin/auto-assign-panels', { panelType: type }, { headers });
+            const res = await axios.post('/api/admin/auto-assign-panels', { panelType: type, programme }, { headers });
             setWarningModalSummary({
                 title: `${type === 'viva' ? 'Viva Panel' : 'Review Panel'} Auto-Assignment Complete`,
                 message: res.data.message,

@@ -95,22 +95,58 @@ const doesUserHaveClash = async (userId, proposedStartTime, proposedEndTime, exi
 exports.setMaxTeamSize = async (req, res) => {
     try {
         const { maxTeamSize } = req.body;
+        const newMax = Number(maxTeamSize);
 
-        if (!maxTeamSize || maxTeamSize < 1) {
+        if (!newMax || newMax < 1) {
             return res.status(400).json({ message: 'Invalid team size' });
         }
 
+        // Capture old max BEFORE saving so we can determine direction of change
         let config = await Config.findOne();
+        const oldMax = config ? Number(config.maxTeamSize) : newMax;
+
         if (!config) {
-            config = new Config({ maxTeamSize });
+            config = new Config({ maxTeamSize: newMax });
         } else {
-            config.maxTeamSize = maxTeamSize;
+            config.maxTeamSize = newMax;
         }
 
         await config.save();
 
-        if (Number(maxTeamSize) === 1) {
-            // Find all students and auto-generate teams for those without one
+        let disbandedCount = 0;
+        let unlockedCount = 0;
+
+        if (newMax < oldMax) {
+            // ── DECREASE: disband oversized teams; unlock non-conflicting locked teams ──
+            const allTeams = await Team.find({});
+
+            for (const team of allTeams) {
+                // Total size = members accepted + team leader
+                const totalSize = (team.members ? team.members.length : 0) + 1;
+                if (totalSize > newMax) {
+                    // Disband: use findOneAndDelete so the pre-hook cascade fires
+                    // (cleans Attendance, Mark, TimeTable, FinalReport, TeamPanelAssignment)
+                    await Team.findOneAndDelete({ _id: team._id });
+                    disbandedCount++;
+                } else if (team.isLocked) {
+                    // Non-conflicting locked team → unlock so members can adjust if needed
+                    await Team.findByIdAndUpdate(team._id, {
+                        $set: { isLocked: false, isTeamComplete: false }
+                    });
+                    unlockedCount++;
+                }
+            }
+        } else if (newMax > oldMax) {
+            // ── INCREASE: unlock all locked teams so they can optionally add more members ──
+            const result = await Team.updateMany(
+                { isLocked: true },
+                { $set: { isLocked: false, isTeamComplete: false } }
+            );
+            unlockedCount = result.modifiedCount || 0;
+        }
+
+        // Special case: maxTeamSize === 1 → auto-generate solo teams for teamless students
+        if (newMax === 1) {
             const students = await User.find({ role: 'student' });
             const allTeams = await Team.find({});
             const usersWithTeam = new Set();
@@ -126,10 +162,10 @@ exports.setMaxTeamSize = async (req, res) => {
                     .map(t => parseInt(t.teamName.split(' ')[1], 10))
                     .filter(n => !isNaN(n))
                     .sort((a, b) => a - b);
-                
+
                 let nextNumber = 1;
                 let existingIndex = 0;
-                
+
                 for (const student of studentsWithoutTeam) {
                     while (existingIndex < existingNumbers.length && nextNumber >= existingNumbers[existingIndex]) {
                         if (nextNumber === existingNumbers[existingIndex]) {
@@ -137,7 +173,7 @@ exports.setMaxTeamSize = async (req, res) => {
                         }
                         existingIndex++;
                     }
-                    
+
                     const newTeamName = `Team ${nextNumber}`;
                     const team = new Team({
                         teamName: newTeamName,
@@ -154,7 +190,12 @@ exports.setMaxTeamSize = async (req, res) => {
             }
         }
 
-        res.json({ message: 'Team size updated successfully', config });
+        res.json({
+            message: 'Team size updated successfully',
+            config,
+            disbandedCount,
+            unlockedCount
+        });
     } catch (error) {
         console.error('Error setting max team size:', error);
         res.status(500).json({ message: 'Server error' });
@@ -265,7 +306,10 @@ exports.getUnassignedTeams = async (req, res) => {
 // Get guides with the count of teams assigned to them, sorted by count
 exports.getGuidesWithTeamCounts = async (req, res) => {
     try {
-        const guides = await User.find({ role: 'guide' }).select('username name designation');
+        const guides = await User.find({
+            'roles.role': 'guide',
+            memberType: 'internal'
+        }).select('username name designation');
         const { buildDesignationLimitMap, resolveGuideLimitStatus } = require('../utils/guideTeamLimit');
         const limitMap = await buildDesignationLimitMap();
 
@@ -2081,17 +2125,26 @@ exports.autoAssignPanels = async (req, res) => {
         const { panelType } = req.body;
         const isViva = panelType === 'viva';
         const teamField = isViva ? 'vivaPanel' : 'panel';
-        const panelFilter = { panelType: isViva ? 'viva' : 'review' };
         const typeLabel = isViva ? 'Viva Panel' : 'Panel';
 
-        // Find teams that don't have this type of panel assigned
-        const teamQuery = { [teamField]: null, status: 'approved' };
-        const teams = await Team.find(teamQuery).populate('guidePreference');
-        const panels = await Panel.find(panelFilter);
-        
+        // FIXED filter:
+        // - For viva panels:   panelType === 'viva'
+        // - For review panels: panelType !== 'viva'  (matches frontend: allPanels.filter(p => p.panelType !== 'viva'))
+        //   This ensures panels without an explicit panelType field are correctly treated as review panels.
+        const panels = isViva
+            ? await Panel.find({ panelType: 'viva' })
+            : await Panel.find({ panelType: { $ne: 'viva' } });
+
         if (panels.length === 0) {
             return res.status(400).json({ message: `No ${typeLabel}s exist to assign.` });
         }
+
+        // Find all teams for this programme
+        const teamQuery = {};
+        if (req.body.programme) {
+            teamQuery.programme = req.body.programme;
+        }
+        const teams = await Team.find(teamQuery).populate('guidePreference').populate(teamField);
 
         let assignedCount = 0;
         const warnings = [];
@@ -2104,59 +2157,88 @@ exports.autoAssignPanels = async (req, res) => {
         }
 
         for (const team of teams) {
-            // Sort panels by least assigned teams
-            const sortedPanels = [...panels].sort((a, b) => panelCounts[a._id.toString()] - panelCounts[b._id.toString()]);
-            
-            let selectedPanel = null;
-            let conflictPanel = null;
-            let guideId = team.guidePreference ? team.guidePreference._id.toString() : null;
+            const teamProgramme = (team.programme || 'UG').trim().toLowerCase();
+            const guideId = team.guidePreference ? team.guidePreference._id.toString() : null;
 
-            for (const panel of sortedPanels) {
-                // Check if guide is in the panel
-                let hasConflict = false;
-                if (guideId) {
-                    if (panel.coordinator && panel.coordinator.toString() === guideId) hasConflict = true;
-                    if (panel.assistantCoordinators && panel.assistantCoordinators.some(ac => ac.toString() === guideId)) hasConflict = true;
-                    if (panel.members && panel.members.some(m => m.toString() === guideId)) hasConflict = true;
-                }
-
-                if (!hasConflict) {
-                    selectedPanel = panel;
-                    break;
-                } else if (!conflictPanel) {
-                    // Remember the first panel with conflict as a fallback
-                    conflictPanel = panel;
+            // Check if the currently assigned panel (if any) is valid and programme matches
+            const currentPanel = team[teamField];
+            let isUnassigned = !currentPanel;
+            if (currentPanel) {
+                const currentPanelProg = (currentPanel.programme || 'UG').trim().toLowerCase();
+                if (currentPanelProg !== teamProgramme) {
+                    isUnassigned = true; // mismatch => treat as unassigned
                 }
             }
 
-            // If all panels have conflicts, pick the one with the least teams (the fallback)
-            if (!selectedPanel && conflictPanel) {
-                selectedPanel = conflictPanel;
-                const guideName = team.guidePreference ? team.guidePreference.name : 'Unknown Guide';
-                warnings.push(`Warning: Team ${team.teamName} has been assigned to ${typeLabel} ${selectedPanel.name}, which contains their Guide (${guideName}) as a panel member.`);
-            } else if (!selectedPanel && sortedPanels.length > 0) {
-                selectedPanel = sortedPanels[0];
-            }
+            if (isUnassigned) {
+                // Filter panels by the team's programme (same logic as the frontend dropdown)
+                const programmePanels = panels.filter(p =>
+                    (p.programme || 'UG').trim().toLowerCase() === teamProgramme
+                );
 
-            if (selectedPanel) {
-                team[teamField] = selectedPanel._id;
-                if (!isViva) {
-                    team.coordinator = selectedPanel.coordinator;
-                }
-                await team.save();
-                
-                // Also update TeamPanelAssignment model (for review panels only)
-                if (!isViva) {
-                    const TeamPanelAssignment = require('../models/TeamPanelAssignment');
-                    await TeamPanelAssignment.findOneAndUpdate(
-                        { panel: selectedPanel._id },
-                        { $addToSet: { teams: team._id } },
-                        { upsert: true }
-                    );
+                if (programmePanels.length === 0) {
+                    warnings.push(`Warning: No ${typeLabel} found for programme "${team.programme || 'UG'}" — Team ${team.teamName} was skipped.`);
+                    continue;
                 }
 
-                panelCounts[selectedPanel._id.toString()]++;
-                assignedCount++;
+                // Sort matching panels by least assigned teams for even distribution
+                const sortedPanels = [...programmePanels].sort(
+                    (a, b) => (panelCounts[a._id.toString()] || 0) - (panelCounts[b._id.toString()] || 0)
+                );
+
+                let selectedPanel = null;
+                let conflictPanel = null;
+
+                for (const panel of sortedPanels) {
+                    // Check if the team's guide is already in this panel (conflict check)
+                    let hasConflict = false;
+                    if (guideId) {
+                        if (panel.coordinator && panel.coordinator.toString() === guideId) hasConflict = true;
+                        if (panel.assistantCoordinators && panel.assistantCoordinators.some(ac => ac.toString() === guideId)) hasConflict = true;
+                        if (panel.members && panel.members.some(m => m.toString() === guideId)) hasConflict = true;
+                    }
+
+                    if (!hasConflict) {
+                        selectedPanel = panel;
+                        break;
+                    } else if (!conflictPanel) {
+                        // Remember first conflicting panel as a fallback
+                        conflictPanel = panel;
+                    }
+                }
+
+                // If all panels have guide conflicts, use the least-loaded one with a warning
+                if (!selectedPanel && conflictPanel) {
+                    selectedPanel = conflictPanel;
+                    const guideName = team.guidePreference ? team.guidePreference.name : 'Unknown Guide';
+                    warnings.push(`Warning: Team ${team.teamName} assigned to ${typeLabel} "${selectedPanel.name}", which contains their Guide (${guideName}) as a panel member.`);
+                } else if (!selectedPanel && sortedPanels.length > 0) {
+                    selectedPanel = sortedPanels[0];
+                }
+
+                if (selectedPanel) {
+                    team[teamField] = selectedPanel._id;
+                    if (!isViva) {
+                        team.coordinator = selectedPanel.coordinator;
+                    }
+                    await team.save();
+
+                    // Also update TeamPanelAssignment model (for review panels only)
+                    if (!isViva) {
+                        const TeamPanelAssignment = require('../models/TeamPanelAssignment');
+                        // Pull from any previous panel assignments first
+                        await TeamPanelAssignment.updateMany({}, { $pull: { teams: team._id } });
+                        // Add to new
+                        await TeamPanelAssignment.findOneAndUpdate(
+                            { panel: selectedPanel._id },
+                            { $addToSet: { teams: team._id } },
+                            { upsert: true }
+                        );
+                    }
+
+                    panelCounts[selectedPanel._id.toString()] = (panelCounts[selectedPanel._id.toString()] || 0) + 1;
+                    assignedCount++;
+                }
             }
         }
 
@@ -2175,19 +2257,7 @@ exports.autoAssignPanels = async (req, res) => {
 // Auto-assign guides to unassigned teams (for allocations dashboard)
 exports.autoAssignGuidesFromAllocations = async (req, res) => {
     try {
-        const unassignedTeams = await Team.find({
-            $or: [
-                { guidePreference: null },
-                { status: 'pending' },
-                { status: 'rejected' }
-            ]
-        }).select('_id');
-
-        if (unassignedTeams.length === 0) {
-            return res.json({ message: 'No unassigned teams found to auto-assign guides.', assignedCount: 0, warnings: [] });
-        }
-
-        // Get all guides sorted by their current team count (ascending)
+        // Fetch all guides sorted by their current team count (ascending)
         const guidesByTeamCount = await exports.getGuidesWithTeamCounts(
             { ...req, originalUrl: '' }, // override originalUrl to trigger internal return
             res, 
@@ -2198,34 +2268,48 @@ exports.autoAssignGuidesFromAllocations = async (req, res) => {
             return res.status(404).json({ message: 'No guides available for assignment.' });
         }
 
+        const validGuideIds = new Set(guidesByTeamCount.map(g => g._id.toString()));
+
+        // Find all teams for this programme
+        const query = {};
+        if (req.body.programme) {
+            query.programme = req.body.programme;
+        }
+        const teams = await Team.find(query).populate('guidePreference');
+
         let assignedCount = 0;
         const warnings = [];
 
-        for (const team of unassignedTeams) {
-            const currentTeam = await Team.findById(team._id).select('rejectedGuides');
-            const teamRejectedGuides = currentTeam ? currentTeam.rejectedGuides.map(id => id.toString()) : [];
+        for (const team of teams) {
+            // Check if the team has a valid internal guide assigned
+            const hasValidGuide = team.guidePreference && validGuideIds.has(team.guidePreference._id.toString());
 
-            const eligibleGuide = guidesByTeamCount.find(guide => {
-                const isRejectedByTeam = teamRejectedGuides.includes(guide._id.toString());
-                if (isRejectedByTeam) return false;
-                if (guide.teamLimit !== null && guide.teamCount >= guide.teamLimit) return false;
-                return true;
-            });
+            if (!hasValidGuide) {
+                const currentTeam = await Team.findById(team._id).select('rejectedGuides');
+                const teamRejectedGuides = currentTeam ? currentTeam.rejectedGuides.map(id => id.toString()) : [];
 
-            if (eligibleGuide) {
-                await Team.findByIdAndUpdate(team._id, {
-                    guidePreference: eligibleGuide._id,
-                    status: 'approved'
+                const eligibleGuide = guidesByTeamCount.find(guide => {
+                    const isRejectedByTeam = teamRejectedGuides.includes(guide._id.toString());
+                    if (isRejectedByTeam) return false;
+                    if (guide.teamLimit !== null && guide.teamCount >= guide.teamLimit) return false;
+                    return true;
                 });
-                assignedCount++;
 
-                const updatedGuideIndex = guidesByTeamCount.findIndex(g => g._id.toString() === eligibleGuide._id.toString());
-                if (updatedGuideIndex !== -1) {
-                    guidesByTeamCount[updatedGuideIndex].teamCount++;
+                if (eligibleGuide) {
+                    await Team.findByIdAndUpdate(team._id, {
+                        guidePreference: eligibleGuide._id,
+                        status: 'approved'
+                    });
+                    assignedCount++;
+
+                    const updatedGuideIndex = guidesByTeamCount.findIndex(g => g._id.toString() === eligibleGuide._id.toString());
+                    if (updatedGuideIndex !== -1) {
+                        guidesByTeamCount[updatedGuideIndex].teamCount++;
+                    }
+                    guidesByTeamCount.sort((a, b) => a.teamCount - b.teamCount);
+                } else {
+                    warnings.push(`No eligible guide found for team ${team.teamName || team._id}.`);
                 }
-                guidesByTeamCount.sort((a, b) => a.teamCount - b.teamCount);
-            } else {
-                warnings.push(`No eligible guide found for team ${team._id}.`);
             }
         }
 
