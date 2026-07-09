@@ -5,7 +5,7 @@ const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 
 router.post('/team-size', auth, authorize(['admin']), adminController.setMaxTeamSize);
-router.get('/team-size', auth, authorize(['admin']), adminController.getMaxTeamSize);
+router.get('/team-size', auth, authorize(['admin']), adminController.getMaxTeamSize); 
 
 router.post('/guide-selection-dates', auth, authorize(['admin']), adminController.setGuideSelectionDates);
 router.get('/guide-selection-dates', auth, authorize(['admin']), adminController.getGuideSelectionDates);

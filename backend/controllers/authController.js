@@ -230,7 +230,7 @@ exports.getFaculty = async (req, res) => {
     try {
         const faculty = await User.find({
             'roles.role': { $in: ['guide', 'panel'] }
-        }).select('username roles memberType name');
+        }).select('username roles memberType name designation seniority');
 
         res.json(faculty);
     } catch (error) {

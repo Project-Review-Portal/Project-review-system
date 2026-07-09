@@ -220,7 +220,8 @@ const GuideUploadAttendance = ({ programme }) => {
                                                         type="datetime-local"
                                                         value={reviewDates[team._id]?.[event] || ''}
                                                         onChange={(e) => handleReviewDateChange(team._id, event, e.target.value)}
-                                                        className="block mx-auto p-1 text-[11px] font-normal border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[140px] text-slate-800 bg-white"
+                                                        disabled={userRole === 'admin'}
+                                                        className="block mx-auto p-1 text-[11px] font-normal border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[140px] text-slate-800 bg-white disabled:bg-slate-100 disabled:text-slate-400"
                                                     />
                                                 </th>
                                             ))}
@@ -240,7 +241,8 @@ const GuideUploadAttendance = ({ programme }) => {
                                                                 type="checkbox"
                                                                 checked={isPresent}
                                                                 onChange={(e) => handleAttendanceChange(team.teamLeader._id, event, e.target.checked)}
-                                                                className="form-checkbox h-5 w-5 rounded border-slate-300 focus:ring-indigo-500 transition duration-200 text-indigo-600"
+                                                                disabled={userRole === 'admin'}
+                                                                className="form-checkbox h-5 w-5 rounded border-slate-300 focus:ring-indigo-500 transition duration-200 text-indigo-600 disabled:opacity-60"
                                                             />
                                                         </td>
                                                     );
@@ -262,7 +264,8 @@ const GuideUploadAttendance = ({ programme }) => {
                                                                 type="checkbox"
                                                                 checked={isPresent}
                                                                 onChange={(e) => handleAttendanceChange(member._id, event, e.target.checked)}
-                                                                className="form-checkbox h-5 w-5 rounded border-slate-300 focus:ring-indigo-500 transition duration-200 text-indigo-600"
+                                                                disabled={userRole === 'admin'}
+                                                                className="form-checkbox h-5 w-5 rounded border-slate-300 focus:ring-indigo-500 transition duration-200 text-indigo-600 disabled:opacity-60"
                                                             />
                                                         </td>
                                                     );
@@ -276,14 +279,16 @@ const GuideUploadAttendance = ({ programme }) => {
                                 </table>
                             </div>
                             
-                            <div className="mt-4 flex flex-col sm:flex-row gap-4">
-                                <button
-                                    onClick={() => handleSubmitAttendance(team._id)}
-                                    className="w-full px-5 py-3.5 rounded-xl font-bold tracking-wide transition-all duration-300 shadow-md bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-700 hover:to-violet-700 hover:shadow-lg hover:scale-[1.01]"
-                                >
-                                    {`Submit Attendance for ${team.teamName}`}
-                                </button>
-                            </div>
+                            {userRole !== 'admin' && (
+                                <div className="mt-4 flex flex-col sm:flex-row gap-4">
+                                    <button
+                                        onClick={() => handleSubmitAttendance(team._id)}
+                                        className="w-full px-5 py-3.5 rounded-xl font-bold tracking-wide transition-all duration-300 shadow-md bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-700 hover:to-violet-700 hover:shadow-lg hover:scale-[1.01]"
+                                    >
+                                        {`Submit Attendance for ${team.teamName}`}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>

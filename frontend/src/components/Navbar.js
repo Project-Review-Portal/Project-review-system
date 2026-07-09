@@ -59,9 +59,8 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     { label: 'Student Registration', path: `${prefix}/user-management` },
                     { label: 'Settings', path: `${prefix}/admin-settings` },
                     { label: 'Review Panels', path: `${prefix}/review-panels` },
-                    { label: 'Viva Panels', path: `${prefix}/viva-panels` },
                     { label: 'Team Panel Allocations', path: `${prefix}/allocations` },
-                    { label: 'Upload Attendance', path: `${prefix}/upload-attendance` },
+                    { label: 'Review Attendance', path: `${prefix}/upload-attendance` },
                     { label: 'Student Attendance', path: `${prefix}/view-attendance` },
                     { label: 'Schedules', path: `${prefix}/manage-review-schedules` },
                     { label: 'Guide Me', path: `${prefix}/guide-me` }
@@ -69,6 +68,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
             case 'coordinator':
                 return [
                     { label: 'Dashboard', path: '/coordinator-dashboard/dashboard' },
+                    { label: 'Viva Panel Formation', path: '/coordinator-dashboard/viva-panel-formation' },
                     { label: 'Assigned Teams', path: '/coordinator-dashboard/assigned-teams' },
                     { label: 'Upload Attendance', path: '/coordinator-dashboard/upload-attendance' },
                     { label: 'Review Schedule', path: '/coordinator-dashboard/review-schedule' },

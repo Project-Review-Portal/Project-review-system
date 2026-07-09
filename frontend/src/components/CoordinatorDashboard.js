@@ -9,6 +9,7 @@ import CoordinatorInstructionTemplate from './coordinator/CoordinatorInstruction
 import GuideMe from './GuideMe';
 import CoordinatorLetterLiveEditorCK from './CoordinatorLetterLiveEditorCK';
 import GuideUploadAttendance from './guide/GuideUploadAttendance';
+import CoordinatorVivaPanelFormation from './coordinator/CoordinatorVivaPanelFormation';
 
 const CoordinatorRulesDashboard = () => {
     const [teamFormationOpen, setTeamFormationOpen] = useState(true);
@@ -231,6 +232,7 @@ const CoordinatorDashboard = () => {
                     <Route path="dashboard" element={<CoordinatorRulesDashboard />} />
                     {/* Show the new live editor on the existing letter-generation route */}
                     <Route path="letter-generation" element={<CoordinatorLetterLiveEditorCK />} />
+                    <Route path="viva-panel-formation" element={<CoordinatorVivaPanelFormation />} />
                     <Route path="guide-me" element={<GuideMe userRole="coordinator" />} />
                     <Route path="assigned-teams" element={<CoordinatorAssignedTeams />} />
                     <Route path="upload-attendance" element={<GuideUploadAttendance />} />

@@ -78,6 +78,15 @@ app.listen(PORT, () => {
 // Ensure default admin exists
 (async () => {
     try {
+        // Drop the old indexes on designation limits if they exist
+        const mongoose = require('mongoose');
+        try {
+            await mongoose.connection.db.collection('designationteamlimits').dropIndex('designation_1');
+        } catch (e) {}
+        try {
+            await mongoose.connection.db.collection('designationteamlimits').dropIndex('designation_1_programmeType_1');
+        } catch (e) {}
+
         const User = require('./models/User');
         const bcrypt = require('bcryptjs');
 

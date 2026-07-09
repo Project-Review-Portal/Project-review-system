@@ -82,6 +82,10 @@ router.get('/coordinator/allotted-schedules', auth, authorize(['coordinator', 'a
 // Allow coordinator (or admin) to delete an allotted schedule they created
 router.delete('/coordinator/allotted-schedules/:scheduleId', auth, authorize(['coordinator', 'admin']), panelController.deleteAllottedSchedule);
 
+// Coordinator Viva Panel endpoints
+router.get('/coordinator/viva-panel', auth, authorize(['coordinator']), panelController.getCoordinatorVivaPanel);
+router.post('/coordinator/viva-panel', auth, authorize(['coordinator']), panelController.saveCoordinatorVivaPanel);
+
 // Debug route for coordinators to check their panel assignment
 router.get('/coordinator/panel-status', auth, authorize(['coordinator', 'admin']), async (req, res) => {
     try {

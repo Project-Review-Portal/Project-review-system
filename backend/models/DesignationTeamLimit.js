@@ -7,7 +7,12 @@ const designationTeamLimitSchema = new mongoose.Schema({
         unique: true,
         trim: true
     },
-    teamLimit: {
+    ugLimit: {
+        type: Number,
+        required: true,
+        min: 1
+    },
+    pgLimit: {
         type: Number,
         required: true,
         min: 1

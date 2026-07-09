@@ -72,15 +72,18 @@ exports.acceptRequest = async (req, res) => {
             resolveGuideLimitStatus
         } = require('../utils/guideTeamLimit');
 
+        const isPg = team.programme && team.programme !== 'UG';
+        const programmeType = isPg ? 'PG' : 'UG';
+
         const guide = await User.findById(guideId);
-        const limitMap = await buildDesignationLimitMap();
-        const countMap = await getTeamCountsByGuideIds([guide._id]);
+        const limitMap = await buildDesignationLimitMap(programmeType);
+        const countMap = await getTeamCountsByGuideIds([guide._id], programmeType);
         const currentApprovedCount = countMap.get(guide._id.toString()) || 0;
         const limitStatus = resolveGuideLimitStatus(guide, currentApprovedCount, limitMap);
 
         if (limitStatus.teamLimit !== null && currentApprovedCount >= limitStatus.teamLimit) {
             return res.status(400).json({
-                message: `Cannot accept: you have already reached your team limit (${currentApprovedCount}/${limitStatus.teamLimit}).`
+                message: `Cannot accept: you have already reached your ${programmeType} team limit (${currentApprovedCount}/${limitStatus.teamLimit}).`
             });
         }
 
@@ -802,18 +805,27 @@ exports.getGuideCapacity = async (req, res) => {
         }
         const designation = guide.designation || null;
 
-        // 2. Reuse your existing utility functions to compute limits
-        const limitMap = await buildDesignationLimitMap();
-        const countMap = await getTeamCountsByGuideIds([guide._id]);
-        
-        const currentApprovedCount = countMap.get(guide._id.toString()) || 0;
-        const limitStatus = resolveGuideLimitStatus(guide, currentApprovedCount, limitMap);
+        // 2. Compute limits for UG and PG separately
+        const limitMapUG = await buildDesignationLimitMap('UG');
+        const countMapUG = await getTeamCountsByGuideIds([guide._id], 'UG');
+        const currentApprovedUG = countMapUG.get(guide._id.toString()) || 0;
+        const limitStatusUG = resolveGuideLimitStatus(guide, currentApprovedUG, limitMapUG);
+
+        const limitMapPG = await buildDesignationLimitMap('PG');
+        const countMapPG = await getTeamCountsByGuideIds([guide._id], 'PG');
+        const currentApprovedPG = countMapPG.get(guide._id.toString()) || 0;
+        const limitStatusPG = resolveGuideLimitStatus(guide, currentApprovedPG, limitMapPG);
 
         // 3. Return everything safely to the frontend container
         return res.status(200).json({ 
             designation: designation,
-            approvedCount: currentApprovedCount, 
-            maxTeams: limitStatus.teamLimit !== null ? limitStatus.teamLimit : 0
+            ugApprovedCount: currentApprovedUG,
+            ugMaxTeams: limitStatusUG.teamLimit !== null ? limitStatusUG.teamLimit : 0,
+            pgApprovedCount: currentApprovedPG,
+            pgMaxTeams: limitStatusPG.teamLimit !== null ? limitStatusPG.teamLimit : 0,
+            // Legacy fallbacks so old UI features don't crash
+            approvedCount: currentApprovedUG + currentApprovedPG,
+            maxTeams: (limitStatusUG.teamLimit || 0) + (limitStatusPG.teamLimit || 0)
         });
     } catch (err) {
         console.error('Error in getGuideCapacity:', err);

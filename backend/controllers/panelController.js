@@ -901,3 +901,121 @@ exports.createInstructionTemplate = async (req, res) => {
     });
   }
 };
+
+// Coordinator Viva Panel controllers
+exports.getCoordinatorVivaPanel = async (req, res) => {
+    try {
+        const coordinatorId = req.user.id;
+        
+        // Find the review panel where the user is coordinator
+        const reviewPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'review' })
+            .populate('members', 'username name memberType designation')
+            .populate('coordinator', 'username name memberType designation')
+            .populate('assistantCoordinators', 'username name memberType designation');
+
+        if (!reviewPanel) {
+            return res.status(404).json({ message: 'You are not assigned as a coordinator to any review panel.' });
+        }
+
+        // Find the viva panel if it exists
+        const vivaPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'viva' })
+            .populate('members', 'username name memberType designation')
+            .populate('coordinator', 'username name memberType designation')
+            .populate('assistantCoordinators', 'username name memberType designation');
+
+        res.json({
+            reviewPanel,
+            vivaPanel
+        });
+    } catch (error) {
+        console.error('Error fetching coordinator viva panel:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+exports.saveCoordinatorVivaPanel = async (req, res) => {
+    try {
+        const coordinatorId = req.user.id;
+        const { externalMemberIds } = req.body; // Array of external examiner IDs
+
+        if (!Array.isArray(externalMemberIds)) {
+            return res.status(400).json({ message: 'externalMemberIds must be an array.' });
+        }
+
+        // Find the review panel where the user is coordinator
+        const reviewPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'review' });
+        if (!reviewPanel) {
+            return res.status(404).json({ message: 'You are not assigned as a coordinator to any review panel.' });
+        }
+
+        // Validate that externalMemberIds are indeed external examiners
+        const externalDetails = await User.find({ _id: { $in: externalMemberIds } });
+        for (const ext of externalDetails) {
+            if (ext.memberType !== 'external') {
+                return res.status(400).json({ message: `Member ${ext.name} is not an external faculty member.` });
+            }
+        }
+
+        // Build members list:
+        // Prefilled: internal members of review panel + coordinator + assistant coordinators of review panel
+        // Plus: external members manually added
+        const reviewMembersDetails = await User.find({ _id: { $in: reviewPanel.members } });
+        const internalReviewMembers = reviewMembersDetails.filter(m => m.memberType === 'internal').map(m => m._id.toString());
+
+        const membersSet = new Set([
+            reviewPanel.coordinator.toString(),
+            ...reviewPanel.assistantCoordinators.map(id => id.toString()),
+            ...internalReviewMembers,
+            ...externalMemberIds.map(id => String(id))
+        ]);
+
+        const finalMembers = Array.from(membersSet);
+
+        // Find or create viva panel
+        let vivaPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'viva' });
+        
+        if (!vivaPanel) {
+            const vivaPanelName = `Viva - ${reviewPanel.name}`;
+            
+            const existing = await Panel.findOne({ name: vivaPanelName, panelType: 'viva', programme: reviewPanel.programme });
+            if (existing) {
+                vivaPanel = existing;
+            } else {
+                vivaPanel = new Panel({
+                    name: vivaPanelName,
+                    panelType: 'viva',
+                    coordinator: reviewPanel.coordinator,
+                    assistantCoordinators: reviewPanel.assistantCoordinators,
+                    members: finalMembers,
+                    programme: reviewPanel.programme
+                });
+            }
+        }
+        
+        vivaPanel.coordinator = reviewPanel.coordinator;
+        vivaPanel.assistantCoordinators = reviewPanel.assistantCoordinators;
+        vivaPanel.members = finalMembers;
+        vivaPanel.programme = reviewPanel.programme;
+
+        await vivaPanel.save();
+
+        // Assign this vivaPanel to all teams currently assigned to this coordinator's review panel
+        const Team = require('../models/Team');
+        const teams = await Team.find({ panel: reviewPanel._id });
+        const teamIds = teams.map(t => t._id);
+        if (teamIds.length > 0) {
+            await Team.updateMany(
+                { _id: { $in: teamIds } },
+                { $set: { vivaPanel: vivaPanel._id } }
+            );
+        }
+
+        res.json({
+            message: 'Viva panel saved and assigned to teams successfully!',
+            vivaPanel
+        });
+    } catch (error) {
+        console.error('Error saving coordinator viva panel:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};

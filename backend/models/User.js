@@ -49,6 +49,11 @@ const userSchema = new mongoose.Schema({
         enum: ['internal', 'external', null],
         default: null
     },
+    seniority: {
+        type: Number,
+        default: null,
+        min: 1
+    },
     // OTP fields for forgot-password flow
     otp: {
         type: String,

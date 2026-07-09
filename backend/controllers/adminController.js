@@ -306,17 +306,23 @@ exports.getUnassignedTeams = async (req, res) => {
 // Get guides with the count of teams assigned to them, sorted by count
 exports.getGuidesWithTeamCounts = async (req, res) => {
     try {
+        const programmeType = req.query.programmeType || 'UG';
         const guides = await User.find({
             'roles.role': 'guide',
             memberType: 'internal'
         }).select('username name designation');
         const { buildDesignationLimitMap, resolveGuideLimitStatus } = require('../utils/guideTeamLimit');
-        const limitMap = await buildDesignationLimitMap();
+        const limitMap = await buildDesignationLimitMap(programmeType);
+
+        const programmeQuery = programmeType === 'UG'
+            ? { programme: 'UG' }
+            : { programme: { $ne: 'UG' } };
 
         const guidesWithCounts = await Promise.all(guides.map(async (guide) => {
             const teamsAssigned = await Team.find({
                 guidePreference: guide._id,
-                status: 'approved'
+                status: 'approved',
+                ...programmeQuery
             }).select('_id teamName'); // Select team _id and teamName
 
             const limitStatus = resolveGuideLimitStatus(guide, teamsAssigned.length, limitMap);
@@ -411,33 +417,70 @@ exports.assignAllUnassignedGuides = async (req, res) => {
                 { status: 'pending' },
                 { status: 'rejected' }
             ]
-        }).select('_id');
+        }).select('_id programme');
 
         if (unassignedTeams.length === 0) {
             return res.status(200).json({ message: 'No unassigned teams found to auto-assign guides.' });
         }
 
-        // Get all guides sorted by their current team count (ascending)
-        const guidesByTeamCount = await exports.getGuidesWithTeamCounts(req, res, true); // Pass true for internal call
+        const { buildDesignationLimitMap, resolveGuideLimitStatus, getTeamCountsByGuideIds } = require('../utils/guideTeamLimit');
+        const limitMapUG = await buildDesignationLimitMap('UG');
+        const limitMapPG = await buildDesignationLimitMap('PG');
 
-        if (!guidesByTeamCount || guidesByTeamCount.length === 0) {
+        const guides = await User.find({
+            'roles.role': 'guide',
+            memberType: 'internal'
+        }).select('username name designation');
+
+        if (!guides || guides.length === 0) {
             return res.status(404).json({ message: 'No guides available for assignment.' });
         }
 
+        const guideIds = guides.map(g => g._id);
+        const countMapUG = await getTeamCountsByGuideIds(guideIds, 'UG');
+        const countMapPG = await getTeamCountsByGuideIds(guideIds, 'PG');
+
+        const guidesData = guides.map(guide => {
+            const ugCount = countMapUG.get(guide._id.toString()) || 0;
+            const pgCount = countMapPG.get(guide._id.toString()) || 0;
+            const ugLimit = limitMapUG.get((guide.designation || '').trim().toLowerCase()) ?? null;
+            const pgLimit = limitMapPG.get((guide.designation || '').trim().toLowerCase()) ?? null;
+
+            return {
+                _id: guide._id,
+                name: guide.name,
+                designation: guide.designation,
+                ugCount,
+                pgCount,
+                ugLimit,
+                pgLimit,
+                totalCount: ugCount + pgCount
+            };
+        });
+
         let assignedCount = 0;
         for (const team of unassignedTeams) {
-            // Find a guide that has not rejected this team
-            // Also, consider the existing rejectedGuides array on the team.
-            const currentTeam = await Team.findById(team._id).select('rejectedGuides');
+            const currentTeam = await Team.findById(team._id).select('rejectedGuides programme');
             const teamRejectedGuides = currentTeam ? currentTeam.rejectedGuides.map(id => id.toString()) : [];
+            const isPg = currentTeam && currentTeam.programme && currentTeam.programme !== 'UG';
+            const programmeType = isPg ? 'PG' : 'UG';
 
-            const eligibleAndAvailableGuide = guidesByTeamCount.find(guide => {
-                // Ensure guide is not in the team's rejectedGuides list
+            // Sort guides to balance workload
+            guidesData.sort((a, b) => {
+                const countA = programmeType === 'UG' ? a.ugCount : a.pgCount;
+                const countB = programmeType === 'UG' ? b.ugCount : b.pgCount;
+                if (countA !== countB) return countA - countB;
+                return a.totalCount - b.totalCount;
+            });
+
+            const eligibleAndAvailableGuide = guidesData.find(guide => {
                 const isRejectedByTeam = teamRejectedGuides.includes(guide._id.toString());
                 if (isRejectedByTeam) return false;
 
-                // Ensure guide has not reached their designation's team limit
-                if (guide.teamLimit !== null && guide.teamCount >= guide.teamLimit) {
+                const count = programmeType === 'UG' ? guide.ugCount : guide.pgCount;
+                const limit = programmeType === 'UG' ? guide.ugLimit : guide.pgLimit;
+
+                if (limit !== null && count >= limit) {
                     return false;
                 }
                 return true;
@@ -450,12 +493,12 @@ exports.assignAllUnassignedGuides = async (req, res) => {
                 });
                 assignedCount++;
 
-                // Re-sort guidesByTeamCount to reflect the new assignment and ensure even distribution
-                const updatedGuideIndex = guidesByTeamCount.findIndex(g => g._id.toString() === eligibleAndAvailableGuide._id.toString());
-                if (updatedGuideIndex !== -1) {
-                    guidesByTeamCount[updatedGuideIndex].teamCount++;
+                if (programmeType === 'UG') {
+                    eligibleAndAvailableGuide.ugCount++;
+                } else {
+                    eligibleAndAvailableGuide.pgCount++;
                 }
-                guidesByTeamCount.sort((a, b) => a.teamCount - b.teamCount);
+                eligibleAndAvailableGuide.totalCount++;
             } else {
                 console.log(`No eligible guide found for team ${team._id}. Team's rejected guides: ${teamRejectedGuides}`);
             }
@@ -1370,7 +1413,7 @@ exports.uploadFaculty = async (req, res) => {
             try {
                 // Expect email_id, name, memberType
                 const emailId = faculty.email_id || faculty.email || faculty.facultyId;
-                const { name, memberType, designation } = faculty;
+                const { name, memberType, designation, seniority } = faculty;
 
                 // Validate required fields
                 if (!emailId || !name) {
@@ -1404,6 +1447,14 @@ exports.uploadFaculty = async (req, res) => {
                 const salt = await bcrypt.genSalt(10);
                 const hashedPassword = await bcrypt.hash(localPart, salt);
 
+                let parsedSeniority = null;
+                if (seniority !== undefined && seniority !== null && seniority !== '') {
+                    const sVal = Number(seniority);
+                    if (!Number.isNaN(sVal) && sVal >= 1) {
+                        parsedSeniority = Math.floor(sVal);
+                    }
+                }
+
                 // Create user with default faculty role (store designation if provided)
                 const user = new User({
                     username: emailId, // use email as username for faculty
@@ -1414,7 +1465,8 @@ exports.uploadFaculty = async (req, res) => {
                     role: 'guide',
                     roles: [{ role: 'guide', team: null }],
                     memberType: normalizedMemberType,
-                    mustChangePassword: true
+                    mustChangePassword: true,
+                    seniority: parsedSeniority
                 });
 
                 await user.save();
@@ -1496,7 +1548,7 @@ exports.uploadStudents = async (req, res) => {
 exports.updateFaculty = async (req, res) => {
     try {
         const { facultyId } = req.params; // can be email or username
-        const { name } = req.body;
+        const { name, designation, memberType, seniority } = req.body;
 
         console.log('Updating faculty with identifier:', facultyId, 'and name:', name);
 
@@ -1514,6 +1566,19 @@ exports.updateFaculty = async (req, res) => {
 
         // Update user
         user.name = name;
+        if (designation !== undefined) {
+            user.designation = designation;
+        }
+        if (memberType !== undefined) {
+            user.memberType = memberType;
+        }
+        if (seniority !== undefined && seniority !== null && seniority !== '') {
+            const sVal = Number(seniority);
+            user.seniority = !Number.isNaN(sVal) && sVal >= 1 ? Math.floor(sVal) : null;
+        } else if (seniority === '') {
+            user.seniority = null;
+        }
+
         // If identifier is email and user has no email saved, set it
         if (!user.email && facultyId.includes('@')) {
             user.email = facultyId;
@@ -1659,8 +1724,8 @@ exports.getAllFaculty = async (req, res) => {
         if (!includeExternal) {
             match.memberType = 'internal';
         }
-        // Include email and designation in the response so frontend can display the correct fields
-        const faculty = await User.find(match).select('username name roles memberType email designation');
+        // Include email, designation, and seniority in the response so frontend can display the correct fields
+        const faculty = await User.find(match).select('username name roles memberType email designation seniority');
         res.json(faculty);
     } catch (error) {
         console.error('Error fetching faculty:', error);
@@ -1872,23 +1937,30 @@ exports.saveDesignationTeamLimits = async (req, res) => {
         const deduped = new Map();
         for (const item of limits) {
             const designation = String(item.designation || '').trim();
-            const teamLimit = Number(item.teamLimit ?? item.team_limit);
+            const ugLimit = Number(item.ugLimit ?? item.ug_limit);
+            const pgLimit = Number(item.pgLimit ?? item.pg_limit);
 
             if (!designation) {
                 continue;
             }
 
-            if (!Number.isInteger(teamLimit) || teamLimit < 1) {
+            if (!Number.isInteger(ugLimit) || ugLimit < 1) {
                 return res.status(400).json({
-                    message: `Invalid team limit for designation "${designation}". Must be a positive integer starting from 1.`
+                    message: `Invalid UG team limit for designation "${designation}". Must be a positive integer starting from 1.`
+                });
+            }
+
+            if (!Number.isInteger(pgLimit) || pgLimit < 1) {
+                return res.status(400).json({
+                    message: `Invalid PG team limit for designation "${designation}". Must be a positive integer starting from 1.`
                 });
             }
 
             // Use lowercase key so duplicate designations (any casing) overwrite each other
-            deduped.set(designation.toLowerCase(), { designation, teamLimit });
+            deduped.set(designation.toLowerCase(), { designation, ugLimit, pgLimit });
         }
 
-        // Clear all existing limits and insert the clean, deduplicated set
+        // Clear existing limits and insert the clean, deduplicated set
         await DesignationTeamLimit.deleteMany({});
 
         const toInsert = Array.from(deduped.values());
@@ -2019,8 +2091,11 @@ exports.updateTeamAllocation = async (req, res) => {
                     resolveGuideLimitStatus
                 } = require('../utils/guideTeamLimit');
 
-                const limitMap = await buildDesignationLimitMap();
-                const countMap = await getTeamCountsByGuideIds([guide._id]);
+                const isPg = team.programme && team.programme !== 'UG';
+                const programmeType = isPg ? 'PG' : 'UG';
+
+                const limitMap = await buildDesignationLimitMap(programmeType);
+                const countMap = await getTeamCountsByGuideIds([guide._id], programmeType);
                 const currentApprovedCount = countMap.get(guide._id.toString()) || 0;
                 const limitStatus = resolveGuideLimitStatus(guide, currentApprovedCount, limitMap);
 

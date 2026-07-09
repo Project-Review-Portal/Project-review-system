@@ -31,7 +31,7 @@ router.get('/review-period-dates', auth, guideController.getReviewPeriodDatesPub
 router.get('/daily-attendance', auth, authorize(['guide', 'panel', 'coordinator', 'admin']), guideController.getDailyAttendance);
 
 // New route for uploading attendance
-router.post('/upload-attendance', auth, authorize(['panel', 'coordinator', 'admin']), guideController.uploadAttendance);
+router.post('/upload-attendance', auth, authorize(['panel', 'coordinator']), guideController.uploadAttendance);
 
 // New routes for locking/unlocking attendance
 router.post('/lock-attendance', auth, authorize(['coordinator', 'admin']), guideController.lockAttendance);

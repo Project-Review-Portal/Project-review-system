@@ -37,8 +37,6 @@ const ProgrammeDashboard = () => {
                 return <AdminSettings />;
             case 'review-panels':
                 return <PanelManagement key={`review-${decodedProgramme}`} panelType="review" programme={decodedProgramme} />;
-            case 'viva-panels':
-                return <PanelManagement key={`viva-${decodedProgramme}`} panelType="viva" programme={decodedProgramme} />;
             case 'allocations':
                 return <AllocationsDashboard programme={decodedProgramme} />;
             case 'upload-attendance':

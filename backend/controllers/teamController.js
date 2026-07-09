@@ -65,9 +65,11 @@ exports.getGuides = async (req, res) => {
             _id: { $nin: rejectedGuideIds }
         }).select('username name designation');
 
-        const limitMap = await buildDesignationLimitMap();
+        const isPg = team && team.programme && team.programme !== 'UG';
+        const programmeType = isPg ? 'PG' : 'UG';
+        const limitMap = await buildDesignationLimitMap(programmeType);
         const guideIds = guides.map((guide) => guide._id);
-        const countMap = await getTeamCountsByGuideIds(guideIds);
+        const countMap = await getTeamCountsByGuideIds(guideIds, programmeType);
 
         const guidesWithStatus = guides.map((guide) => {
             const currentTeamCount = countMap.get(guide._id.toString()) || 0;
@@ -236,8 +238,10 @@ exports.requestGuide = async (req, res) => {
             return res.status(400).json({ message: 'Invalid guide selected.' });
         }
 
-        const limitMap = await buildDesignationLimitMap();
-        const countMap = await getTeamCountsByGuideIds([guide._id]);
+        const isPg = team && team.programme && team.programme !== 'UG';
+        const programmeType = isPg ? 'PG' : 'UG';
+        const limitMap = await buildDesignationLimitMap(programmeType);
+        const countMap = await getTeamCountsByGuideIds([guide._id], programmeType);
         const currentTeamCount = countMap.get(guide._id.toString()) || 0;
         const limitStatus = resolveGuideLimitStatus(guide, currentTeamCount, limitMap);
 
