@@ -23,52 +23,57 @@ const getUserActiveRoles = async (userId) => {
     
     try {
         // Check if user is assigned as a guide to any team
-        const guideTeams = await Team.find({ guidePreference: userId }).select('_id');
+        const guideTeams = await Team.find({ guidePreference: userId }).select('_id programme');
         for (const t of guideTeams) {
-            activeRoles.push({ role: 'guide', team: t._id.toString() });
+            activeRoles.push({ role: 'guide', team: t._id.toString(), programme: t.programme });
         }
         
         // Check if user is a member of any panel that's assigned to teams
-        const userPanels = await Panel.find({ members: userId }).select('_id');
+        const userPanels = await Panel.find({ members: userId }).select('_id programme');
         if (userPanels.length > 0) {
             const panelIds = userPanels.map(p => p._id);
-            const teamsWithPanels = await Team.find({ panel: { $in: panelIds } }).select('_id');
+            const teamsWithPanels = await Team.find({ panel: { $in: panelIds } }).select('_id programme');
             for (const t of teamsWithPanels) {
-                activeRoles.push({ role: 'panel', team: t._id.toString() });
+                activeRoles.push({ role: 'panel', team: t._id.toString(), programme: t.programme });
+            }
+            if (teamsWithPanels.length === 0) {
+                for (const p of userPanels) {
+                    activeRoles.push({ role: 'panel', team: null, programme: p.programme });
+                }
             }
         }
         
         // Check if user is assigned as coordinator to any panel
-        const coordinatorPanels = await Panel.find({ coordinator: userId }).select('_id');
+        const coordinatorPanels = await Panel.find({ coordinator: userId }).select('_id programme');
         for (const p of coordinatorPanels) {
             // Get teams assigned to this panel
-            const teamsWithPanel = await Team.find({ panel: p._id }).select('_id');
+            const teamsWithPanel = await Team.find({ panel: p._id }).select('_id programme');
             for (const t of teamsWithPanel) {
-                activeRoles.push({ role: 'coordinator', team: t._id.toString() });
+                activeRoles.push({ role: 'coordinator', team: t._id.toString(), programme: t.programme });
             }
             // Also add the coordinator role with panel reference if no teams are assigned yet
             if (teamsWithPanel.length === 0) {
-                activeRoles.push({ role: 'coordinator', team: null });
+                activeRoles.push({ role: 'coordinator', team: null, programme: p.programme });
             }
         }
         
         // If no active roles found, return at least the primary role
+        const user = await User.findById(userId);
+        const defaultProg = user?.programme || 'UG';
         if (activeRoles.length === 0) {
-            const user = await User.findById(userId);
             if (user && user.roles && user.roles.length > 0) {
-                activeRoles.push({ role: user.roles[0].role, team: null });
+                activeRoles.push({ role: user.roles[0].role, team: null, programme: defaultProg });
             }
         }
         
         // Ensure all faculty roles are present at least once with null team
         const rolesToEnsure = ['guide', 'panel', 'coordinator'];
-        const ensuredRoles = [...activeRoles];
         for (const roleName of rolesToEnsure) {
-            if (!ensuredRoles.some(r => r.role === roleName)) {
-                ensuredRoles.push({ role: roleName, team: null });
+            if (!activeRoles.some(r => r.role === roleName)) {
+                activeRoles.push({ role: roleName, team: null, programme: defaultProg });
             }
         }
-        return ensuredRoles;
+        return activeRoles;
     } catch (error) {
         console.error('Error getting user active roles:', error);
         // Fallback to user's potential roles if there's an error
@@ -177,6 +182,7 @@ exports.login = async (req, res) => {
                 team: firstRole.team || null,
                 memberType: user.memberType || null,
                 roles: activeRoles,     // Only active/assigned roles
+                programme: user.programme || null,
                 mustChangePassword: !!user.mustChangePassword
             }
         });

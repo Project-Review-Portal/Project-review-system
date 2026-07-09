@@ -56,13 +56,13 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                 if (!activeProgramme) return []; // Hidden on home screen via parent, but extra safeguard
                 const prefix = `/admin-dashboard/programme/${encodeURIComponent(activeProgramme)}`;
                 return [
-                    { label: 'Registration', path: `${prefix}/user-management` },
+                    { label: 'Student Registration', path: `${prefix}/user-management` },
                     { label: 'Settings', path: `${prefix}/admin-settings` },
                     { label: 'Review Panels', path: `${prefix}/review-panels` },
                     { label: 'Viva Panels', path: `${prefix}/viva-panels` },
-                    { label: 'Allocations', path: `${prefix}/allocations` },
+                    { label: 'Team Panel Allocations', path: `${prefix}/allocations` },
                     { label: 'Upload Attendance', path: `${prefix}/upload-attendance` },
-                    { label: 'Summary', path: `${prefix}/view-attendance` },
+                    { label: 'Student Attendance', path: `${prefix}/view-attendance` },
                     { label: 'Schedules', path: `${prefix}/manage-review-schedules` },
                     { label: 'Guide Me', path: `${prefix}/guide-me` }
                 ];
@@ -89,8 +89,34 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     <div className="flex items-center">
-                        <div className="flex-shrink-0">
+                        {user && (() => {
+                            let text = '';
+                            if (user.role === 'admin') {
+                                text = `Admin${activeProgramme ? ` (${activeProgramme})` : ''}`;
+                            } else if (['guide', 'panel', 'coordinator'].includes(user.role)) {
+                                const activeRoleObjects = user.roles?.filter(r => r.role === user.role) || [];
+                                const uniqueProgrammes = Array.from(new Set(activeRoleObjects.map(r => r.programme).filter(Boolean)));
+                                const displayProg = uniqueProgrammes.length > 0 ? uniqueProgrammes.join(', ') : (user.programme || 'UG');
+                                const roleLabel = user.role === 'panel' ? 'Panel Member' : user.role.charAt(0).toUpperCase() + user.role.slice(1);
+                                text = `${roleLabel} (${displayProg})`;
+                            } else if (user.role === 'student') {
+                                text = `${user.username} - ${user.name}`;
+                            }
+
+                            if (!text) return null;
+
+                            return (
+                                <span className="text-indigo-200 font-semibold mr-3 bg-indigo-800/40 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm whitespace-nowrap flex items-center gap-1.5 shadow-inner">
+                                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                    <span>{text}</span>
+                                </span>
+                            );
+                        })()}
+                        <div className="flex-shrink-0 flex items-center">
                             <span className="text-white font-bold">Project Review</span>
+                            
                         </div>
                         
                         {/* Desktop Navigation */}

@@ -21,13 +21,39 @@ const FinalReportSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['uploaded', 'approved'],
+    enum: ['uploaded', 'approved', 'rejected'],
     default: 'uploaded',
   },
   approvedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+  remarks: {
+    type: String,
+    default: '',
+  },
+  rejectedAt: {
+    type: Date,
+    default: null,
+  },
+  rejections: [{
+    fileName: {
+      type: String,
+      required: true,
+    },
+    filePath: {
+      type: String,
+      required: true,
+    },
+    remarks: {
+      type: String,
+      default: '',
+    },
+    rejectedAt: {
+      type: Date,
+      default: Date.now,
+    }
+  }],
 }, { timestamps: true });
 
 module.exports = mongoose.model('FinalReport', FinalReportSchema); 

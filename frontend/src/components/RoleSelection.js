@@ -11,7 +11,11 @@ const RoleRow = ({ roleObj, loading, getRoleDisplayName, handleRoleSelect, teamN
         handleRoleSelect(payload);
     };
 
-    const teamLabel = roleObj.teams && roleObj.teams.length > 0 ? ` (${roleObj.teams.map(t => teamNames[t] ? teamNames[t] : `Team ${t}`).join(', ')})` : '';
+    // Extract unique programmes of all teams for this role
+    const programmes = roleObj.teams && roleObj.teams.length > 0
+        ? Array.from(new Set(roleObj.teams.map(t => teamNames[t]?.programme).filter(Boolean)))
+        : [];
+    const teamLabel = programmes.length > 0 ? ` (${programmes.join(', ')})` : '';
 
     return (
         <div className={`w-full p-4 rounded-lg border-2 ${loading ? 'bg-gray-100 border-gray-200' : 'bg-white border-gray-200'}`}>
@@ -66,7 +70,12 @@ const RoleSelection = () => {
                 if (!res.ok) return;
                 const data = await res.json();
                 const map = {};
-                data.forEach(t => { map[t._id] = `${t.programme ? t.programme + ' ' : ''}${t.teamName}`; });
+                data.forEach(t => {
+                    map[t._id] = {
+                        teamName: t.teamName,
+                        programme: t.programme || 'UG'
+                    };
+                });
                 setTeamNames(map);
             } catch (e) {
                 console.warn('Failed to fetch team names', e);

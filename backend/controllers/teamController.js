@@ -350,7 +350,29 @@ exports.uploadReport = async (req, res) => {
 
         const existingReport = await FinalReport.findOne({ team: team._id });
         if (existingReport) {
-            return res.status(400).json({ message: 'Report already uploaded' });
+            if (existingReport.status !== 'rejected') {
+                return res.status(400).json({ message: 'Report already uploaded' });
+            } else {
+                const fs = require('fs');
+                const path = require('path');
+                const oldPath = path.join(__dirname, '..', existingReport.filePath);
+                if (fs.existsSync(oldPath)) {
+                    try {
+                        fs.unlinkSync(oldPath);
+                    } catch (e) {
+                        console.warn('Failed to delete old rejected file:', e);
+                    }
+                }
+                existingReport.filePath = req.file.path;
+                existingReport.fileName = req.file.originalname;
+                existingReport.uploadedBy = userId;
+                existingReport.status = 'uploaded';
+                existingReport.remarks = '';
+                existingReport.rejectedAt = null;
+                existingReport.approvedBy = undefined;
+                await existingReport.save();
+                return res.status(200).json({ message: 'Report updated successfully', report: existingReport });
+            }
         }
 
         const newReport = new FinalReport({

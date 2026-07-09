@@ -46,6 +46,7 @@ router.get('/marks', auth, authorize(['guide', 'admin']), guideController.getMar
 // Final report routes (allow both guide and admin)
 router.get('/reports', auth, authorize(['guide', 'admin']), guideController.getReportsForGuide);
 router.put('/reports/:reportId/approve', auth, authorize(['guide', 'admin']), guideController.approveReport);
+router.put('/reports/:reportId/reject', auth, authorize(['guide', 'admin']), guideController.rejectReport);
 router.get('/reports/:reportId/download', auth, authorize(['guide', 'admin']), guideController.downloadReport);
 router.get('/capacity',auth,authorize(['guide']),guideController.getGuideCapacity);
 module.exports = router; 

@@ -721,6 +721,46 @@ exports.approveReport = async (req, res) => {
     }
 };
 
+exports.rejectReport = async (req, res) => {
+    try {
+        const { reportId } = req.params;
+        const { remarks } = req.body;
+        const guideId = req.user.id;
+
+        const report = await FinalReport.findById(reportId).populate('team');
+        if (!report) {
+            return res.status(404).json({ message: 'Report not found' });
+        }
+
+        if (report.team.guidePreference.toString() !== guideId) {
+            return res.status(403).json({ message: 'You are not authorized to reject this report' });
+        }
+
+        const rejectTime = new Date();
+        report.status = 'rejected';
+        report.approvedBy = null;
+        report.remarks = remarks || '';
+        report.rejectedAt = rejectTime;
+
+        if (!report.rejections) {
+            report.rejections = [];
+        }
+        report.rejections.push({
+            fileName: report.fileName,
+            filePath: report.filePath,
+            remarks: remarks || '',
+            rejectedAt: rejectTime
+        });
+
+        await report.save();
+
+        res.json({ message: 'Report rejected successfully', report });
+    } catch (error) {
+        console.error('Error rejecting report:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 exports.downloadReport = async (req, res) => {
     try {
         const { reportId } = req.params;
