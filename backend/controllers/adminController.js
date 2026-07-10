@@ -145,39 +145,35 @@ exports.setMaxTeamSize = async (req, res) => {
             unlockedCount = result.modifiedCount || 0;
         }
 
-        // Special case: maxTeamSize === 1 → auto-generate solo teams for teamless students
+        // Special case: maxTeamSize === 1 → auto-generate solo teams for teamless students and rename existing
         if (newMax === 1) {
             const students = await User.find({ role: 'student' });
-            const allTeams = await Team.find({});
+            const allTeams = await Team.find({}).populate('teamLeader');
+
+            // 1. Rename existing solo teams to the registration number of the leader
+            for (const t of allTeams) {
+                if (t.teamLeader && (!t.members || t.members.length === 0)) {
+                    if (t.teamName !== t.teamLeader.username) {
+                        t.teamName = t.teamLeader.username;
+                        await t.save();
+                    }
+                }
+            }
+
             const usersWithTeam = new Set();
             allTeams.forEach(t => {
-                if (t.teamLeader) usersWithTeam.add(t.teamLeader.toString());
+                if (t.teamLeader) usersWithTeam.add(t.teamLeader._id.toString());
                 if (t.members) t.members.forEach(m => usersWithTeam.add(m.toString()));
             });
 
             const studentsWithoutTeam = students.filter(s => !usersWithTeam.has(s._id.toString()));
 
             if (studentsWithoutTeam.length > 0) {
-                let existingNumbers = allTeams
-                    .map(t => parseInt(t.teamName.split(' ')[1], 10))
-                    .filter(n => !isNaN(n))
-                    .sort((a, b) => a - b);
-
-                let nextNumber = 1;
-                let existingIndex = 0;
-
                 for (const student of studentsWithoutTeam) {
-                    while (existingIndex < existingNumbers.length && nextNumber >= existingNumbers[existingIndex]) {
-                        if (nextNumber === existingNumbers[existingIndex]) {
-                            nextNumber++;
-                        }
-                        existingIndex++;
-                    }
-
-                    const newTeamName = `Team ${nextNumber}`;
                     const team = new Team({
-                        teamName: newTeamName,
+                        teamName: student.username,
                         teamLeader: student._id,
+                        programme: student.programme || 'UG',
                         members: [],
                         memberStatus: [],
                         isTeamComplete: true,
@@ -185,7 +181,6 @@ exports.setMaxTeamSize = async (req, res) => {
                         status: 'pending'
                     });
                     await team.save();
-                    nextNumber++;
                 }
             }
         }
@@ -1087,8 +1082,8 @@ exports.getDailyAttendanceRecords = async (req, res) => {
         const teamFilter = {};
         if (req.query.programme) teamFilter.programme = req.query.programme;
         const teams = await Team.find(teamFilter)
-            .populate('teamLeader', 'name')
-            .populate('members', 'name')
+            .populate('teamLeader', 'name username')
+            .populate('members', 'name username')
             .populate('guidePreference', 'name')
             .populate('panel', 'name');
 
@@ -1146,6 +1141,7 @@ exports.getDailyAttendanceRecords = async (req, res) => {
 
                 studentData.push({
                     studentId: member._id,
+                    studentRegNo: member.username,
                     studentName: member.name,
                     teamName: team.teamName,
                     guideName: team.guidePreference ? team.guidePreference.name : 'N/A',
@@ -1496,6 +1492,9 @@ exports.uploadStudents = async (req, res) => {
             return res.status(400).json({ message: 'Invalid payload: studentData must be an array' });
         }
 
+        const config = await Config.findOne();
+        const isSoloMode = config && config.maxTeamSize === 1;
+
         for (const student of studentData) {
             const { regno, name } = student;
             const emailId = student.email || student.email_id || null;
@@ -1535,6 +1534,21 @@ exports.uploadStudents = async (req, res) => {
 
             await user.save();
             count++;
+
+            // Auto-form solo team if maxTeamSize is 1
+            if (isSoloMode) {
+                const team = new Team({
+                    teamName: user.username,
+                    teamLeader: user._id,
+                    programme: user.programme,
+                    members: [],
+                    memberStatus: [],
+                    isTeamComplete: true,
+                    isLocked: true,
+                    status: 'pending'
+                });
+                await team.save();
+            }
         }
 
         res.json({ message: `Successfully uploaded ${count} students`, count });

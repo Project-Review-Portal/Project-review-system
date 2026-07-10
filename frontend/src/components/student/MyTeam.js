@@ -202,19 +202,24 @@ const MyTeam = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h2 className="text-xl font-semibold">My Team</h2>
                 <div className="flex gap-2">
-                    {team.isLocked && (
+                    {team.isLocked && maxTeamSize !== 1 && (
                         <span className="px-3 py-1 bg-red-100 text-red-800 text-xs font-bold rounded-full border border-red-200">
                             🔒 Team Locked
                         </span>
                     )}
-                    {!team.isLocked && !canLockTeam && (
+                    {maxTeamSize === 1 && (
+                        <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full border border-blue-200">
+                            👤 Solo Team
+                        </span>
+                    )}
+                    {!team.isLocked && !canLockTeam && maxTeamSize !== 1 && (
                         <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-bold rounded-full border border-yellow-200">
                             Has Pending Invites
                         </span>
                     )}
-                    {!team.isLocked && canLockTeam && (
+                    {!team.isLocked && canLockTeam && maxTeamSize !== 1 && (
                         <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-bold rounded-full border border-green-200">
-                            {acceptedMembersOnly.length === 0 ? 'Solo Project Ready' : 'Ready to Lock'}
+                            Ready to Lock
                         </span>
                     )}
                 </div>
@@ -227,12 +232,21 @@ const MyTeam = () => {
             {inviteError && <div className="text-sm text-red-600 bg-red-50 p-3 rounded border border-red-200">{inviteError}</div>}
             {inviteSuccess && <div className="text-sm text-green-600 bg-green-50 p-3 rounded border border-green-200">{inviteSuccess}</div>}
 
-            {team.isLocked && (
+            {team.isLocked && maxTeamSize !== 1 && (
                 <div className="p-4 bg-green-50 border-l-4 border-green-500 text-green-800 rounded shadow-sm">
                     <h4 className="font-bold flex items-center gap-2">
                         <span>🔒 Team is Locked & Finalized</span>
                     </h4>
                     <p className="text-sm mt-1">This team is locked. Members and settings cannot be changed. Only an administrator can unlock or disband this team.</p>
+                </div>
+            )}
+
+            {maxTeamSize === 1 && (
+                <div className="p-4 bg-indigo-50 border-l-4 border-indigo-500 text-indigo-800 rounded shadow-sm">
+                    <h4 className="font-bold flex items-center gap-2">
+                        <span>👤 Solo Team Finalized</span>
+                    </h4>
+                    <p className="text-sm mt-1">Team is formed with only that student.</p>
                 </div>
             )}
 

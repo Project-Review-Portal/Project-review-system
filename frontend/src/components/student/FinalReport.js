@@ -6,23 +6,37 @@ const FinalReport = () => {
     const [reportStatus, setReportStatus] = useState(null);
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
+    const [team, setTeam] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-    const fetchReportStatus = async () => {
+    const fetchTeamAndReport = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/teams/report/status', {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            });
-            setReportStatus(res.data);
-        } catch (err) {
-            if (err.response && err.response.status !== 404) {
-                setError('Error fetching report status');
+            setLoading(true);
+            const headers = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
+            
+            try {
+                const teamRes = await axios.get('http://localhost:5000/api/teams/my-team', { headers });
+                setTeam(teamRes.data);
+            } catch (err) {
+                // Ignore if team not found
             }
-            setReportStatus(null);
+
+            try {
+                const res = await axios.get('http://localhost:5000/api/teams/report/status', { headers });
+                setReportStatus(res.data);
+            } catch (err) {
+                if (err.response && err.response.status !== 404) {
+                    setError('Error fetching report status');
+                }
+                setReportStatus(null);
+            }
+        } finally {
+            setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchReportStatus();
+        fetchTeamAndReport();
     }, []);
 
     const onFileChange = (e) => {
@@ -48,12 +62,27 @@ const FinalReport = () => {
             });
             setMessage('Report uploaded successfully!');
             setError('');
-            fetchReportStatus();
+            fetchTeamAndReport();
         } catch (err) {
             setError(err.response?.data?.message || 'Error uploading report');
             setMessage('');
         }
     };
+
+    if (loading) {
+        return <div className="text-center mt-10">Loading...</div>;
+    }
+
+    if (!team) {
+        return (
+            <div className="container mx-auto p-4">
+                <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
+                    <strong className="font-bold">Notice: </strong>
+                    <span className="block sm:inline">You are not part of any team. Please form or join a team first.</span>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="container mx-auto p-4">
@@ -86,26 +115,33 @@ const FinalReport = () => {
                     {reportStatus.status === 'rejected' && (
                         <div className="mt-6 border-t pt-6">
                             <h4 className="text-lg font-semibold mb-4 text-gray-900">Upload Revised Report</h4>
-                            <form onSubmit={onSubmit}>
-                                <div className="mb-4">
-                                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="report">
-                                        Select Revised Report (PDF only)
-                                    </label>
-                                    <input
-                                        type="file"
-                                        id="report"
-                                        onChange={onFileChange}
-                                        className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white"
-                                        accept="application/pdf"
-                                    />
+                            {!team.isLocked ? (
+                                <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
+                                    <strong className="font-bold">Notice: </strong>
+                                    <span className="block sm:inline">Your team must be locked to upload a revised report.</span>
                                 </div>
-                                <button
-                                    type="submit"
-                                    className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-                                >
-                                    Upload Revised Report
-                                </button>
-                            </form>
+                            ) : (
+                                <form onSubmit={onSubmit}>
+                                    <div className="mb-4">
+                                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="report">
+                                            Select Revised Report (PDF only)
+                                        </label>
+                                        <input
+                                            type="file"
+                                            id="report"
+                                            onChange={onFileChange}
+                                            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white"
+                                            accept="application/pdf"
+                                        />
+                                    </div>
+                                    <button
+                                        type="submit"
+                                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                                    >
+                                        Upload Revised Report
+                                    </button>
+                                </form>
+                            )}
                         </div>
                     )}
 
@@ -140,6 +176,11 @@ const FinalReport = () => {
                             </div>
                         </div>
                     )}
+                </div>
+            ) : !team.isLocked ? (
+                <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
+                    <strong className="font-bold">Notice: </strong>
+                    <span className="block sm:inline">Your team must be locked before you can upload the final report.</span>
                 </div>
             ) : (
                 <form onSubmit={onSubmit}>

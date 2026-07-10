@@ -32,19 +32,19 @@ const ProgrammeDashboard = () => {
             case 'guide-me':
                 return <GuideMe userRole="admin" />;
             case 'user-management':
-                return <UserManagement programme={decodedProgramme} studentsOnly />;
+                return <UserManagement key={`user-${decodedProgramme}`} programme={decodedProgramme} studentsOnly />;
             case 'admin-settings':
                 return <AdminSettings />;
             case 'review-panels':
                 return <PanelManagement key={`review-${decodedProgramme}`} panelType="review" programme={decodedProgramme} />;
             case 'allocations':
-                return <AllocationsDashboard programme={decodedProgramme} />;
+                return <AllocationsDashboard key={`alloc-${decodedProgramme}`} programme={decodedProgramme} />;
             case 'upload-attendance':
-                return <GuideUploadAttendance programme={decodedProgramme} />;
+                return <GuideUploadAttendance key={`upatt-${decodedProgramme}`} programme={decodedProgramme} />;
             case 'view-attendance':
-                return <AdminViewAttendance programme={decodedProgramme} />;
+                return <AdminViewAttendance key={`viewatt-${decodedProgramme}`} programme={decodedProgramme} />;
             case 'manage-review-schedules':
-                return <AdminManageReviewSchedules programme={decodedProgramme} />;
+                return <AdminManageReviewSchedules key={`manage-${decodedProgramme}`} programme={decodedProgramme} />;
 
             default:
                 return (
