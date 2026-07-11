@@ -49,7 +49,7 @@ const CoordinatorInstructionTemplate = () => {
     const formData = new FormData();
     formData.append('reviewInstructions', instructions);
     if (selectedFile) {
-      formData.append('reviewResource', selectedFile);
+      formData.append('reviewTemplate', selectedFile);
     }
 
     try {
