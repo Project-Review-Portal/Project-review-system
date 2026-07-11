@@ -99,38 +99,6 @@ app.listen(PORT, () => {
                 password: 'cseceg@admin',
                 role: 'admin',
                 roles: [{ role: 'admin', team: null }]
-            },
-            {
-                email: 'student@example.com',
-                username: 'student@example.com',
-                name: 'Default Student',
-                password: 'cseceg@student',
-                role: 'student',
-                roles: [{ role: 'student', team: null }]
-            },
-            {
-                email: 'guide@example.com',
-                username: 'guide@example.com',
-                name: 'Default Guide',
-                password: 'cseceg@guide',
-                role: 'guide',
-                roles: [{ role: 'guide', team: null }]
-            },
-            {
-                email: 'panel@example.com',
-                username: 'panel@example.com',
-                name: 'Default Panel Member',
-                password: 'cseceg@panel',
-                role: 'panel',
-                roles: [{ role: 'panel', team: null }]
-            },
-            {
-                email: 'coordinator@example.com',
-                username: 'coordinator@example.com',
-                name: 'Default Coordinator',
-                password: 'cseceg@coordinator',
-                role: 'coordinator',
-                roles: [{ role: 'coordinator', team: null }]
             }
         ];
 
