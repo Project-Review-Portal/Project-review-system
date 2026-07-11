@@ -123,8 +123,14 @@ const CoordinatorReviewSchedule = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setSlots(res.data.slots);
-      setTeams(res.data.teams);
-      setAssignments(res.data.teams.map((team) => ({ teamId: team._id, slot: null })));
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const selectedProgramme = storedUser.programme;
+      let fetchedTeams = res.data.teams || [];
+      if (selectedProgramme) {
+          fetchedTeams = fetchedTeams.filter(t => t.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+      }
+      setTeams(fetchedTeams);
+      setAssignments(fetchedTeams.map((team) => ({ teamId: team._id, slot: null })));
       const prevReview = getPreviousReview(form.reviewType);
       if (prevReview) {
         const attRes = await axios.post('http://localhost:5000/api/panels/attendance/check', {
@@ -224,7 +230,13 @@ const CoordinatorReviewSchedule = () => {
         const res = await axios.get('http://localhost:5000/api/panels/coordinator/allotted-schedules', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setAllottedSchedules(res.data);
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const selectedProgramme = storedUser.programme;
+        let fetchedSchedules = res.data || [];
+        if (selectedProgramme) {
+            fetchedSchedules = fetchedSchedules.filter(sch => sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+        }
+        setAllottedSchedules(fetchedSchedules);
       } catch (err) {
         // silently ignore when unauthorized
       } finally {
@@ -245,7 +257,13 @@ const CoordinatorReviewSchedule = () => {
       await axios.delete(`http://localhost:5000/api/panels/coordinator/allotted-schedules/${scheduleId}`, { headers: { Authorization: `Bearer ${token}` } });
       // refresh the list
       const res = await axios.get('http://localhost:5000/api/panels/coordinator/allotted-schedules', { headers: { Authorization: `Bearer ${token}` } });
-      setAllottedSchedules(res.data);
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const selectedProgramme = storedUser.programme;
+      let fetchedSchedules = res.data || [];
+      if (selectedProgramme) {
+          fetchedSchedules = fetchedSchedules.filter(sch => sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+      }
+      setAllottedSchedules(fetchedSchedules);
       setMessage('Schedule deleted successfully');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete schedule');

@@ -22,57 +22,54 @@ const getUserActiveRoles = async (userId) => {
     const activeRoles = [];
     
     try {
-        // Check if user is assigned as a guide to any team
-        const guideTeams = await Team.find({ guidePreference: userId }).select('_id programme');
-        for (const t of guideTeams) {
-            activeRoles.push({ role: 'guide', team: t._id.toString(), programme: t.programme });
+        const Programme = require('../models/Programme');
+        const allProgrammes = await Programme.find().sort({ name: 1 });
+        const programmeNames = allProgrammes.map(p => p.name);
+        if (!programmeNames.some(name => name.toLowerCase() === 'ug')) {
+            programmeNames.unshift('ug');
         }
-        
-        // Check if user is a member of any panel that's assigned to teams
+
+        // 1. Guide role: Every faculty member can defaultly be a guide for all programs
+        for (const progName of programmeNames) {
+            activeRoles.push({ role: 'guide', team: null, programme: progName });
+        }
+
+        // 2. Panel role: Check if user is a member of any panel/team dynamically
         const userPanels = await Panel.find({ members: userId }).select('_id programme');
+        const panelProgrammes = new Set();
+        for (const p of userPanels) {
+            if (p.programme) panelProgrammes.add(p.programme);
+        }
+
         if (userPanels.length > 0) {
             const panelIds = userPanels.map(p => p._id);
             const teamsWithPanels = await Team.find({ panel: { $in: panelIds } }).select('_id programme');
             for (const t of teamsWithPanels) {
-                activeRoles.push({ role: 'panel', team: t._id.toString(), programme: t.programme });
-            }
-            if (teamsWithPanels.length === 0) {
-                for (const p of userPanels) {
-                    activeRoles.push({ role: 'panel', team: null, programme: p.programme });
-                }
+                if (t.programme) panelProgrammes.add(t.programme);
             }
         }
-        
-        // Check if user is assigned as coordinator to any panel
+        for (const prog of panelProgrammes) {
+            activeRoles.push({ role: 'panel', team: null, programme: prog });
+        }
+
+        // 3. Coordinator role: Check if user is coordinator dynamically
         const coordinatorPanels = await Panel.find({ coordinator: userId }).select('_id programme');
+        const coordinatorProgrammes = new Set();
         for (const p of coordinatorPanels) {
-            // Get teams assigned to this panel
-            const teamsWithPanel = await Team.find({ panel: p._id }).select('_id programme');
+            if (p.programme) coordinatorProgrammes.add(p.programme);
+        }
+
+        if (coordinatorPanels.length > 0) {
+            const panelIds = coordinatorPanels.map(p => p._id);
+            const teamsWithPanel = await Team.find({ panel: { $in: panelIds } }).select('_id programme');
             for (const t of teamsWithPanel) {
-                activeRoles.push({ role: 'coordinator', team: t._id.toString(), programme: t.programme });
-            }
-            // Also add the coordinator role with panel reference if no teams are assigned yet
-            if (teamsWithPanel.length === 0) {
-                activeRoles.push({ role: 'coordinator', team: null, programme: p.programme });
+                if (t.programme) coordinatorProgrammes.add(t.programme);
             }
         }
-        
-        // If no active roles found, return at least the primary role
-        const user = await User.findById(userId);
-        const defaultProg = user?.programme || 'UG';
-        if (activeRoles.length === 0) {
-            if (user && user.roles && user.roles.length > 0) {
-                activeRoles.push({ role: user.roles[0].role, team: null, programme: defaultProg });
-            }
+        for (const prog of coordinatorProgrammes) {
+            activeRoles.push({ role: 'coordinator', team: null, programme: prog });
         }
-        
-        // Ensure all faculty roles are present at least once with null team
-        const rolesToEnsure = ['guide', 'panel', 'coordinator'];
-        for (const roleName of rolesToEnsure) {
-            if (!activeRoles.some(r => r.role === roleName)) {
-                activeRoles.push({ role: roleName, team: null, programme: defaultProg });
-            }
-        }
+
         return activeRoles;
     } catch (error) {
         console.error('Error getting user active roles:', error);

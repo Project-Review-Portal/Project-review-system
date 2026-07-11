@@ -158,6 +158,29 @@ window.alert = function (message) {
     }, 10);
 };
 
+// Add selected role and programme to every outgoing HTTP request header
+axios.interceptors.request.use(
+  (config) => {
+    try {
+      const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
+      if (storedUser) {
+        if (storedUser.role) {
+          config.headers['X-Selected-Role'] = storedUser.role;
+        }
+        if (storedUser.programme) {
+          config.headers['X-Selected-Programme'] = storedUser.programme;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse user from localStorage for axios interceptor', e);
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Global interceptor to surface unauthorized coordinator access
 axios.interceptors.response.use(
   (response) => response,

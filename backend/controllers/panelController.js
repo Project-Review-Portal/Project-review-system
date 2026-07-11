@@ -402,7 +402,9 @@ exports.getAssignedTeamsForPanel = async (req, res) => {
         } else if (userRole === 'coordinator' || rolesArray.includes('coordinator')) {
             // For coordinators, find teams assigned to their coordinated panel
             console.log('User is a coordinator, finding teams for their panel');
-            const panel = await Panel.findOne({ coordinator: userId });
+            const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
+            const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
+            const panel = await Panel.findOne({ coordinator: userId, programme });
             if (!panel) {
                 console.log('No panel found for coordinator');
                 return res.json([]);
@@ -660,10 +662,12 @@ exports.generateSlotsForCoordinator = async (req, res) => {
 
         // Find the coordinator's panel
         const coordinatorId = req.user.id;
-        const panel = await Panel.findOne({ coordinator: coordinatorId });
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
+        const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
+        const panel = await Panel.findOne({ coordinator: coordinatorId, programme });
         if (!panel) {
-            console.log('❌ No panel found for coordinator:', coordinatorId);
-            return res.status(404).json({ message: 'No panel found for this coordinator. Please ensure you are assigned as a coordinator to a panel.' });
+            console.log('❌ No panel found for coordinator:', coordinatorId, 'programme:', programme);
+            return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
         }
         
         console.log('✅ Found panel for coordinator:', panel._id, panel.name);
@@ -712,9 +716,11 @@ exports.assignSlotsForCoordinator = async (req, res) => {
         const { slotType, assignments, date: providedDate } = req.body;
         // assignments: [{ teamId, slot: { start, end } }]
         const coordinatorId = req.user.id;
-        const panel = await Panel.findOne({ coordinator: coordinatorId });
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
+        const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
+        const panel = await Panel.findOne({ coordinator: coordinatorId, programme });
         if (!panel) {
-            return res.status(404).json({ message: 'No panel found for this coordinator.' });
+            return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
         }
         
         const teamIds = assignments.map(a => a.teamId);
@@ -906,19 +912,21 @@ exports.createInstructionTemplate = async (req, res) => {
 exports.getCoordinatorVivaPanel = async (req, res) => {
     try {
         const coordinatorId = req.user.id;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
+        const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
         
         // Find the review panel where the user is coordinator
-        const reviewPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'review' })
+        const reviewPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'review', programme })
             .populate('members', 'username name memberType designation')
             .populate('coordinator', 'username name memberType designation')
             .populate('assistantCoordinators', 'username name memberType designation');
 
         if (!reviewPanel) {
-            return res.status(404).json({ message: 'You are not assigned as a coordinator to any review panel.' });
+            return res.status(404).json({ message: `You are not assigned as a coordinator to any review panel under programme ${programme}.` });
         }
 
         // Find the viva panel if it exists
-        const vivaPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'viva' })
+        const vivaPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'viva', programme })
             .populate('members', 'username name memberType designation')
             .populate('coordinator', 'username name memberType designation')
             .populate('assistantCoordinators', 'username name memberType designation');
@@ -936,6 +944,8 @@ exports.getCoordinatorVivaPanel = async (req, res) => {
 exports.saveCoordinatorVivaPanel = async (req, res) => {
     try {
         const coordinatorId = req.user.id;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
+        const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
         const { externalMemberIds } = req.body; // Array of external examiner IDs
 
         if (!Array.isArray(externalMemberIds)) {
@@ -943,9 +953,9 @@ exports.saveCoordinatorVivaPanel = async (req, res) => {
         }
 
         // Find the review panel where the user is coordinator
-        const reviewPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'review' });
+        const reviewPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'review', programme });
         if (!reviewPanel) {
-            return res.status(404).json({ message: 'You are not assigned as a coordinator to any review panel.' });
+            return res.status(404).json({ message: `You are not assigned as a coordinator to any review panel under programme ${programme}.` });
         }
 
         // Validate that externalMemberIds are indeed external examiners
@@ -972,7 +982,7 @@ exports.saveCoordinatorVivaPanel = async (req, res) => {
         const finalMembers = Array.from(membersSet);
 
         // Find or create viva panel
-        let vivaPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'viva' });
+        let vivaPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'viva', programme: reviewPanel.programme });
         
         if (!vivaPanel) {
             const vivaPanelName = `Viva - ${reviewPanel.name}`;

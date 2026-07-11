@@ -23,7 +23,13 @@ const GuideMyTeams = () => {
             const headers = { Authorization: `Bearer ${token}` };
             // Use endpoint that returns only approved teams with panel populated
             const res = await axios.get('http://localhost:5000/api/guide/approved-teams', { headers });
-            setApprovedTeams(res.data || []);
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const selectedProgramme = storedUser.programme;
+            let fetchedTeams = res.data || [];
+            if (selectedProgramme) {
+                fetchedTeams = fetchedTeams.filter(t => t.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+            }
+            setApprovedTeams(fetchedTeams);
         } catch (err) {
             console.error('Error fetching approved teams:', err);
             setError(err.response?.data?.message || 'Failed to fetch approved teams.');

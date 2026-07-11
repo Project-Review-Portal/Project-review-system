@@ -71,7 +71,13 @@ const PanelAssignedTeams = () => {
             });
 
             console.log('✅ Success! Response:', response.status, response.data);
-            setAssignedTeams(response.data);
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const selectedProgramme = storedUser.programme;
+            let fetchedTeams = response.data || [];
+            if (selectedProgramme) {
+                fetchedTeams = fetchedTeams.filter(t => t.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+            }
+            setAssignedTeams(fetchedTeams);
             setLoading(false);
         } catch (err) {
             console.error('❌ Error fetching assigned teams:', err);

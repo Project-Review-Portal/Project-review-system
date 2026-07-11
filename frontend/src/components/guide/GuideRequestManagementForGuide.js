@@ -58,7 +58,13 @@ const GuideRequestManagementForGuide = () => {
             // Fetch guide requests 
             if (activePeriod) {
                 const res = await axios.get('http://localhost:5000/api/guide/team-requests', { headers });
-                setRequests(res.data.filter(req => req.status === 'pending'));
+                const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+                const selectedProgramme = storedUser.programme;
+                let filtered = res.data.filter(req => req.status === 'pending');
+                if (selectedProgramme) {
+                    filtered = filtered.filter(req => req.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+                }
+                setRequests(filtered);
             } else {
                 setRequests([]); 
             }

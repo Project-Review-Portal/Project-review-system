@@ -22,7 +22,13 @@ const PanelReviewSchedules = () => {
                 axios.get('/api/panels/review-schedules', { headers: { Authorization: `Bearer ${token}` } }),
                 axios.get('/api/auth/profile', { headers: { Authorization: `Bearer ${token}` } })
             ]);
-            setReviewSchedules(schedulesRes.data);
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const selectedProgramme = storedUser.programme;
+            let fetchedSchedules = schedulesRes.data || [];
+            if (selectedProgramme) {
+                fetchedSchedules = fetchedSchedules.filter(sch => sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+            }
+            setReviewSchedules(fetchedSchedules);
             setLoading(false);
         } catch (err) {
             console.error('Error fetching data:', err);

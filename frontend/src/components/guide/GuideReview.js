@@ -11,7 +11,13 @@ const GuideReview = () => {
             try {
                 const token = localStorage.getItem('token');
                 const schedulesRes = await axios.get('http://localhost:5000/api/guide/review-schedules', { headers: { Authorization: `Bearer ${token}` } });
-                setReviewSchedules(schedulesRes.data);
+                const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+                const selectedProgramme = storedUser.programme;
+                let filtered = schedulesRes.data || [];
+                if (selectedProgramme) {
+                    filtered = filtered.filter(sch => sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+                }
+                setReviewSchedules(filtered);
                 setLoading(false);
             } catch (err) {
                 console.error('Error fetching review schedules:', err);

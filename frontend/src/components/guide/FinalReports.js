@@ -13,7 +13,13 @@ const FinalReports = () => {
             const res = await axios.get('/api/guide/reports', {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
-            setReports(res.data);
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const selectedProgramme = storedUser.programme;
+            let fetchedReports = res.data || [];
+            if (selectedProgramme) {
+                fetchedReports = fetchedReports.filter(r => r.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+            }
+            setReports(fetchedReports);
         } catch (err) {
             setError('Error fetching reports');
         }

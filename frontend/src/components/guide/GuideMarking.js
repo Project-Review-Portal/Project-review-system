@@ -28,7 +28,13 @@ const GuideMarking = () => {
             }
 
             const teamsRes = await axios.get('/api/guide/assigned-teams', { headers });
-            setTeams(teamsRes.data);
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const selectedProgramme = storedUser.programme;
+            let fetchedTeams = teamsRes.data || [];
+            if (selectedProgramme) {
+                fetchedTeams = fetchedTeams.filter(t => t.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+            }
+            setTeams(fetchedTeams);
 
             const marksRes = await axios.get('/api/guide/marks', { headers });
             setMarks(marksRes.data);

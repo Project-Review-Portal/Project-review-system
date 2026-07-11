@@ -34,7 +34,7 @@ const GuideUploadAttendance = ({ programme }) => {
         const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
         setUserRole(storedUser.role);
         fetchData();
-    }, [programme]);
+    }, []);
 
     const fetchData = async () => {
         try {
@@ -46,9 +46,11 @@ const GuideUploadAttendance = ({ programme }) => {
             setReviewEvents(validSlots);
 
             const teamsRes = await axios.get('/api/guide/assigned-teams', { headers });
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const selectedProgramme = storedUser.programme;
             let fetchedTeams = teamsRes.data;
-            if (programme) {
-                fetchedTeams = fetchedTeams.filter(t => t.programme === programme);
+            if (selectedProgramme) {
+                fetchedTeams = fetchedTeams.filter(t => t.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
             }
             setAssignedTeams(fetchedTeams);
 

@@ -27,6 +27,7 @@ const PanelAssignedReviews = () => {
 
             // If user is external (from localStorage), filter to viva only
             const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const selectedProgramme = user.programme;
             const isExternal = user?.memberType === 'external';
             const isViva = (s) => {
                 const slotLabel = (s.slotLabel || '').toString().toLowerCase();
@@ -36,7 +37,11 @@ const PanelAssignedReviews = () => {
                 if (name.includes('viva')) return true;
                 return false;
             };
-            const onlyViva = isExternal ? (res.data || []).filter(s => isViva(s)) : (res.data || []);
+            let fetched = res.data || [];
+            if (selectedProgramme) {
+                fetched = fetched.filter(sch => sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+            }
+            const onlyViva = isExternal ? fetched.filter(s => isViva(s)) : fetched;
             setSchedules(onlyViva);
         } catch (err) {
             console.error('Error fetching assigned reviews:', err);

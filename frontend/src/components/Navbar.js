@@ -94,9 +94,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                             if (user.role === 'admin') {
                                 text = `Admin${activeProgramme ? ` (${activeProgramme})` : ''}`;
                             } else if (['guide', 'panel', 'coordinator'].includes(user.role)) {
-                                const activeRoleObjects = user.roles?.filter(r => r.role === user.role) || [];
-                                const uniqueProgrammes = Array.from(new Set(activeRoleObjects.map(r => r.programme).filter(Boolean)));
-                                const displayProg = uniqueProgrammes.length > 0 ? uniqueProgrammes.join(', ') : (user.programme || 'UG');
+                                const displayProg = user.programme || 'UG';
                                 const roleLabel = user.role === 'panel' ? 'Panel Member' : user.role.charAt(0).toUpperCase() + user.role.slice(1);
                                 text = `${roleLabel} (${displayProg})`;
                             } else if (user.role === 'student') {

@@ -19,7 +19,13 @@ const CoordinatorAssignedTeams = () => {
                 const res = await axios.get('http://localhost:5000/api/panels/assigned-teams', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                setTeams(res.data || []);
+                const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+                const selectedProgramme = storedUser.programme;
+                let fetchedTeams = res.data || [];
+                if (selectedProgramme) {
+                    fetchedTeams = fetchedTeams.filter(t => t.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+                }
+                setTeams(fetchedTeams);
             } catch (err) {
                 setError(err.response?.data?.message || 'Failed to load assigned teams');
             } finally {
