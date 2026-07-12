@@ -85,6 +85,14 @@ app.listen(PORT, () => {
             console.log('✅ Dropped obsolete teamName_1 index from teams collection');
         } catch (e) {}
         try {
+            await mongoose.connection.db.collection('panels').dropIndex('name_1');
+            console.log('✅ Dropped obsolete name_1 index from panels collection');
+        } catch (e) {}
+        try {
+            await mongoose.connection.db.collection('panels').dropIndex('name_1_panelType_1');
+            console.log('✅ Dropped obsolete name_1_panelType_1 index from panels collection');
+        } catch (e) {}
+        try {
             await mongoose.connection.db.collection('designationteamlimits').dropIndex('designation_1');
         } catch (e) {}
         try {

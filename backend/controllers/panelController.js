@@ -104,26 +104,34 @@ exports.createPanel = async (req, res) => {
             return res.status(400).json({ message: 'Coordinator must be an internal faculty member.' });
         }
         // Generate panel name based on current count for this panelType and programme
-        const namePrefix = resolvedPanelType === 'viva' ? 'Viva Panel' : 'Panel';
+        const namePrefix = resolvedPanelType === 'viva' ? `${targetProgramme} Viva Panel` : `${targetProgramme} Panel`;
+        
         const existingPanelNames = await Panel.find({ panelType: resolvedPanelType, programme: targetProgramme }, { _id: 0, name: 1 });
-        const usedNumbers = existingPanelNames
-            .map(x => {
-                const match = x.name.match(/(\d+)/);
-                return match ? Number(match[1]) : 0;
-            })
-            .filter(n => n > 0)
-            .sort((a, b) => a - b);
-            
-        let numberTracker = 1;
-        for (const num of usedNumbers) {
-            if (num === numberTracker) {
-                numberTracker++;
+        
+        // Helper function to escape regex special characters in the programme name
+        const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        
+        // Regex to extract the number at the end, handling legacy "Panel X", "Viva Panel X", and new "Programme [Viva] Panel X"
+        const panelNameRegex = new RegExp(`^(?:${escapeRegExp(targetProgramme)}\\s+)?(?:Viva\\s+)?Panel\\s+(\\d+)$`, 'i');
+        
+        const existingNumbers = new Set();
+        if (existingPanelNames) {
+            for (const p of existingPanelNames) {
+                if (p.name) {
+                    const match = p.name.match(panelNameRegex);
+                    if (match) {
+                        existingNumbers.add(parseInt(match[1], 10));
+                    }
+                }
             }
         }
         
-        const panelCount = numberTracker;
-
-        const newPanelName = `${namePrefix} ${panelCount}`;
+        let numberTracker = 1;
+        while (existingNumbers.has(numberTracker)) {
+            numberTracker++;
+        }
+        
+        const newPanelName = `${namePrefix} ${numberTracker}`;
         const newPanel = new Panel({
             name: newPanelName,
             panelType: resolvedPanelType,
