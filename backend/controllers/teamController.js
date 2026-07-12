@@ -137,17 +137,33 @@ exports.createTeam = async (req, res) => {
         const leader = await User.findById(teamLeaderId);
         const leaderProgramme = leader.programme || 'UG';
 
-        const existingTeamNames = await Team.find({programme: leaderProgramme},{_id:0, teamName: 1})
-        let numberTracker = 1;
-        if (existingTeamNames){
-            for(let x of existingTeamNames){
-                if( numberTracker != Number(x.teamName.split(' ')[1]))
-                    break;
-                numberTracker++;
+        // Retrieve all existing teams for this programme to generate the next sequential team name
+        const existingTeams = await Team.find({ programme: leaderProgramme }, { teamName: 1 });
+        
+        // Helper function to escape regex special characters in the programme name
+        const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        
+        // Match either "{Programme} Team {Number}" or the legacy "Team {Number}"
+        const teamNameRegex = new RegExp(`^(?:${escapeRegExp(leaderProgramme)}\\s+)?Team\\s+(\\d+)$`, 'i');
+        
+        const existingNumbers = new Set();
+        if (existingTeams) {
+            for (const team of existingTeams) {
+                if (team.teamName) {
+                    const match = team.teamName.match(teamNameRegex);
+                    if (match) {
+                        existingNumbers.add(parseInt(match[1], 10));
+                    }
+                }
             }
         }
+        
+        let numberTracker = 1;
+        while (existingNumbers.has(numberTracker)) {
+            numberTracker++;
+        }
 
-        const newTeamName = `Team ${numberTracker}`;
+        const newTeamName = `${leaderProgramme} Team ${numberTracker}`;
 
         // Create team
         const team = new Team({

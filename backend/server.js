@@ -81,6 +81,10 @@ app.listen(PORT, () => {
         // Drop the old indexes on designation limits if they exist
         const mongoose = require('mongoose');
         try {
+            await mongoose.connection.db.collection('teams').dropIndex('teamName_1');
+            console.log('✅ Dropped obsolete teamName_1 index from teams collection');
+        } catch (e) {}
+        try {
             await mongoose.connection.db.collection('designationteamlimits').dropIndex('designation_1');
         } catch (e) {}
         try {
