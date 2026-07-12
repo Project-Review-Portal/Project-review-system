@@ -47,7 +47,7 @@ const GuideUploadAttendance = ({ programme }) => {
 
             const teamsRes = await axios.get('/api/guide/assigned-teams', { headers });
             const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-            const selectedProgramme = storedUser.programme;
+            const selectedProgramme = programme || storedUser.programme;
             let fetchedTeams = teamsRes.data;
             if (selectedProgramme) {
                 fetchedTeams = fetchedTeams.filter(t => t.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
