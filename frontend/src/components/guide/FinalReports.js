@@ -16,12 +16,16 @@ const FinalReports = () => {
             const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
             const selectedProgramme = storedUser.programme;
             let fetchedReports = res.data || [];
+  
             if (selectedProgramme) {
-                fetchedReports = fetchedReports.filter(r => r.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+                fetchedReports = fetchedReports.filter(r => 
+                    r.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase()
+                );
             }
             setReports(fetchedReports);
         } catch (err) {
             setError('Error fetching reports');
+            setMessage('');
         }
     };
 
@@ -35,9 +39,11 @@ const FinalReports = () => {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             setMessage('Report approved successfully');
+            setError('');
             fetchReports();
         } catch (err) {
             setError('Error approving report');
+            setMessage('');
         }
     };
 
@@ -49,11 +55,13 @@ const FinalReports = () => {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             setMessage('Report rejected successfully');
+            setError('');
             setSelectedReportForReject(null);
             setRejectRemarks('');
             fetchReports();
         } catch (err) {
             setError('Error rejecting report');
+            setMessage('');
         }
     };
 
@@ -72,6 +80,7 @@ const FinalReports = () => {
             link.remove();
         } catch (err) {
             setError('Error downloading report');
+            setMessage('');
         }
     };
 
@@ -90,17 +99,17 @@ const FinalReports = () => {
                 <table className="min-w-full bg-white">
                     <thead>
                         <tr>
-                            <th className="py-2 px-4 border-b">Team Name</th>
-                            <th className="py-2 px-4 border-b">File Name</th>
-                            <th className="py-2 px-4 border-b">Status</th>
-                            <th className="py-2 px-4 border-b">Actions</th>
+                            <th className="py-2 px-4 border-b text-left">Team Name</th>
+                            <th className="py-2 px-4 border-b text-left">File Name</th>
+                            <th className="py-2 px-4 border-b text-left">Status</th>
+                            <th className="py-2 px-4 border-b text-left">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {reports.map((report) => (
                             <React.Fragment key={report._id}>
                                 <tr className="hover:bg-gray-50/50">
-                                    <td className="py-3 px-4 border-b font-medium text-gray-900">{report.team.teamName}</td>
+                                    <td className="py-3 px-4 border-b font-medium text-gray-900">{report.team?.teamName || 'N/A'}</td>
                                     <td className="py-3 px-4 border-b text-gray-700">{report.fileName}</td>
                                     <td className="py-3 px-4 border-b">
                                         <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -165,7 +174,7 @@ const FinalReports = () => {
                 </table>
             </div>
 
-            {/* Premium Rejection Modal */}
+            {/* Rejection Modal */}
             {selectedReportForReject && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded-xl shadow-2xl max-w-md w-full mx-4">
@@ -213,4 +222,4 @@ const FinalReports = () => {
     );
 };
 
-export default FinalReports; 
+export default FinalReports;

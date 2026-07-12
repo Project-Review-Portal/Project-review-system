@@ -685,13 +685,14 @@ exports.getReportsForGuide = async (req, res) => {
 
         const reports = await FinalReport.find({ team: { $in: teamIds } }).populate({
             path: 'team',
-            select: 'teamName teamLeader members',
+            // Added 'programme' 
+            select: 'teamName teamLeader members programme', 
             populate: {
                 path: 'teamLeader members',
                 select: 'name username'
             }
         });
-
+        
         res.json(reports);
     } catch (error) {
         console.error('Error fetching reports for guide:', error);
