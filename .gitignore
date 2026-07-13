@@ -21,6 +21,9 @@ test-outputs/
 uploads/generated/
 backend/uploads/generated/
 
+backend/uploads/report/
+backend/uploads/review-templates/
+
 # Log files
 *.log
 logs/
@@ -56,3 +59,7 @@ ignore.txt
 
 #ignore sample data
 sampleData
+
+#ignore IDE ignores
+.antigravityignore
+.cursorignore
