@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const DURATION_OPTIONS = [15, 20, 30, 45, 60];
 
 const CoordinatorReviewSchedule = () => {
@@ -43,7 +43,7 @@ const CoordinatorReviewSchedule = () => {
   const fetchSettings = async () => {
     try {
       const token = localStorage.getItem('token');
-      const settingsRes = await axios.get('http://localhost:5000/api/auth/review-settings', {
+      const settingsRes = await axios.get(`${SERVER_API_KEY}/api/auth/review-settings`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const validSlots = settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva'];
@@ -112,7 +112,7 @@ const CoordinatorReviewSchedule = () => {
     try {
       const token = localStorage.getItem('token');
       const res = await axios.post(
-        'http://localhost:5000/api/panels/coordinator/generate-slots',
+        `${SERVER_API_KEY}/api/panels/coordinator/generate-slots`,
         {
           slotType: form.reviewType,
           date: form.date,
@@ -133,7 +133,7 @@ const CoordinatorReviewSchedule = () => {
       setAssignments(fetchedTeams.map((team) => ({ teamId: team._id, slot: null })));
       const prevReview = getPreviousReview(form.reviewType);
       if (prevReview) {
-        const attRes = await axios.post('http://localhost:5000/api/panels/attendance/check', {
+        const attRes = await axios.post(`${SERVER_API_KEY}/api/panels/attendance/check`, {
           teamIds: res.data.teams.map(t => t._id),
           reviewType: prevReview
         }, { headers: { Authorization: `Bearer ${token}` } });
@@ -193,7 +193,7 @@ const CoordinatorReviewSchedule = () => {
         usedSlots.add(slotKey);
       }
       await axios.post(
-        'http://localhost:5000/api/panels/coordinator/assign-slots',
+        `${SERVER_API_KEY}/api/panels/coordinator/assign-slots`,
         {
           slotType: form.reviewType,
           date: form.date,
@@ -227,7 +227,7 @@ const CoordinatorReviewSchedule = () => {
       setLoadingSchedules(true);
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get('http://localhost:5000/api/panels/coordinator/allotted-schedules', {
+        const res = await axios.get(`${SERVER_API_KEY}/api/panels/coordinator/allotted-schedules`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -254,9 +254,9 @@ const CoordinatorReviewSchedule = () => {
     setLoadingSchedules(true);
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:5000/api/panels/coordinator/allotted-schedules/${scheduleId}`, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.delete(`${SERVER_API_KEY}/api/panels/coordinator/allotted-schedules/${scheduleId}`, { headers: { Authorization: `Bearer ${token}` } });
       // refresh the list
-      const res = await axios.get('http://localhost:5000/api/panels/coordinator/allotted-schedules', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await axios.get(`${SERVER_API_KEY}/api/panels/coordinator/allotted-schedules`, { headers: { Authorization: `Bearer ${token}` } });
       const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
       const selectedProgramme = storedUser.programme;
       let fetchedSchedules = res.data || [];

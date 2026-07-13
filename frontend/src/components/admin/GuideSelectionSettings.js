@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 // Converts a UTC date string from DB into "YYYY-MM-DDTHH:mm" in LOCAL timezone
 // This is what datetime-local input expects
 const toLocalDateTimeInput = (utcString) => {
@@ -43,7 +45,7 @@ const GuideSelectionSettings = () => {
     const fetchCurrentSettings = async () => {
         try {
             if (!token) { setError('Authentication token not found'); return; }
-            const response = await axios.get('/api/admin/guide-selection-dates', { headers });
+            const response = await axios.get(`${SERVER_API_KEY}/api/admin/guide-selection-dates`, { headers });
             const { startDate: s, endDate: e } = response.data;
 
             // ✅ Use local timezone conversion — NOT .toISOString() which gives UTC
@@ -80,7 +82,7 @@ const GuideSelectionSettings = () => {
 
             // Send as ISO string — new Date(localString) correctly converts
             // local time back to UTC for storage
-            await axios.post('/api/admin/guide-selection-dates',
+            await axios.post(`${SERVER_API_KEY}/api/admin/guide-selection-dates`,
                 {
                     startDate: new Date(startDate).toISOString(),
                     endDate:   new Date(endDate).toISOString()

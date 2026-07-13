@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const FinalReports = () => {
     const [reports, setReports] = useState([]);
     const [error, setError] = useState('');
@@ -10,7 +12,7 @@ const FinalReports = () => {
 
     const fetchReports = async () => {
         try {
-            const res = await axios.get('/api/guide/reports', {
+            const res = await axios.get(`${SERVER_API_KEY}/api/guide/reports`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -35,7 +37,7 @@ const FinalReports = () => {
 
     const handleApprove = async (reportId) => {
         try {
-            await axios.put(`/api/guide/reports/${reportId}/approve`, {}, {
+            await axios.put(`${SERVER_API_KEY}/api/guide/reports/${reportId}/approve`, {}, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             setMessage('Report approved successfully');
@@ -51,7 +53,7 @@ const FinalReports = () => {
         e.preventDefault();
         if (!selectedReportForReject) return;
         try {
-            await axios.put(`/api/guide/reports/${selectedReportForReject}/reject`, { remarks: rejectRemarks }, {
+            await axios.put(`${SERVER_API_KEY}/api/guide/reports/${selectedReportForReject}/reject`, { remarks: rejectRemarks }, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             setMessage('Report rejected successfully');
@@ -67,7 +69,7 @@ const FinalReports = () => {
 
     const handleDownload = async (reportId, fileName) => {
         try {
-            const res = await axios.get(`/api/guide/reports/${reportId}/download`, {
+            const res = await axios.get(`${SERVER_API_KEY}/api/guide/reports/${reportId}/download`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
                 responseType: 'blob',
             });

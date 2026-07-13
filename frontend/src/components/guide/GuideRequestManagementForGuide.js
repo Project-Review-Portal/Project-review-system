@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const GuideRequestManagementForGuide = () => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -35,7 +37,7 @@ const GuideRequestManagementForGuide = () => {
 
             // 1. Fetch live metadata allocations from capacity route
             try {
-                const capacityRes = await axios.get('http://localhost:5000/api/guide/capacity', { headers });
+                const capacityRes = await axios.get(`${SERVER_API_KEY}/api/guide/capacity`, { headers });
                 setCapacity({
                     designation: capacityRes.data.designation,
                     approvedCount: capacityRes.data.approvedCount,
@@ -46,7 +48,7 @@ const GuideRequestManagementForGuide = () => {
             }
 
             // Fetch guide selection dates
-            const datesRes = await axios.get('http://localhost:5000/api/guide/selection-dates', { headers });
+            const datesRes = await axios.get(`${SERVER_API_KEY}/api/guide/selection-dates`, { headers });
             const { startDate, endDate } = datesRes.data;
             setGuideSelectionDates({ startDate, endDate });
             const now = new Date();
@@ -57,7 +59,7 @@ const GuideRequestManagementForGuide = () => {
 
             // Fetch guide requests 
             if (activePeriod) {
-                const res = await axios.get('http://localhost:5000/api/guide/team-requests', { headers });
+                const res = await axios.get(`${SERVER_API_KEY}/api/guide/team-requests`, { headers });
                 const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
                 const selectedProgramme = storedUser.programme;
                 let filtered = res.data.filter(req => req.status === 'pending');
@@ -82,7 +84,7 @@ const GuideRequestManagementForGuide = () => {
         try {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
-            await axios.post(`http://localhost:5000/api/guide/team-requests/${action}`, { teamId }, { headers });
+            await axios.post(`${SERVER_API_KEY}/api/guide/team-requests/${action}`, { teamId }, { headers });
             setMessage(`Request ${action === 'accept' ? 'accepted' : 'rejected'} successfully!`);
             fetchGuideData(); 
         } catch (err) {

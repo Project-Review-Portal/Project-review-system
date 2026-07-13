@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626"; 
 
 const ReviewsVivaSettings = () => {
     const [numReviews, setNumReviews] = useState(3);
@@ -20,7 +20,7 @@ const ReviewsVivaSettings = () => {
         setLoading(true);
         setMessage(null);
         try {
-            const res = await fetch(`${API_BASE}/api/admin/reviews-viva-settings`, {
+            const res = await fetch(`${SERVER_API_KEY}/api/admin/reviews-viva-settings`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (!res.ok) throw new Error('Failed to fetch settings');
@@ -38,7 +38,7 @@ const ReviewsVivaSettings = () => {
         setSaving(true);
         setMessage(null);
         try {
-            const res = await fetch(`${API_BASE}/api/admin/reviews-viva-settings`, {
+            const res = await fetch(`${SERVER_API_KEY}/api/admin/reviews-viva-settings`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

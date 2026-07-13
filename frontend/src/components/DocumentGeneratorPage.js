@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const DocumentGeneratorPage = () => {
     const [templates, setTemplates] = useState([]);
     const [selectedTemplate, setSelectedTemplate] = useState('');
@@ -32,7 +34,7 @@ const DocumentGeneratorPage = () => {
     const fetchTemplates = async () => {
         try {
             setLoading(true);
-            const response = await axios.get('/api/documents/templates', {
+            const response = await axios.get(`${SERVER_API_KEY}/api/documents/templates`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
@@ -65,7 +67,7 @@ const DocumentGeneratorPage = () => {
             setSuccess('');
             setValidationErrors([]);
             
-            const response = await axios.get(`/api/documents/templates/${templateId}/structure`, {
+            const response = await axios.get(`${SERVER_API_KEY}/api/documents/templates/${templateId}/structure`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
@@ -112,7 +114,7 @@ const DocumentGeneratorPage = () => {
 
         try {
             setLoading(true);
-            const response = await axios.get(`/api/documents/templates/${selectedTemplate}/sample-data`, {
+            const response = await axios.get(`${SERVER_API_KEY}/api/documents/templates/${selectedTemplate}/sample-data`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
@@ -152,7 +154,7 @@ const DocumentGeneratorPage = () => {
 
         try {
             setLoading(true);
-            const response = await axios.get(`/api/documents/templates/${selectedTemplate}/guide`, {
+            const response = await axios.get(`${SERVER_API_KEY}/api/documents/templates/${selectedTemplate}/guide`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
@@ -306,7 +308,7 @@ const DocumentGeneratorPage = () => {
                 ...tableData
             };
 
-            const response = await axios.post('/api/documents/generate', {
+            const response = await axios.post(`${SERVER_API_KEY}/api/documents/generate`, {
                 templateId: selectedTemplate,
                 data: documentData,
                 filename: `${selectedTemplate}_${new Date().toISOString().split('T')[0]}.docx`

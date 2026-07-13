@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const PanelAssignedReviews = () => {
     const [schedules, setSchedules] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -23,7 +25,7 @@ const PanelAssignedReviews = () => {
             const headers = { Authorization: `Bearer ${token}` };
 
             // Fetch review schedules for this panel member
-            const res = await axios.get('http://localhost:5000/api/panels/review-schedules', { headers });
+            const res = await axios.get(`${SERVER_API_KEY}/api/panels/review-schedules`, { headers });
 
             // If user is external (from localStorage), filter to viva only
             const user = JSON.parse(localStorage.getItem('user') || '{}');

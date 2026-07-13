@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const GuideMarking = () => {
     const [teams, setTeams] = useState([]);
     const [marks, setMarks] = useState({}); // { studentId: { review1: {...}, review2: {...}, review3: {...}, viva: {...} } }
@@ -20,14 +22,14 @@ const GuideMarking = () => {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
             
-            const settingsRes = await axios.get('/api/auth/review-settings', { headers });
+            const settingsRes = await axios.get(`${SERVER_API_KEY}/api/auth/review-settings`, { headers });
             const validSlots = (settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva']).filter(s => s !== 'review0');
             setSlotTypes(validSlots);
             if (validSlots.length > 0) {
                 setActiveSlotType(validSlots[0]);
             }
 
-            const teamsRes = await axios.get('/api/guide/assigned-teams', { headers });
+            const teamsRes = await axios.get(`${SERVER_API_KEY}/api/guide/assigned-teams`, { headers });
             const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
             const selectedProgramme = storedUser.programme;
             let fetchedTeams = teamsRes.data || [];
@@ -36,7 +38,7 @@ const GuideMarking = () => {
             }
             setTeams(fetchedTeams);
 
-            const marksRes = await axios.get('/api/guide/marks', { headers });
+            const marksRes = await axios.get(`${SERVER_API_KEY}/api/guide/marks`, { headers });
             setMarks(marksRes.data);
             setLoading(false);
         } catch (err) {
@@ -70,7 +72,7 @@ const GuideMarking = () => {
                 const studentId = stu._id;
                 const studentMarks = ((marks[studentId] || {})[activeSlotType]) || {};
                 const { mark1 = 0, mark2 = 0, mark3 = 0, mark4 = 0 } = studentMarks;
-                return axios.post('/api/guide/marks', { teamId: team._id, studentId, mark1, mark2, mark3, mark4, slotType: activeSlotType }, { headers });
+                return axios.post(`${SERVER_API_KEY}/api/guide/marks`, { teamId: team._id, studentId, mark1, mark2, mark3, mark4, slotType: activeSlotType }, { headers });
             });
             await Promise.all(requests);
             alert('All marks submitted successfully!');

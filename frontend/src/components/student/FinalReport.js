@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const FinalReport = () => {
     const [file, setFile] = useState(null);
     const [reportStatus, setReportStatus] = useState(null);
@@ -15,14 +17,14 @@ const FinalReport = () => {
             const headers = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
             
             try {
-                const teamRes = await axios.get('http://localhost:5000/api/teams/my-team', { headers });
+                const teamRes = await axios.get(`${SERVER_API_KEY}/api/teams/my-team`, { headers });
                 setTeam(teamRes.data);
             } catch (err) {
                 // Ignore if team not found
             }
 
             try {
-                const res = await axios.get('http://localhost:5000/api/teams/report/status', { headers });
+                const res = await axios.get(`${SERVER_API_KEY}/api/teams/report/status`, { headers });
                 setReportStatus(res.data);
             } catch (err) {
                 if (err.response && err.response.status !== 404) {
@@ -54,7 +56,7 @@ const FinalReport = () => {
         formData.append('report', file);
 
         try {
-            const res = await axios.post('http://localhost:5000/api/teams/report/upload', formData, {
+            const res = await axios.post(`${SERVER_API_KEY}/api/teams/report/upload`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,

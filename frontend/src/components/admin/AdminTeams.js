@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const AdminTeams = () => {
     const [teams, setTeams] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -14,7 +16,7 @@ const AdminTeams = () => {
         setError('');
         setMessage('');
         try {
-            const res = await axios.get('/api/admin/teams', { headers });
+            const res = await axios.get(`${SERVER_API_KEY}/api/admin/teams`, { headers });
             setTeams(res.data);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to fetch teams');
@@ -30,7 +32,7 @@ const AdminTeams = () => {
         setError('');
         setMessage('');
         try {
-            await axios.delete(`/api/admin/teams/${teamId}`, { headers });
+            await axios.delete(`${SERVER_API_KEY}/api/admin/teams/${teamId}`, { headers });
             setMessage('Team deleted successfully');
             await fetchTeams();
         } catch (err) {

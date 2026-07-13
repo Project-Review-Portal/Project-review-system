@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const StudentReviewSchedule = () => {
     const [schedules, setSchedules] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -10,7 +12,7 @@ const StudentReviewSchedule = () => {
         const fetchSchedule = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const res = await axios.get('http://localhost:5000/api/student/review-schedule', {
+                const res = await axios.get(`${SERVER_API_KEY}/api/student/review-schedule`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setSchedules(res.data);

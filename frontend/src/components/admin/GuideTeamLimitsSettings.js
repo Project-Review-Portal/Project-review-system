@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const GuideTeamLimitsSettings = () => {
     const { programmeName } = useParams();
     const decodedProgramme = decodeURIComponent(programmeName || 'UG');
@@ -120,7 +122,7 @@ const GuideTeamLimitsSettings = () => {
     const fetchDesignationLimits = async () => {
         setLoading(true);
         try {
-            const response = await axios.get(`/api/admin/designation-team-limits?programmeType=${programmeType}`, { headers });
+            const response = await axios.get(`${SERVER_API_KEY}/api/admin/designation-team-limits?programmeType=${programmeType}`, { headers });
             const limits = response.data.map((item) => ({
                 designation: item.designation,
                 teamLimit: item.teamLimit
@@ -145,7 +147,7 @@ const GuideTeamLimitsSettings = () => {
         setLimitMessage('');
         setLimitMessageType('');
         try {
-            await axios.delete(`/api/admin/designation-team-limits/all?programmeType=${programmeType}`, { headers });
+            await axios.delete(`${SERVER_API_KEY}/api/admin/designation-team-limits/all?programmeType=${programmeType}`, { headers });
             setDesignationLimits([]);
             setLimitMessage('All designation team limits deleted successfully.');
             setLimitMessageType('success');
@@ -182,7 +184,7 @@ const GuideTeamLimitsSettings = () => {
                 teamLimit: Number(item.teamLimit)
             }));
 
-            await axios.post('/api/admin/designation-team-limits', { limits: payload, programmeType }, { headers });
+            await axios.post(`${SERVER_API_KEY}/api/admin/designation-team-limits`, { limits: payload, programmeType }, { headers });
             setLimitsSaved(true);
             setLimitMessage('Designation team limits saved successfully');
             setLimitMessageType('success');
@@ -219,7 +221,7 @@ const GuideTeamLimitsSettings = () => {
         if (limitsSaved) {
             setLoading(true);
             try {
-                await axios.delete(`/api/admin/designation-team-limits/${encodeURIComponent(row.designation)}?programmeType=${programmeType}`, { headers });
+                await axios.delete(`${SERVER_API_KEY}/api/admin/designation-team-limits/${encodeURIComponent(row.designation)}?programmeType=${programmeType}`, { headers });
                 setDesignationLimits((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
                 setLimitMessage('Designation team limit deleted successfully');
                 setLimitMessageType('success');

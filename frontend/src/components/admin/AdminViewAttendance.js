@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const AdminViewAttendance = ({ programme }) => {
     const [studentData, setStudentData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -101,7 +103,7 @@ const AdminViewAttendance = ({ programme }) => {
             const headers = { Authorization: `Bearer ${token}` };
 
             const progParam = programme ? `?programme=${encodeURIComponent(programme)}` : '';
-            const response = await axios.get(`/api/admin/daily-attendance-records${progParam}`, { headers });
+            const response = await axios.get(`${SERVER_API_KEY}/api/admin/daily-attendance-records${progParam}`, { headers });
             setStudentData(response.data);
             setLoading(false);
         } catch (err) {

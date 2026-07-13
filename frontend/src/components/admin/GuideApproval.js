@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import '../../styles/AuthForms.css'; // Reusing styling
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626"; 
 const GuideAllotmentApproval = () => {
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
@@ -19,7 +19,7 @@ const GuideAllotmentApproval = () => {
                 return;
             }
 
-            const res = await axios.put('http://localhost:5000/api/guide/approve-allotment', {}, {
+            const res = await axios.put(`${SERVER_API_KEY}/api/guide/approve-allotment`, {}, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             setMessage(res.data.message);

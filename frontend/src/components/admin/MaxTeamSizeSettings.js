@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const MaxTeamSizeSettings = () => {
     const [maxTeamSize, setMaxTeamSize] = useState(4);
     const [currentMaxTeamSize, setCurrentMaxTeamSize] = useState(4); // tracks the last saved value
@@ -18,8 +20,8 @@ const MaxTeamSizeSettings = () => {
         try {
             const token = localStorage.getItem('token');
             const [teamSizeRes, reviewPeriodRes] = await Promise.all([
-                axios.get('/api/admin/team-size', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('/api/admin/review-period-dates', { headers: { Authorization: `Bearer ${token}` } })
+                axios.get(`${SERVER_API_KEY}/api/admin/team-size`, { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get(`${SERVER_API_KEY}/api/admin/review-period-dates`, { headers: { Authorization: `Bearer ${token}` } })
             ]);
             setMaxTeamSize(teamSizeRes.data.maxTeamSize);
             setCurrentMaxTeamSize(Number(teamSizeRes.data.maxTeamSize)); // sync the saved baseline
@@ -53,7 +55,7 @@ const MaxTeamSizeSettings = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post('/api/admin/team-size', { maxTeamSize: newMax }, {
+            const res = await axios.post(`${SERVER_API_KEY}/api/admin/team-size`, { maxTeamSize: newMax }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 

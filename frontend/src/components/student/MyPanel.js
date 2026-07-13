@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const MyPanel = () => {
     const [assignedPanel, setAssignedPanel] = useState(null);
     const [guide, setGuide] = useState(null);
@@ -20,7 +22,7 @@ const MyPanel = () => {
                 return;
             }
             const headers = { Authorization: `Bearer ${token}` };
-            const response = await axios.get('http://localhost:5000/api/teams/my-assigned-panel', { headers });
+            const response = await axios.get(`${SERVER_API_KEY}/api/teams/my-assigned-panel`, { headers });
             setAssignedPanel(response.data.panel);
             setGuide(response.data.guide || null);
         } catch (err) {

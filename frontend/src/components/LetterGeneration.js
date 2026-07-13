@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const LetterGeneration = () => {
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
@@ -23,7 +25,7 @@ const LetterGeneration = () => {
     const fetchTemplates = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch('/api/documents/templates', {
+        const res = await fetch(`${SERVER_API_KEY}/api/documents/templates`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -47,7 +49,7 @@ const LetterGeneration = () => {
     if (!selectedTemplate) return;
     setLoading(true);
     const token = localStorage.getItem('token');
-    fetch(`/api/documents/templates/${selectedTemplate}/structure`, {
+    fetch(`${SERVER_API_KEY}/api/documents/templates/${selectedTemplate}/structure`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -108,7 +110,7 @@ const LetterGeneration = () => {
     setError('');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/documents/generate', {
+      const res = await fetch(`${SERVER_API_KEY}/api/documents/generate`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

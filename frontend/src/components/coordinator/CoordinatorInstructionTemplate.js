@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const CoordinatorInstructionTemplate = () => {
   const [instructions, setInstructions] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
@@ -54,7 +56,7 @@ const CoordinatorInstructionTemplate = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/panels/coordinator/instruction-template', formData, {
+      const response = await axios.post(`${SERVER_API_KEY}/api/panels/coordinator/instruction-template`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
            'Authorization': `Bearer ${token}`

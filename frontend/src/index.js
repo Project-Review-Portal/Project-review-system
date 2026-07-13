@@ -5,6 +5,8 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 // Global custom window.alert override to display center-aligned premium modal
 window.alert = function (message) {
     const existing = document.getElementById('custom-global-alert');
@@ -186,7 +188,7 @@ axios.interceptors.response.use(
   (response) => response,
   (error) => {
     const url = error?.config?.url || '';
-    if (error?.response?.status === 403 && url.includes('/api/panels/coordinator/')) {
+    if (error?.response?.status === 403 && url.includes(`/api/panels/coordinator/`)) {
       const storedUser = (() => { try { return JSON.parse(localStorage.getItem('user') || 'null'); } catch { return null; } })();
       const hasCoordinator = (Array.isArray(storedUser?.roles) && storedUser.roles.some(r => r.role === 'coordinator')) || storedUser?.role === 'coordinator';
       if (hasCoordinator) {

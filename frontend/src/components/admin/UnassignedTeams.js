@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import '../../styles/AuthForms.css'; // Reusing styling
 import '../../styles/Dashboard.css'; // For team list display
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626"; 
 const UnassignedTeams = () => {
     const [unassignedTeams, setUnassignedTeams] = useState([]);
     const [message, setMessage] = useState('');
@@ -22,7 +22,7 @@ const UnassignedTeams = () => {
                     return;
                 }
 
-                const res = await axios.get('http://localhost:5000/api/admin/unassigned-teams-after-period', {
+                const res = await axios.get(`${SERVER_API_KEY}/api/admin/unassigned-teams-after-period`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 setUnassignedTeams(res.data);

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const CoordinatorInstructions = () => {
   const [instructionData, setInstructionData] = useState([]);
   const [panelId, setPanelId] = useState(null);
@@ -29,7 +31,7 @@ const CoordinatorInstructions = () => {
         const user = JSON.parse(storedUserRaw);
 
         // Fetch instructions based on user id lookup chain
-        const response = await axios.get('/api/student/get-instructions-template', {
+        const response = await axios.get(`${SERVER_API_KEY}/api/student/get-instructions-template`, {
           params: { userId: user.id },
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -63,7 +65,7 @@ const CoordinatorInstructions = () => {
     if (!templateId) return;
     
     try {
-      const response = await axios.get(`/api/student/download-template/${templateId}`, {
+      const response = await axios.get(`${SERVER_API_KEY}/api/student/download-template/${templateId}`, {
         responseType: 'blob', 
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`

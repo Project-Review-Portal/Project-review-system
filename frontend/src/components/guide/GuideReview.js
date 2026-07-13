@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const GuideReview = () => {
     const [reviewSchedules, setReviewSchedules] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -10,7 +12,7 @@ const GuideReview = () => {
         const fetchData = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const schedulesRes = await axios.get('http://localhost:5000/api/guide/review-schedules', { headers: { Authorization: `Bearer ${token}` } });
+                const schedulesRes = await axios.get(`${SERVER_API_KEY}/api/guide/review-schedules`, { headers: { Authorization: `Bearer ${token}` } });
                 const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
                 const selectedProgramme = storedUser.programme;
                 let filtered = schedulesRes.data || [];

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const TeamFormation = () => {
     const [selectedMembers, setSelectedMembers] = useState([]);
     const [availableStudents, setAvailableStudents] = useState([]);
@@ -44,16 +46,16 @@ const TeamFormation = () => {
 
             // First, ensure team formation is open
             try {
-                await axios.post('http://localhost:5000/api/teams/ensure-formation-open');
+                await axios.post(`${SERVER_API_KEY}/api/teams/ensure-formation-open`);
             } catch (err) {
                 console.log('Could not ensure team formation is open:', err);
             }
     
             const [studentsRes, teamRes, configRes, configPublicRes, invitationsRes] = await Promise.all([
-                axios.get('http://localhost:5000/api/teams/available-students', {
+                axios.get(`${SERVER_API_KEY}/api/teams/available-students`, {
                     headers: { Authorization: `Bearer ${token}` }
                 }),
-                axios.get('http://localhost:5000/api/teams/my-team', {
+                axios.get(`${SERVER_API_KEY}/api/teams/my-team`, {
                     headers: { Authorization: `Bearer ${token}` }
                 }).catch(err => {
                     if (err.response?.status === 404) {
@@ -61,11 +63,11 @@ const TeamFormation = () => {
                     }
                     throw err;
                 }),
-                axios.get('http://localhost:5000/api/teams/max-team-size', { // Fetch max team size from new public endpoint
+                axios.get(`${SERVER_API_KEY}/api/teams/max-team-size`, { // Fetch max team size from new public endpoint
                     headers: { Authorization: `Bearer ${token}` }
                 }),
-                axios.get('http://localhost:5000/api/teams/config/public'),
-                axios.get('http://localhost:5000/api/teams/invitations', {
+                axios.get(`${SERVER_API_KEY}/api/teams/config/public`),
+                axios.get(`${SERVER_API_KEY}/api/teams/invitations`, {
                     headers: { Authorization: `Bearer ${token}` }
                 })
             ]);
@@ -107,7 +109,7 @@ const TeamFormation = () => {
                 return;
             }
 
-            await axios.post('http://localhost:5000/api/teams/respond-invitation', {
+            await axios.post(`${SERVER_API_KEY}/api/teams/respond-invitation`, {
                 teamId,
                 action
             }, {
@@ -152,7 +154,7 @@ const TeamFormation = () => {
                 return;
             }
 
-            await axios.post('http://localhost:5000/api/teams/create', {
+            await axios.post(`${SERVER_API_KEY}/api/teams/create`, {
                 members: selectedMembers.map(m => m._id)
             }, {
                 headers: { Authorization: `Bearer ${token}` }

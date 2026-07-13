@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/Dashboard.css';
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const GuideDashboard = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('requests');
@@ -27,7 +27,7 @@ const GuideDashboard = () => {
             const token = localStorage.getItem('token');
             
             // Fetch guide requests
-            const requestsResponse = await fetch('http://localhost:5000/api/guide/requests', {
+            const requestsResponse = await fetch(`${SERVER_API_KEY}/api/guide/requests`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -41,7 +41,7 @@ const GuideDashboard = () => {
             setGuideRequests(requestsData);
 
             // Fetch assigned teams
-            const teamsResponse = await fetch('http://localhost:5000/api/guide/assigned-teams', {
+            const teamsResponse = await fetch(`${SERVER_API_KEY}/api/guide/assigned-teams`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -65,7 +65,7 @@ const GuideDashboard = () => {
     const handleRequestAction = async (teamId, action) => {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`http://localhost:5000/api/guide/requests/${teamId}/${action}`, {
+            const response = await fetch(`${SERVER_API_KEY}/api/guide/requests/${teamId}/${action}`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -87,7 +87,7 @@ const GuideDashboard = () => {
     const handleTeamAction = async (teamId, action) => {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`http://localhost:5000/api/guide/teams/${teamId}/${action}`, {
+            const response = await fetch(`${SERVER_API_KEY}/api/guide/teams/${teamId}/${action}`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,

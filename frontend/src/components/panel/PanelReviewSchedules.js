@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const PanelReviewSchedules = () => {
     const [user, setUser] = useState(null);
     const [reviewSchedules, setReviewSchedules] = useState([]);
@@ -19,8 +21,8 @@ const PanelReviewSchedules = () => {
         try {
             const token = localStorage.getItem('token');
             const [schedulesRes, userRes] = await Promise.all([
-                axios.get('/api/panels/review-schedules', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('/api/auth/profile', { headers: { Authorization: `Bearer ${token}` } })
+                axios.get(`${SERVER_API_KEY}/api/panels/review-schedules`, { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get(`${SERVER_API_KEY}/api/auth/profile`, { headers: { Authorization: `Bearer ${token}` } })
             ]);
             const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
             const selectedProgramme = storedUser.programme;

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const PanelAssignedTeams = () => {
     const [assignedTeams, setAssignedTeams] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -50,7 +52,7 @@ const PanelAssignedTeams = () => {
             console.log('🔍 Testing token with debug endpoint...');
             console.log('🔍 Full token:', token);
             try {
-                const debugResponse = await axios.get('http://localhost:5000/api/panels/debug-token', {
+                const debugResponse = await axios.get(`${SERVER_API_KEY}/api/panels/debug-token`, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
@@ -63,7 +65,7 @@ const PanelAssignedTeams = () => {
             }
 
             console.log('🚀 Making request to /api/panels/assigned-teams');
-            const response = await axios.get('http://localhost:5000/api/panels/assigned-teams', {
+            const response = await axios.get(`${SERVER_API_KEY}/api/panels/assigned-teams`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'

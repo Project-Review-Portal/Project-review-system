@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import '../../styles/TeamApproval.css'; // Import new CSS
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const TeamApproval = () => {
     const [teams, setTeams] = useState([]);
     const [message, setMessage] = useState('');
@@ -12,7 +12,7 @@ const TeamApproval = () => {
             const token = localStorage.getItem('token');
             // We're using the existing panel-assignment endpoint that returns teams
             // as there's no specific 'get all teams' or 'get pending teams' route for admin
-            const response = await axios.get('http://localhost:5000/api/panel-assignments/panels-teams', {
+            const response = await axios.get(`${SERVER_API_KEY}/api/panel-assignments/panels-teams`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             // Filter for pending teams on the frontend
@@ -34,7 +34,7 @@ const TeamApproval = () => {
         setMessage(''); // Clear previous messages
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.post('http://localhost:5000/api/admin/approve-reject-team',
+            const response = await axios.post(`${SERVER_API_KEY}/api/admin/approve-reject-team`,
                 { teamId, status },
                 { headers: { Authorization: `Bearer ${token}` } }
             );

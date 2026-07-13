@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const ProgrammeManagement = () => {
     const [programmes, setProgrammes] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -28,7 +30,7 @@ const ProgrammeManagement = () => {
     const fetchProgrammes = async () => {
         setLoading(true);
         try {
-            const res = await axios.get('/api/programmes', { headers });
+            const res = await axios.get(`${SERVER_API_KEY}/api/programmes`, { headers });
             setProgrammes(res.data || []);
         } catch (err) {
             setMessage(err.response?.data?.message || 'Error fetching programmes');
@@ -67,7 +69,7 @@ const ProgrammeManagement = () => {
             }
             try {
                 setLoading(true);
-                const res = await axios.post('/api/programmes/bulk', { names }, { headers });
+                const res = await axios.post(`${SERVER_API_KEY}/api/programmes/bulk`, { names }, { headers });
                 setMessage(res.data.message);
                 setMessageType('success');
                 await fetchProgrammes();
@@ -91,7 +93,7 @@ const ProgrammeManagement = () => {
         }
         try {
             setLoading(true);
-            const res = await axios.post('/api/programmes', { name: newName.trim() }, { headers });
+            const res = await axios.post(`${SERVER_API_KEY}/api/programmes`, { name: newName.trim() }, { headers });
             setMessage(res.data.message);
             setMessageType('success');
             setNewName('');
@@ -117,7 +119,7 @@ const ProgrammeManagement = () => {
         }
         try {
             setLoading(true);
-            const res = await axios.put(`/api/programmes/${editingId}`, { name: editingName.trim() }, { headers });
+            const res = await axios.put(`${SERVER_API_KEY}/api/programmes/${editingId}`, { name: editingName.trim() }, { headers });
             setMessage(res.data.message);
             setMessageType('success');
             setEditingId(null);
@@ -135,7 +137,7 @@ const ProgrammeManagement = () => {
         if (!window.confirm(`Delete programme "${name}"? This will NOT delete students already uploaded for it.`)) return;
         try {
             setLoading(true);
-            const res = await axios.delete(`/api/programmes/${id}`, { headers });
+            const res = await axios.delete(`${SERVER_API_KEY}/api/programmes/${id}`, { headers });
             setMessage(res.data.message);
             setMessageType('success');
             await fetchProgrammes();

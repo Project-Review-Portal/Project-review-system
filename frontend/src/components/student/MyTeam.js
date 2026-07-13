@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const MyTeam = () => {
     const [team, setTeam] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -32,7 +34,7 @@ const MyTeam = () => {
             }
 
             const [teamRes, sizeRes, studentsRes] = await Promise.all([
-                axios.get('http://localhost:5000/api/teams/my-team', {
+                axios.get(`${SERVER_API_KEY}/api/teams/my-team`, {
                     headers: { Authorization: `Bearer ${token}` }
                 }).catch(err => {
                     if (err.response && err.response.status === 404) {
@@ -40,10 +42,10 @@ const MyTeam = () => {
                     }
                     throw err;
                 }),
-                axios.get('http://localhost:5000/api/teams/max-team-size', {
+                axios.get(`${SERVER_API_KEY}/api/teams/max-team-size`, {
                     headers: { Authorization: `Bearer ${token}` }
                 }),
-                axios.get('http://localhost:5000/api/teams/available-students', {
+                axios.get(`${SERVER_API_KEY}/api/teams/available-students`, {
                     headers: { Authorization: `Bearer ${token}` }
                 })
             ]);
@@ -92,7 +94,7 @@ const MyTeam = () => {
         setInviteSuccess('');
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post('http://localhost:5000/api/teams/invite', {
+            const res = await axios.post(`${SERVER_API_KEY}/api/teams/invite`, {
                 studentId
             }, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -113,7 +115,7 @@ const MyTeam = () => {
         }
         try {
             const token = localStorage.getItem('token');
-            await axios.post('http://localhost:5000/api/teams/remove-member', {
+            await axios.post(`${SERVER_API_KEY}/api/teams/remove-member`, {
                 studentId
             }, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -131,7 +133,7 @@ const MyTeam = () => {
         }
         try {
             const token = localStorage.getItem('token');
-            await axios.delete('http://localhost:5000/api/teams/my-team', {
+            await axios.delete(`${SERVER_API_KEY}/api/teams/my-team`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             alert('Team disbanded successfully!');
@@ -155,7 +157,7 @@ const MyTeam = () => {
         }
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post('http://localhost:5000/api/teams/request-lock', {}, {
+            const res = await axios.post(`${SERVER_API_KEY}/api/teams/request-lock`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setInviteSuccess(res.data.message || 'Lock operation completed successfully!');

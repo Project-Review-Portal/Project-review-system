@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const PanelManagement = ({ panelType = 'review', programme }) => {
     const [panels, setPanels] = useState([]);
     const [allFaculty, setAllFaculty] = useState([]); // All potential faculty (guides, panel members)
@@ -50,15 +52,15 @@ const PanelManagement = ({ panelType = 'review', programme }) => {
 
             // Fetch all panels of the specific type, filtered by programme if provided
             const progParam = programme ? `&programme=${encodeURIComponent(programme)}` : '';
-            const panelsRes = await axios.get(`/api/panels?panelType=${panelType}${progParam}`, { headers });
+            const panelsRes = await axios.get(`${SERVER_API_KEY}/api/panels?panelType=${panelType}${progParam}`, { headers });
             setPanels(panelsRes.data);
 
             // Fetch all faculty (guides and panel members)
-            const facultyRes = await axios.get('/api/auth/faculty', { headers });
+            const facultyRes = await axios.get(`${SERVER_API_KEY}/api/auth/faculty`, { headers });
             setAllFaculty(facultyRes.data);
 
             // Fetch all faculty for coordinator selection
-            const facultyListRes = await axios.get('/api/admin/faculty-list', { headers });
+            const facultyListRes = await axios.get(`${SERVER_API_KEY}/api/admin/faculty-list`, { headers });
             setCoordinators(facultyListRes.data);
 
         } catch (err) {
@@ -118,10 +120,10 @@ const PanelManagement = ({ panelType = 'review', programme }) => {
             const headers = { Authorization: `Bearer ${token}` };
 
             if (editingPanelId) {
-                await axios.put(`/api/panels/${editingPanelId}`, panelData, { headers });
+                await axios.put(`${SERVER_API_KEY}/api/panels/${editingPanelId}`, panelData, { headers });
                 setMessage('Panel updated successfully!');
             } else {
-                await axios.post('/api/panels', panelData, { headers });
+                await axios.post(`${SERVER_API_KEY}/api/panels`, panelData, { headers });
                 setMessage('Panel created successfully!');
             }
             handleClearForm();
@@ -153,7 +155,7 @@ const PanelManagement = ({ panelType = 'review', programme }) => {
             try {
                 const token = localStorage.getItem('token');
                 const headers = { Authorization: `Bearer ${token}` };
-                await axios.delete(`/api/panels/${panelId}`, { headers });
+                await axios.delete(`${SERVER_API_KEY}/api/panels/${panelId}`, { headers });
                 setMessage('Panel deleted successfully!');
                 fetchData();
             } catch (err) {

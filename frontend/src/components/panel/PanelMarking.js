@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const PanelMarking = () => {
     const [teams, setTeams] = useState([]);
     const [marks, setMarks] = useState({}); // { studentId: { review1:{}, review2:{}, review3:{}, viva:{} } }
@@ -22,7 +24,7 @@ const PanelMarking = () => {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
 
-            const settingsRes = await axios.get('/api/auth/review-settings', { headers });
+            const settingsRes = await axios.get(`${SERVER_API_KEY}/api/auth/review-settings`, { headers });
             const validSlots = (settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva']).filter(s => s !== 'review0');
             
             const dynamicSlots = isExternal ? validSlots.filter(s => s === 'viva') : validSlots;
@@ -32,7 +34,7 @@ const PanelMarking = () => {
                 setActiveSlotType(dynamicSlots.includes(activeSlotType) ? activeSlotType : dynamicSlots[0]);
             }
 
-            const teamsRes = await axios.get('/api/panels/assigned-teams', { headers });
+            const teamsRes = await axios.get(`${SERVER_API_KEY}/api/panels/assigned-teams`, { headers });
             const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
             const selectedProgramme = storedUser.programme;
             let fetchedTeams = teamsRes.data || [];
@@ -41,7 +43,7 @@ const PanelMarking = () => {
             }
             setTeams(fetchedTeams);
 
-            const marksRes = await axios.get('/api/panels/marks', { headers });
+            const marksRes = await axios.get(`${SERVER_API_KEY}/api/panels/marks`, { headers });
             setMarks(marksRes.data);
             setLoading(false);
         } catch (err) {
@@ -75,7 +77,7 @@ const PanelMarking = () => {
                 const studentId = stu._id;
                 const studentMarks = ((marks[studentId] || {})[activeSlotType]) || {};
                 const { mark1 = 0, mark2 = 0, mark3 = 0, mark4 = 0 } = studentMarks;
-                return axios.post('/api/panels/marks', { teamId: team._id, studentId, mark1, mark2, mark3, mark4, slotType: activeSlotType }, { headers });
+                return axios.post(`${SERVER_API_KEY}/api/panels/marks`, { teamId: team._id, studentId, mark1, mark2, mark3, mark4, slotType: activeSlotType }, { headers });
             });
             await Promise.all(requests);
             alert('All marks submitted successfully!');

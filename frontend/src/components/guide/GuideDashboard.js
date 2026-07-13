@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const GuideDashboard = () => {
   const [teamFormationOpen, setTeamFormationOpen] = useState(true);
   const [guideSelectionStart, setGuideSelectionStart] = useState(null);
@@ -12,11 +14,11 @@ const GuideDashboard = () => {
     const fetchRules = async () => {
       try {
         const token = localStorage.getItem('token');
-        const configRes = await fetch('http://localhost:5000/api/teams/config/public');
+        const configRes = await fetch(`${SERVER_API_KEY}/api/teams/config/public`);
         const configData = await configRes.json();
         setTeamFormationOpen(configData.teamFormationOpen);
         if (token) {
-          const guideDatesRes = await fetch('http://localhost:5000/api/guide/selection-dates', {
+          const guideDatesRes = await fetch(`${SERVER_API_KEY}/api/guide/selection-dates`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (guideDatesRes.ok) {

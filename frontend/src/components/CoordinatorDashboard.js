@@ -10,7 +10,7 @@ import GuideMe from './GuideMe';
 import CoordinatorLetterLiveEditorCK from './CoordinatorLetterLiveEditorCK';
 import GuideUploadAttendance from './guide/GuideUploadAttendance';
 import CoordinatorVivaPanelFormation from './coordinator/CoordinatorVivaPanelFormation';
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const CoordinatorRulesDashboard = () => {
     const [teamFormationOpen, setTeamFormationOpen] = useState(true);
     const navigate = useNavigate();
@@ -27,11 +27,11 @@ const CoordinatorRulesDashboard = () => {
         const fetchRules = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const configRes = await fetch('http://localhost:5000/api/teams/config/public');
+                const configRes = await fetch(`${SERVER_API_KEY}/api/teams/config/public`);
                 const configData = await configRes.json();
                 setTeamFormationOpen(configData.teamFormationOpen);
                 if (token) {
-                    const guideDatesRes = await fetch('http://localhost:5000/api/guide/selection-dates', {
+                    const guideDatesRes = await fetch(`${SERVER_API_KEY}/api/guide/selection-dates`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
                     if (guideDatesRes.ok) {
@@ -53,7 +53,7 @@ const CoordinatorRulesDashboard = () => {
         setLoadingPanel(true);
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:5000/api/panels/coordinator/panel-status', {
+            const response = await fetch(`${SERVER_API_KEY}/api/panels/coordinator/panel-status`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const data = await response.json();
@@ -70,7 +70,7 @@ const CoordinatorRulesDashboard = () => {
         setLoadingAuth(true);
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:5000/api/panels/coordinator/debug-auth', {
+            const response = await fetch(`${SERVER_API_KEY}/api/panels/coordinator/debug-auth`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const data = await response.json();

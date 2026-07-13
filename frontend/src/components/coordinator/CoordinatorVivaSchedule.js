@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626"; 
 const DURATION_OPTIONS = [15, 20, 30, 45, 60];
 
 const CoordinatorVivaSchedule = () => {
@@ -36,7 +36,7 @@ const CoordinatorVivaSchedule = () => {
   const fetchSettings = async () => {
     try {
       const token = localStorage.getItem('token');
-      const settingsRes = await axios.get('http://localhost:5000/api/auth/review-settings', {
+      const settingsRes = await axios.get(`${SERVER_API_KEY}/api/auth/review-settings`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const validSlots = settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva'];
@@ -90,7 +90,7 @@ const CoordinatorVivaSchedule = () => {
       const token = localStorage.getItem('token');
       // Fetch teams and slots as before
       const res = await axios.post(
-        'http://localhost:5000/api/panels/coordinator/generate-slots',
+        `${SERVER_API_KEY}/api/panels/coordinator/generate-slots`,
         {
           slotType: 'viva',
           date: form.date,
@@ -108,7 +108,7 @@ const CoordinatorVivaSchedule = () => {
       const reviews = slotTypes.filter(s => s !== 'viva');
       const attendanceRequests = reviews.map(reviewType => {
         return axios.post(
-          'http://localhost:5000/api/panels/attendance/check',
+          `${SERVER_API_KEY}/api/panels/attendance/check`,
           {
             teamIds: res.data.teams.map(t => t._id),
             reviewType: reviewType,
@@ -170,7 +170,7 @@ const CoordinatorVivaSchedule = () => {
         usedSlots.add(slotKey);
       }
       await axios.post(
-        'http://localhost:5000/api/panels/coordinator/assign-slots',
+        `${SERVER_API_KEY}/api/panels/coordinator/assign-slots`,
         {
           slotType: 'viva',
           date: form.date,
@@ -198,7 +198,7 @@ const CoordinatorVivaSchedule = () => {
       setLoadingSchedules(true);
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get('http://localhost:5000/api/panels/coordinator/allotted-schedules', {
+        const res = await axios.get(`${SERVER_API_KEY}/api/panels/coordinator/allotted-schedules`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setAllottedSchedules(res.data.filter(s => s.slotType === 'viva'));

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const GuideRequestManagement = () => {
     const [user, setUser] = useState(null);
     const [guideSelectionDates, setGuideSelectionDates] = useState({ startDate: null, endDate: null });
@@ -37,7 +39,7 @@ const GuideRequestManagement = () => {
             const headers = { Authorization: `Bearer ${token}` };
 
             // Fetch guide selection dates from the new public endpoint
-            const datesRes = await axios.get('http://localhost:5000/api/guide/selection-dates', { headers });
+            const datesRes = await axios.get(`${SERVER_API_KEY}/api/guide/selection-dates`, { headers });
             const { startDate, endDate } = datesRes.data;
             setGuideSelectionDates({ startDate, endDate });
             const now = new Date();
@@ -47,7 +49,7 @@ const GuideRequestManagement = () => {
             setIsRequestPeriodActive(activePeriod);
 
             // Fetch user's team and existing request
-            const teamRes = await axios.get('http://localhost:5000/api/teams/my-team', { headers });
+            const teamRes = await axios.get(`${SERVER_API_KEY}/api/teams/my-team`, { headers });
             setMyTeam(teamRes.data);
             console.log('--- fetchData Debug ---'); // Added debug separator
             console.log('fetchData: myTeam after fetch:', teamRes.data); // Debug log
@@ -67,7 +69,7 @@ const GuideRequestManagement = () => {
             if (teamRes.data && teamRes.data.teamLeader && teamRes.data.teamLeader._id && currentUser?.id && teamRes.data.teamLeader._id === currentUser.id && activePeriod) { 
                 // Only fetch guides if there's no current accepted/pending request, or if it's rejected
                 if (!teamRes.data.guidePreference || teamRes.data.status === 'rejected') {
-                    const guidesRes = await axios.get('http://localhost:5000/api/teams/guides', { headers });
+                    const guidesRes = await axios.get(`${SERVER_API_KEY}/api/teams/guides`, { headers });
                     setGuides(guidesRes.data);
                 } else {
                     setGuides([]); // Clear guides if there's an active request
@@ -116,7 +118,7 @@ const GuideRequestManagement = () => {
             const headers = { Authorization: `Bearer ${token}` };
             
             console.log('Sending POST request to /api/teams/request-guide with guideId:', guideId); // Debug log
-            await axios.post('http://localhost:5000/api/teams/request-guide', { guideId }, { headers });
+            await axios.post(`${SERVER_API_KEY}/api/teams/request-guide`, { guideId }, { headers });
             setMessage('Guide request sent successfully!');
             console.log('Request sent successfully, re-fetching data.'); // Debug log
             fetchData(user); // Re-fetch data to update request status
@@ -140,7 +142,7 @@ const GuideRequestManagement = () => {
                 return;
             }
             const headers = { Authorization: `Bearer ${token}` };
-            await axios.post('http://localhost:5000/api/teams/cancel-guide-request', {}, { headers });
+            await axios.post(`${SERVER_API_KEY}/api/teams/cancel-guide-request`, {}, { headers });
             setMessage('Guide request cancelled successfully!');
             fetchData(user);
         } catch (err) {

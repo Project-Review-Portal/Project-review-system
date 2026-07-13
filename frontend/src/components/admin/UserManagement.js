@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
     const [facultyFile, setFacultyFile] = useState(null);
     const [studentFile, setStudentFile] = useState(null);
@@ -35,7 +37,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
     useEffect(() => {
         const fetchLimitsOnMount = async () => {
             try {
-                const response = await axios.get('/api/admin/designation-team-limits', { headers });
+                const response = await axios.get(`${SERVER_API_KEY}/api/admin/designation-team-limits`, { headers });
                 const limits = response.data.map((item) => ({
                     designation: item.designation,
                     ugLimit: item.ugLimit,
@@ -108,7 +110,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
                 seniority: newFaculty.seniority ? Number(newFaculty.seniority) : null
             }];
 
-            await axios.post('/api/admin/upload-faculty', { facultyData: payload }, { headers });
+            await axios.post(`${SERVER_API_KEY}/api/admin/upload-faculty`, { facultyData: payload }, { headers });
             setMessage('Faculty member added successfully!');
             setMessageType('success');
             
@@ -226,7 +228,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
     const fetchDesignationLimits = async () => {
         setLoading(true);
         try {
-            const response = await axios.get('/api/admin/designation-team-limits', { headers });
+            const response = await axios.get(`${SERVER_API_KEY}/api/admin/designation-team-limits`, { headers });
             const limits = response.data.map((item) => ({
                 designation: item.designation,
                 ugLimit: item.ugLimit,
@@ -259,7 +261,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
         setLimitMessage('');
         setLimitMessageType('');
         try {
-            await axios.delete('/api/admin/designation-team-limits/all', { headers });
+            await axios.delete(`${SERVER_API_KEY}/api/admin/designation-team-limits/all`, { headers });
             setDesignationLimits([]);
             setLimitMessage('All designation team limits deleted successfully.');
             setLimitMessageType('success');
@@ -299,7 +301,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
                 pgLimit: Number(item.pgLimit)
             }));
 
-            await axios.post('/api/admin/designation-team-limits', { limits: payload }, { headers });
+            await axios.post(`${SERVER_API_KEY}/api/admin/designation-team-limits`, { limits: payload }, { headers });
             setLimitsSaved(true);
             setLimitMessage('Designation team limits saved successfully');
             setLimitMessageType('success');
@@ -338,7 +340,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
         if (limitsSaved) {
             setLoading(true);
             try {
-                await axios.delete(`/api/admin/designation-team-limits/${encodeURIComponent(row.designation)}`, { headers });
+                await axios.delete(`${SERVER_API_KEY}/api/admin/designation-team-limits/${encodeURIComponent(row.designation)}`, { headers });
                 setDesignationLimits((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
                 setLimitMessage('Designation team limit deleted successfully');
                 setLimitMessageType('success');
@@ -407,7 +409,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
         try {
             // Include username mapped from email for backend compatibility
             const payload = facultyData.map(f => ({ ...f, username: f.email_id }));
-            const response = await axios.post('/api/admin/upload-faculty', { facultyData: payload }, { headers });
+            const response = await axios.post(`${SERVER_API_KEY}/api/admin/upload-faculty`, { facultyData: payload }, { headers });
             setMessage(`Successfully uploaded ${response.data.count} faculty members`);
             setMessageType('success');
             // Refresh list from server so the page shows the new faculty
@@ -435,7 +437,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
             // Include email for students and also provide username if backend expects it
             const payload = studentData.map(s => ({ ...s, username: s.regno, email: s.email_id }));
             // Pass the programme context so backend tags students correctly
-            const response = await axios.post('/api/admin/upload-students', { studentData: payload, programme: programme || 'UG' }, { headers });
+            const response = await axios.post(`${SERVER_API_KEY}/api/admin/upload-students`, { studentData: payload, programme: programme || 'UG' }, { headers });
             setMessage(`Successfully uploaded ${response.data.count} students`);
             setMessageType('success');
             // Refresh list from server so the page shows the new students
@@ -454,7 +456,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
     const updateFaculty = async (index) => {
         setLoading(true);
         try {
-            const response = await axios.put(`/api/admin/update-faculty/${facultyData[index].email_id}`, 
+            const response = await axios.put(`${SERVER_API_KEY}/api/admin/update-faculty/${facultyData[index].email_id}`, 
                 facultyData[index], { headers });
             setMessage('Faculty member updated successfully');
             setMessageType('success');
@@ -470,7 +472,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
     const updateStudent = async (index) => {
         setLoading(true);
         try {
-            const response = await axios.put(`/api/admin/update-student/${studentData[index].regno}`, 
+            const response = await axios.put(`${SERVER_API_KEY}/api/admin/update-student/${studentData[index].regno}`, 
                 studentData[index], { headers });
             setMessage('Student updated successfully');
             setMessageType('success');
@@ -488,7 +490,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
 
         setLoading(true);
         try {
-            await axios.delete(`/api/admin/delete-faculty/${emailId}`, { headers });
+            await axios.delete(`${SERVER_API_KEY}/api/admin/delete-faculty/${emailId}`, { headers });
             setFacultyData(facultyData.filter(f => f.email_id !== emailId));
             setMessage('Faculty member deleted successfully');
             setMessageType('success');
@@ -505,7 +507,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
         if (!window.confirm('Are you sure you want to DELETE ALL faculty users? This action cannot be undone.')) return;
         setLoading(true);
         try {
-            await axios.delete('/api/admin/faculty', { headers });
+            await axios.delete(`${SERVER_API_KEY}/api/admin/faculty`, { headers });
             setFacultyData([]);
             setMessage('All faculty users deleted successfully');
             setMessageType('success');
@@ -522,7 +524,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
 
         setLoading(true);
         try {
-            await axios.delete(`/api/admin/delete-student/${regno}`, { headers });
+            await axios.delete(`${SERVER_API_KEY}/api/admin/delete-student/${regno}`, { headers });
             setStudentData(studentData.filter(s => s.regno !== regno));
             setMessage('Student deleted successfully');
             setMessageType('success');
@@ -539,7 +541,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
         if (!window.confirm('Are you sure you want to DELETE ALL student users? This action cannot be undone.')) return;
         setLoading(true);
         try {
-            await axios.delete('/api/admin/students', { headers });
+            await axios.delete(`${SERVER_API_KEY}/api/admin/students`, { headers });
             setStudentData([]);
             setMessage('All student users deleted successfully');
             setMessageType('success');
@@ -554,7 +556,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
     const fetchFacultyList = async () => {
         setLoading(true);
         try {
-            const response = await axios.get('/api/admin/faculty-list?includeExternal=true', { headers });
+            const response = await axios.get(`${SERVER_API_KEY}/api/admin/faculty-list?includeExternal=true`, { headers });
             setFacultyData(response.data.map(f => ({
                 seniority: f.seniority || '',
                 email_id: f.email || f.username || '',
@@ -581,7 +583,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
         setLoading(true);
         try {
             const progParam = programme ? `?programme=${encodeURIComponent(programme)}` : '';
-            const response = await axios.get(`/api/admin/student-list${progParam}`, { headers });
+            const response = await axios.get(`${SERVER_API_KEY}/api/admin/student-list${progParam}`, { headers });
             setStudentData(response.data.map(s => ({ 
                 regno: s.username, 
                 name: s.name,

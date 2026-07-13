@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const GuideUploadAttendance = ({ programme }) => {
     const [assignedTeams, setAssignedTeams] = useState([]);
     const [userRole, setUserRole] = useState(null);
@@ -41,11 +43,11 @@ const GuideUploadAttendance = ({ programme }) => {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
 
-            const settingsRes = await axios.get('/api/auth/review-settings', { headers });
+            const settingsRes = await axios.get(`${SERVER_API_KEY}/api/auth/review-settings`, { headers });
             const validSlots = settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva'];
             setReviewEvents(validSlots);
 
-            const teamsRes = await axios.get('/api/guide/assigned-teams', { headers });
+            const teamsRes = await axios.get(`${SERVER_API_KEY}/api/guide/assigned-teams`, { headers });
             const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
             const selectedProgramme = programme || storedUser.programme;
             let fetchedTeams = teamsRes.data;
@@ -54,7 +56,7 @@ const GuideUploadAttendance = ({ programme }) => {
             }
             setAssignedTeams(fetchedTeams);
 
-            const existingAttendanceRes = await axios.get('/api/guide/daily-attendance', { headers });
+            const existingAttendanceRes = await axios.get(`${SERVER_API_KEY}/api/guide/daily-attendance`, { headers });
             if (existingAttendanceRes.data && existingAttendanceRes.data.attendanceData) {
                 setAttendanceData(existingAttendanceRes.data.attendanceData);
                 setReviewDates(existingAttendanceRes.data.reviewDates || {});
@@ -131,7 +133,7 @@ const GuideUploadAttendance = ({ programme }) => {
             }));
 
             // Sends the restructured array matching Mongoose schema
-            await axios.post('/api/guide/upload-attendance', { 
+            await axios.post(`${SERVER_API_KEY}/api/guide/upload-attendance`, { 
                 teamId, 
                 studentAttendances,
                 reviewDates: formattedDates

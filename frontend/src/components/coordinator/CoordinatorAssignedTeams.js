@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626"; 
 const CoordinatorAssignedTeams = () => {
     const [teams, setTeams] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -16,7 +16,7 @@ const CoordinatorAssignedTeams = () => {
                     setLoading(false);
                     return;
                 }
-                const res = await axios.get('http://localhost:5000/api/panels/assigned-teams', {
+                const res = await axios.get(`${SERVER_API_KEY}/api/panels/assigned-teams`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 const storedUser = JSON.parse(localStorage.getItem('user') || '{}');

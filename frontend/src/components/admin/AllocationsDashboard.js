@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const AllocationsDashboard = ({ programme }) => {
     const [teams, setTeams] = useState([]);
     const [guides, setGuides] = useState([]);
@@ -45,9 +47,9 @@ const AllocationsDashboard = ({ programme }) => {
         try {
             const progParam = programme ? `?programme=${encodeURIComponent(programme)}` : '';
             const [teamsRes, facultyRes, panelsRes] = await Promise.all([
-                axios.get(`/api/admin/teams${progParam}`, { headers }),
-                axios.get('/api/auth/faculty', { headers }),
-                axios.get('/api/panels', { headers })
+                axios.get(`${SERVER_API_KEY}/api/admin/teams${progParam}`, { headers }),
+                axios.get(`${SERVER_API_KEY}/api/auth/faculty`, { headers }),
+                axios.get(`${SERVER_API_KEY}/api/panels`, { headers })
             ]);
 
             const allTeams = teamsRes.data || [];
@@ -209,7 +211,7 @@ const AllocationsDashboard = ({ programme }) => {
             const results = await Promise.all(
                 modifiedTeamIds.map(async (teamId) => {
                     const { guideId, panelId, vivaPanelId } = allocations[teamId];
-                    const res = await axios.put(`/api/admin/allocations/${teamId}`, {
+                    const res = await axios.put(`${SERVER_API_KEY}/api/admin/allocations/${teamId}`, {
                         guideId: guideId || null,
                         panelId: panelId || null,
                         vivaPanelId: vivaPanelId || null
@@ -265,7 +267,7 @@ const AllocationsDashboard = ({ programme }) => {
         setError('');
         setMessage('');
         try {
-            await axios.delete(`/api/admin/teams/${teamId}`, { headers });
+            await axios.delete(`${SERVER_API_KEY}/api/admin/teams/${teamId}`, { headers });
             setMessage('Team successfully removed and deleted.');
             setTimeout(() => setMessage(''), 5000);
             fetchData();
@@ -279,7 +281,7 @@ const AllocationsDashboard = ({ programme }) => {
         setAutoAssigning(true);
         setError('');
         try {
-            const res = await axios.post('/api/admin/auto-assign-guides', { programme }, { headers });
+            const res = await axios.post(`${SERVER_API_KEY}/api/admin/auto-assign-guides`, { programme }, { headers });
             setWarningModalSummary({
                 title: 'Guide Auto-Assignment Complete',
                 message: res.data.message,
@@ -299,7 +301,7 @@ const AllocationsDashboard = ({ programme }) => {
         setAutoAssigning(true);
         setError('');
         try {
-            const res = await axios.post('/api/admin/auto-assign-panels', { panelType: type, programme }, { headers });
+            const res = await axios.post(`${SERVER_API_KEY}/api/admin/auto-assign-panels`, { panelType: type, programme }, { headers });
             setWarningModalSummary({
                 title: `${type === 'viva' ? 'Viva Panel' : 'Review Panel'} Auto-Assignment Complete`,
                 message: res.data.message,

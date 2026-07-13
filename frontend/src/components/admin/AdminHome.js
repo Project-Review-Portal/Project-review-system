@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const AdminHome = () => {
     const [programmes, setProgrammes] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -14,7 +16,7 @@ const AdminHome = () => {
     const fetchProgrammes = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('/api/programmes', { headers: { Authorization: `Bearer ${token}` } });
+            const res = await axios.get(`${SERVER_API_KEY}/api/programmes`, { headers: { Authorization: `Bearer ${token}` } });
             setProgrammes(res.data || []);
         } catch (err) {
             console.error('Error fetching programmes:', err);

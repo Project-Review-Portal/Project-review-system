@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const GuideMyTeams = () => {
     const [approvedTeams, setApprovedTeams] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -22,7 +24,7 @@ const GuideMyTeams = () => {
             }
             const headers = { Authorization: `Bearer ${token}` };
             // Use endpoint that returns only approved teams with panel populated
-            const res = await axios.get('http://localhost:5000/api/guide/approved-teams', { headers });
+            const res = await axios.get(`${SERVER_API_KEY}/api/guide/approved-teams`, { headers });
             const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
             const selectedProgramme = storedUser.programme;
             let fetchedTeams = res.data || [];

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const AdminManageReviewSchedules = ({ programme }) => {
     const [panels, setPanels] = useState([]);
     const [teams, setTeams] = useState([]);
@@ -29,11 +31,11 @@ const AdminManageReviewSchedules = ({ programme }) => {
             const token = localStorage.getItem('token');
             const progParam = programme ? `?programme=${encodeURIComponent(programme)}` : '';
             const [panelsRes, teamsRes, schedulesRes, reviewPeriodRes, settingsRes] = await Promise.all([
-                axios.get(`/api/admin/panels-with-members${progParam}`, { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get(`/api/admin/teams${progParam}`, { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get(`/api/admin/review-schedules${progParam}`, { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('/api/admin/review-period-dates', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('/api/auth/review-settings', { headers: { Authorization: `Bearer ${token}` } })
+                axios.get(`${SERVER_API_KEY}/api/admin/panels-with-members${progParam}`, { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get(`${SERVER_API_KEY}/api/admin/teams${progParam}`, { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get(`${SERVER_API_KEY}/api/admin/review-schedules${progParam}`, { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get(`${SERVER_API_KEY}/api/admin/review-period-dates`, { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get(`${SERVER_API_KEY}/api/auth/review-settings`, { headers: { Authorization: `Bearer ${token}` } })
             ]);
 
             console.log('Raw Teams Data:', teamsRes.data);
@@ -56,7 +58,7 @@ const AdminManageReviewSchedules = ({ programme }) => {
         e.preventDefault();
         try {
             const token = localStorage.getItem('token');
-            await axios.post('/api/admin/review-period-dates', {
+            await axios.post(`${SERVER_API_KEY}/api/admin/review-period-dates`, {
                 startDate: reviewPeriodStart,
                 endDate: reviewPeriodEnd
             }, {
@@ -77,7 +79,7 @@ const AdminManageReviewSchedules = ({ programme }) => {
         setIsGeneratingSchedule(true);
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.post('/api/admin/generate-schedules', { programme: programme || 'UG' }, {
+            const response = await axios.post(`${SERVER_API_KEY}/api/admin/generate-schedules`, { programme: programme || 'UG' }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setSuccessMessage(response.data.message);
@@ -94,7 +96,7 @@ const AdminManageReviewSchedules = ({ programme }) => {
     const handleSendNotification = async (scheduleId) => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.post('/api/admin/send-schedule-notification', { scheduleId }, {
+            const response = await axios.post(`${SERVER_API_KEY}/api/admin/send-schedule-notification`, { scheduleId }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setNotificationMessage(response.data.message);

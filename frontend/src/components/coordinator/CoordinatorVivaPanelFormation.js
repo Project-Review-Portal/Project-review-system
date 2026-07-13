@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const CoordinatorVivaPanelFormation = () => {
     const [reviewPanel, setReviewPanel] = useState(null);
     const [, setVivaPanel] = useState(null);
@@ -34,7 +36,7 @@ const CoordinatorVivaPanelFormation = () => {
     const fetchPanelDetails = async () => {
         setLoading(true);
         try {
-            const response = await axios.get('/api/panels/coordinator/viva-panel', { headers });
+            const response = await axios.get(`${SERVER_API_KEY}/api/panels/coordinator/viva-panel`, { headers });
             setReviewPanel(response.data.reviewPanel);
             setVivaPanel(response.data.vivaPanel);
             
@@ -55,7 +57,7 @@ const CoordinatorVivaPanelFormation = () => {
 
     const fetchExternalFaculty = async () => {
         try {
-            const response = await axios.get('/api/admin/faculty-list?includeExternal=true', { headers });
+            const response = await axios.get(`${SERVER_API_KEY}/api/admin/faculty-list?includeExternal=true`, { headers });
             const externals = response.data.filter(f => f.memberType === 'external');
             setExternalFaculty(externals);
         } catch (error) {
@@ -92,7 +94,7 @@ const CoordinatorVivaPanelFormation = () => {
         setMessageType('');
         try {
             const externalMemberIds = assignedExternalMembers.map(m => m._id);
-            const response = await axios.post('/api/panels/coordinator/viva-panel', { externalMemberIds }, { headers });
+            const response = await axios.post(`${SERVER_API_KEY}/api/panels/coordinator/viva-panel`, { externalMemberIds }, { headers });
             setVivaPanel(response.data.vivaPanel);
             setMessage('Viva Panel updated and assigned to all panel teams successfully!');
             setMessageType('success');

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const Login = () => {
     const [formData, setFormData] = useState({
         email: '',
@@ -34,7 +34,7 @@ const Login = () => {
                 username: formData.email,
                 password: formData.password
             };
-            const res = await axios.post('http://localhost:5000/api/auth/login', payload);
+            const res = await axios.post(`${SERVER_API_KEY}/api/auth/login`, payload);
             localStorage.setItem('token', res.data.token);
             localStorage.setItem('user', JSON.stringify(res.data.user));
             
@@ -86,7 +86,7 @@ const Login = () => {
         setError('');
         setSuccess('');
         try {
-            await axios.post('http://localhost:5000/api/auth/forgot-password', { identifier });
+            await axios.post(`${SERVER_API_KEY}/api/auth/forgot-password`, { identifier });
             setSuccess('OTP sent to your email.');
             setMode('verify-otp');
         } catch (err) {
@@ -102,7 +102,7 @@ const Login = () => {
         setError('');
         setSuccess('');
         try {
-            await axios.post('http://localhost:5000/api/auth/verify-otp', { identifier, otp });
+            await axios.post(`${SERVER_API_KEY}/api/auth/verify-otp`, { identifier, otp });
             setSuccess('OTP verified.');
             setMode('reset');
         } catch (err) {
@@ -123,7 +123,7 @@ const Login = () => {
                 setLoading(false);
                 return;
             }
-            await axios.post('http://localhost:5000/api/auth/reset-password-otp', { identifier, otp, newPassword });
+            await axios.post(`${SERVER_API_KEY}/api/auth/reset-password-otp`, { identifier, otp, newPassword });
             setSuccess('Password reset successful. You can sign in now.');
             setMode('login');
             setFormData({ email: identifier, password: '' });
