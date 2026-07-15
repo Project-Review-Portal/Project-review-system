@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const GuideAssignmentManagement = () => {
     const [unassignedTeams, setUnassignedTeams] = useState([]);
     const [guidesWithCounts, setGuidesWithCounts] = useState([]);
@@ -30,11 +30,11 @@ const GuideAssignmentManagement = () => {
             const headers = { Authorization: `Bearer ${token}` };
 
             // Fetch summary of currently assigned teams (always fetch this)
-            const summaryRes = await axios.get('http://localhost:5000/api/admin/assigned-teams-summary', { headers });
+            const summaryRes = await axios.get(`${SERVER_API_KEY}/api/admin/assigned-teams-summary`, { headers });
             setAssignedTeamsSummary(summaryRes.data);
 
             // Fetch guide selection dates
-            const datesRes = await axios.get('http://localhost:5000/api/admin/guide-selection-dates', { headers });
+            const datesRes = await axios.get(`${SERVER_API_KEY}/api/admin/guide-selection-dates`, { headers });
             setGuideSelectionDates(datesRes.data);
 
             const now = new Date();
@@ -42,14 +42,14 @@ const GuideAssignmentManagement = () => {
 
             if (selectionEndDate && now > selectionEndDate) {
                 // Fetch unassigned teams
-                const teamsRes = await axios.get('http://localhost:5000/api/admin/unassigned-teams', { headers });
+                const teamsRes = await axios.get(`${SERVER_API_KEY}/api/admin/unassigned-teams`, { headers });
                 setUnassignedTeams(teamsRes.data);
 
                 // Fetch guides with team counts
-                const guidesRes = await axios.get('http://localhost:5000/api/admin/guides-with-team-counts', { headers });
+                const guidesRes = await axios.get(`${SERVER_API_KEY}/api/admin/guides-with-team-counts`, { headers });
 
                 // Cross-check with full faculty list to reliably exclude externals
-                const facultyRes = await axios.get('http://localhost:5000/api/auth/faculty', { headers });
+                const facultyRes = await axios.get(`${SERVER_API_KEY}/api/auth/faculty`, { headers });
                 const internalIds = new Set(
                     (facultyRes.data || [])
                         .filter(f => f && String(f.memberType).toLowerCase() !== 'external')
@@ -86,7 +86,7 @@ const GuideAssignmentManagement = () => {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
 
-            const res = await axios.post('http://localhost:5000/api/admin/assign-all-unassigned-guides', {}, { headers });
+            const res = await axios.post(`${SERVER_API_KEY}/api/admin/assign-all-unassigned-guides`, {}, { headers });
             setMessage(res.data.message);
             fetchManagementData(); // Refresh data
         } catch (err) {
@@ -105,7 +105,7 @@ const GuideAssignmentManagement = () => {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
             
-            await axios.post('http://localhost:5000/api/admin/assign-guide', {
+            await axios.post(`${SERVER_API_KEY}/admin/assign-guide`, {
                 teamId,
                 guideId: selectedGuide._id
             }, { headers });
@@ -123,7 +123,7 @@ const GuideAssignmentManagement = () => {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
             
-            await axios.post('http://localhost:5000/api/admin/remove-guide', {
+            await axios.post(`${SERVER_API_KEY}/api/admin/remove-guide`, {
                 teamId
             }, { headers });
 

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const panelController = require('../controllers/panelController');
 const auth = require('../middleware/auth');
+const { templateUpload } = require('../middleware/upload');
 const authorize = require('../middleware/authorize');
 const attendanceController = require('../controllers/attendanceController');
 
@@ -63,9 +64,7 @@ router.get('/debug-token', (req, res) => {
 // Review schedules for panel members (allow panel, guide, and admin)
 router.get('/review-schedules', auth, authorize(['panel', 'guide', 'admin']), panelController.getPanelReviewSchedules);
 
-// Availability routes for panel members (allow panel, guide, and admin)
-router.get('/availability', auth, authorize(['panel', 'guide', 'admin']), panelController.getPanelAvailability);
-router.post('/availability', auth, authorize(['panel', 'guide', 'admin']), panelController.submitPanelAvailability);
+
 
 // New route for fetching public review period dates
 router.get('/review-period-dates', auth, panelController.getReviewPeriodDatesPublic);
@@ -82,6 +81,10 @@ router.post('/coordinator/assign-slots', auth, authorize(['coordinator', 'admin'
 router.get('/coordinator/allotted-schedules', auth, authorize(['coordinator', 'admin']), panelController.getAllottedSchedulesForCoordinator);
 // Allow coordinator (or admin) to delete an allotted schedule they created
 router.delete('/coordinator/allotted-schedules/:scheduleId', auth, authorize(['coordinator', 'admin']), panelController.deleteAllottedSchedule);
+
+// Coordinator Viva Panel endpoints
+router.get('/coordinator/viva-panel', auth, authorize(['coordinator']), panelController.getCoordinatorVivaPanel);
+router.post('/coordinator/viva-panel', auth, authorize(['coordinator']), panelController.saveCoordinatorVivaPanel);
 
 // Debug route for coordinators to check their panel assignment
 router.get('/coordinator/panel-status', auth, authorize(['coordinator', 'admin']), async (req, res) => {
@@ -140,5 +143,5 @@ router.post('/attendance/check', auth, attendanceController.checkAttendanceForTe
 
 // New route for checking schedule existence
 router.post('/check-schedule-exists', auth, attendanceController.checkPreviousScheduleExists);
-
+router.post('/coordinator/instruction-template',auth,authorize(['coordinator']),templateUpload,panelController.createInstructionTemplate)
 module.exports = router; 

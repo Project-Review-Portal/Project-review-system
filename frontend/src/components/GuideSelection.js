@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import '../../styles/AuthForms.css'; // Assuming common styling
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
 const GuideSelection = () => {
     const [availableGuides, setAvailableGuides] = useState([]);
@@ -26,7 +27,7 @@ const GuideSelection = () => {
                 }
 
                 // Fetch user's team info and guide assignment period end
-                const teamRes = await axios.get('http://localhost:5000/api/team/my-team', {
+                const teamRes = await axios.get(`${SERVER_API_KEY}/api/team/my-team`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 setTeamInfo(teamRes.data);
@@ -43,7 +44,7 @@ const GuideSelection = () => {
 
                 if (isTeamLeader && teamStatus === 'approved' && !isGuideFinalized && !periodEnded) {
                     if (guideStatus === 'none' || guideStatus === 'rejected') {
-                        const guidesRes = await axios.get('http://localhost:5000/api/team/guides', {
+                        const guidesRes = await axios.get(`${SERVER_API_KEY}/api/team/guides`, {
                             headers: { 'Authorization': `Bearer ${token}` }
                         });
                         setAvailableGuides(guidesRes.data);
@@ -86,7 +87,7 @@ const GuideSelection = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.put(`http://localhost:5000/api/team/request-guide/${teamInfo._id}`, {
+            const res = await axios.put(`${SERVER_API_KEY}/api/team/request-guide/${teamInfo._id}`, {
                 guideId: selectedGuideId
             }, {
                 headers: { 'Authorization': `Bearer ${token}` }

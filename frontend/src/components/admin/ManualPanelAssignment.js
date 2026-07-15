@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-
+import axios from 'axios';const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626"; 
 const ManualPanelAssignment = () => {
     const [teams, setTeams] = useState([]);
     const [availablePanels, setAvailablePanels] = useState([]);
@@ -21,7 +20,7 @@ const ManualPanelAssignment = () => {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
             
-            const response = await axios.get('http://localhost:5000/api/admin/teams', { headers });
+            const response = await axios.get(`${SERVER_API_KEY}/api/admin/teams`, { headers });
             const allTeams = response.data || [];
             // Sort: teams with panel first, then without; within group by name
             allTeams.sort((a, b) => {
@@ -43,7 +42,7 @@ const ManualPanelAssignment = () => {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
             
-            const response = await axios.get(`http://localhost:5000/api/panel-assignments/available-panels/${teamId}`, { headers });
+            const response = await axios.get(`${SERVER_API_KEY}/api/panel-assignments/available-panels/${teamId}`, { headers });
 
             // Build counts from current teams state
             const panelIdToCount = new Map();
@@ -74,7 +73,7 @@ const ManualPanelAssignment = () => {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
             
-            await axios.post('http://localhost:5000/api/panel-assignments/assign-panel', {
+            await axios.post(`${SERVER_API_KEY}/api/panel-assignments/assign-panel`, {
                 teamId,
                 panelId
             }, { headers });
@@ -100,7 +99,7 @@ const ManualPanelAssignment = () => {
             setAutoAssignLoading(true);
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
-            const res = await axios.post('http://localhost:5000/api/panel-assignments/auto-assign', {}, { headers });
+            const res = await axios.post(`${SERVER_API_KEY}/api/panel-assignments/auto-assign`, {}, { headers });
             const assignedCount = res.data?.assignedCount ?? 0;
             const skippedCount = Array.isArray(res.data?.skipped) ? res.data.skipped.length : 0;
             setSuccess(`Auto-assign completed. Assigned: ${assignedCount}. Skipped: ${skippedCount}.`);
@@ -152,7 +151,7 @@ const ManualPanelAssignment = () => {
             </div>
             
             {error && (
-                <div className="p-3 bg-red-100 text-red-700 rounded">
+                <div className="p-3 bg-red-100 text-red-700 rounded sticky top-0">
                     {error}
                 </div>
             )}
@@ -178,7 +177,8 @@ const ManualPanelAssignment = () => {
                                             <p><span className="font-medium">Team Leader:</span> {team.teamLeader?.name} ({team.teamLeader?.username})</p>
                                             <p><span className="font-medium">Members:</span> {team.members.map(m => m.name).join(', ')}</p>
                                             <p><span className="font-medium">Guide:</span> {team.guidePreference ? team.guidePreference.name : 'Not assigned'}</p>
-                                            <p><span className="font-medium">Panel:</span> {team.panel ? team.panel.name : 'Not assigned'}</p>
+                                            <p><span className="font-medium">Review Panel:</span> {team.panel ? team.panel.name : 'Not assigned'}</p>
+                                            <p><span className="font-medium">Viva Panel:</span> {team.vivaPanel ? team.vivaPanel.name : 'Not assigned'}</p>
                                         </div>
                                     </div>
                                     <div className="ml-4">
@@ -194,6 +194,7 @@ const ManualPanelAssignment = () => {
                                 {selectedTeam && selectedTeam._id === team._id && (
                                     <div className="mt-4 pt-4 border-t">
                                         <h5 className="font-medium mb-2">Available Panels (Fewest assigned teams first):</h5>
+                                        <div className="font-light text-sm">Note: Panels having team guides as one of the member/coordinator (cannot be assigned) are not displayed </div>
                                         {availablePanels.length === 0 ? (
                                             <p className="text-gray-500">No available panels (all have conflicts with team guide)</p>
                                         ) : (
@@ -210,12 +211,26 @@ const ManualPanelAssignment = () => {
                                                                     <p>Coordinator: {panel.coordinator ? panel.coordinator.name : 'Not assigned'}</p>
                                                                 </div>
                                                             </div>
-                                                            <button
-                                                                onClick={() => handleAssignPanel(team._id, panel._id)}
-                                                                className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
-                                                            >
-                                                                Assign
-                                                            </button>
+                                                            {
+                                                                console.log('----------------------'),
+                                                                console.log({panel, team})
+                                                            }
+                                                            { (team.panel && panel._id == team.panel._id) &&
+                                                                <button
+                                                                    className="bg-green-400 text-white px-3 py-1 rounded text-sm hover:bg-green-300 cursor-not-allowed"
+                                                                >
+                                                                    Assigned
+                                                                </button>
+                                                            }
+                                                            { (!team.panel || panel._id !== team.panel?._id) &&
+                                                                <button
+                                                                    onClick={() => handleAssignPanel(team._id, panel._id)}
+                                                                    className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                                                                >
+                                                                    Assign
+                                                                </button>
+                                                            }
+
                                                         </div>
                                                     );
                                                 })}

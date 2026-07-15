@@ -4,11 +4,11 @@ const authorize = (roles = []) => {
     }
 
     return (req, res, next) => {
-        console.log('🔍 === Authorization Debug ===');
-        console.log('🔍 Required roles:', roles);
-        console.log('🔍 User object:', req.user);
-        console.log('🔍 User role:', req.user?.role);
-        console.log('🔍 User roles array:', req.user?.roles);
+        // console.log('🔍 === Authorization Debug ===');
+        // console.log('🔍 Required roles:', roles);
+        // console.log('🔍 User object:', req.user);
+        // console.log('🔍 User role:', req.user?.role);
+        // console.log('🔍 User roles array:', req.user?.roles);
         
         // Check if user has the required role or is admin
         let hasPermission = false;
@@ -54,8 +54,8 @@ const authorize = (roles = []) => {
             return res.status(403).json({ message: 'Forbidden: You do not have permission to access this resource.' });
         }
 
-        console.log('✅ Authorization successful');
-        console.log('🔍 === End Authorization Debug ===');
+        // console.log('✅ Authorization successful');
+        // console.log('🔍 === End Authorization Debug ===');
         // authentication and authorization successful
         next();
     };

@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-
-const REVIEW_TYPES = [
-  { value: 'review1', label: 'Review 1' },
-  { value: 'review2', label: 'Review 2' },
-  { value: 'review3', label: 'Review 3' },
-];
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const DURATION_OPTIONS = [15, 20, 30, 45, 60];
 
 const CoordinatorReviewSchedule = () => {
   const [user, setUser] = useState(null);
+  const [reviewTypes, setReviewTypes] = useState([
+    { value: 'review1', label: 'Review 1' },
+    { value: 'review2', label: 'Review 2' },
+    { value: 'review3', label: 'Review 3' },
+  ]);
+  const [slotTypes, setSlotTypes] = useState(['review1', 'review2', 'review3', 'viva']);
   const [form, setForm] = useState({
     reviewType: 'review1',
     date: '',
@@ -37,7 +37,30 @@ const CoordinatorReviewSchedule = () => {
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
+    fetchSettings();
   }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const settingsRes = await axios.get(`${SERVER_API_KEY}/api/auth/review-settings`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const validSlots = settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva'];
+      setSlotTypes(validSlots);
+      
+      const generatedTypes = validSlots.map(slot => ({
+        value: slot,
+        label: slot === 'viva' ? 'VIVA' : `Review ${slot.replace('review', '')}`
+      }));
+      setReviewTypes(generatedTypes);
+      if (generatedTypes.length > 0) {
+        setForm(prev => ({ ...prev, reviewType: generatedTypes[0].value }));
+      }
+    } catch (err) {
+      console.error('Failed to fetch review settings:', err);
+    }
+  };
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -65,8 +88,10 @@ const CoordinatorReviewSchedule = () => {
   const formInvalid = validationErrors.length > 0;
 
   const getPreviousReview = (reviewType) => {
-    if (reviewType === 'review2') return 'review1';
-    if (reviewType === 'review3') return 'review2';
+    const idx = slotTypes.indexOf(reviewType);
+    if (idx > 0) {
+      return slotTypes[idx - 1];
+    }
     return null;
   };
 
@@ -87,7 +112,7 @@ const CoordinatorReviewSchedule = () => {
     try {
       const token = localStorage.getItem('token');
       const res = await axios.post(
-        'http://localhost:5000/api/panels/coordinator/generate-slots',
+        `${SERVER_API_KEY}/api/panels/coordinator/generate-slots`,
         {
           slotType: form.reviewType,
           date: form.date,
@@ -98,11 +123,17 @@ const CoordinatorReviewSchedule = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setSlots(res.data.slots);
-      setTeams(res.data.teams);
-      setAssignments(res.data.teams.map((team) => ({ teamId: team._id, slot: null })));
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const selectedProgramme = storedUser.programme;
+      let fetchedTeams = res.data.teams || [];
+      if (selectedProgramme) {
+          fetchedTeams = fetchedTeams.filter(t => t.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+      }
+      setTeams(fetchedTeams);
+      setAssignments(fetchedTeams.map((team) => ({ teamId: team._id, slot: null })));
       const prevReview = getPreviousReview(form.reviewType);
       if (prevReview) {
-        const attRes = await axios.post('http://localhost:5000/api/panels/attendance/check', {
+        const attRes = await axios.post(`${SERVER_API_KEY}/api/panels/attendance/check`, {
           teamIds: res.data.teams.map(t => t._id),
           reviewType: prevReview
         }, { headers: { Authorization: `Bearer ${token}` } });
@@ -162,7 +193,7 @@ const CoordinatorReviewSchedule = () => {
         usedSlots.add(slotKey);
       }
       await axios.post(
-        'http://localhost:5000/api/panels/coordinator/assign-slots',
+        `${SERVER_API_KEY}/api/panels/coordinator/assign-slots`,
         {
           slotType: form.reviewType,
           date: form.date,
@@ -196,10 +227,16 @@ const CoordinatorReviewSchedule = () => {
       setLoadingSchedules(true);
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get('http://localhost:5000/api/panels/coordinator/allotted-schedules', {
+        const res = await axios.get(`${SERVER_API_KEY}/api/panels/coordinator/allotted-schedules`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setAllottedSchedules(res.data);
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const selectedProgramme = storedUser.programme;
+        let fetchedSchedules = res.data || [];
+        if (selectedProgramme) {
+            fetchedSchedules = fetchedSchedules.filter(sch => sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+        }
+        setAllottedSchedules(fetchedSchedules);
       } catch (err) {
         // silently ignore when unauthorized
       } finally {
@@ -217,10 +254,16 @@ const CoordinatorReviewSchedule = () => {
     setLoadingSchedules(true);
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:5000/api/panels/coordinator/allotted-schedules/${scheduleId}`, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.delete(`${SERVER_API_KEY}/api/panels/coordinator/allotted-schedules/${scheduleId}`, { headers: { Authorization: `Bearer ${token}` } });
       // refresh the list
-      const res = await axios.get('http://localhost:5000/api/panels/coordinator/allotted-schedules', { headers: { Authorization: `Bearer ${token}` } });
-      setAllottedSchedules(res.data);
+      const res = await axios.get(`${SERVER_API_KEY}/api/panels/coordinator/allotted-schedules`, { headers: { Authorization: `Bearer ${token}` } });
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const selectedProgramme = storedUser.programme;
+      let fetchedSchedules = res.data || [];
+      if (selectedProgramme) {
+          fetchedSchedules = fetchedSchedules.filter(sch => sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+      }
+      setAllottedSchedules(fetchedSchedules);
       setMessage('Schedule deleted successfully');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete schedule');
@@ -251,7 +294,7 @@ const CoordinatorReviewSchedule = () => {
             <div>
               <label className="block text-sm font-medium mb-1">Review Type</label>
               <select name="reviewType" value={form.reviewType} onChange={handleChange} className="w-full border rounded px-2 py-1">
-                {REVIEW_TYPES.map((rt) => (
+                {reviewTypes.map((rt) => (
                   <option key={rt.value} value={rt.value}>{rt.label}</option>
                 ))}
               </select>
@@ -370,10 +413,9 @@ const CoordinatorReviewSchedule = () => {
             className="border rounded px-2 py-1 w-full md:w-1/3"
           >
             <option value="all">All Types</option>
-            <option value="review1">review1</option>
-            <option value="review2">review2</option>
-            <option value="review3">review3</option>
-            <option value="viva">viva</option>
+            {slotTypes.map(st => (
+              <option key={st} value={st}>{st === 'viva' ? 'VIVA' : `Review ${st.replace('review', '')}`}</option>
+            ))}
           </select>
         </div>
         {loadingSchedules ? (
@@ -401,20 +443,13 @@ const CoordinatorReviewSchedule = () => {
                     const teamName = (s.team?.teamName || '').toString().toLowerCase();
                     const teamOk = !filterTeam || teamName.includes(filterTeam.toLowerCase());
                     const rawType = (s.slotType || s.type || '').toString().toLowerCase();
-                    const inferred = rawType.includes('review1') || rawType === 'review1' ? 'review1'
-                      : rawType.includes('review2') || rawType === 'review2' ? 'review2'
-                      : rawType.includes('review3') || rawType === 'review3' ? 'review3'
-                      : rawType.includes('viva') ? 'viva' : '';
-                    const typeOk = filterType === 'all' || inferred === filterType;
+                    const typeOk = filterType === 'all' || rawType === filterType;
                     return teamOk && typeOk;
                   })
                   .map((schedule) => {
                     const displayName = schedule.name || (schedule.slotType ? `${schedule.slotType}` : 'Review');
                     const rawType = (schedule.slotType || schedule.type || '').toString().toLowerCase();
-                    const typeLabel = rawType.includes('review1') || rawType === 'review1' ? 'review1'
-                      : rawType.includes('review2') || rawType === 'review2' ? 'review2'
-                      : rawType.includes('review3') || rawType === 'review3' ? 'review3'
-                      : rawType.includes('viva') ? 'viva' : (rawType || '-');
+                    const typeLabel = rawType === 'viva' ? 'VIVA' : `Review ${rawType.replace('review', '')}`;
                     let duration = schedule.duration;
                     try {
                       if ((!duration || duration === 0) && schedule.startTime && schedule.endTime) {

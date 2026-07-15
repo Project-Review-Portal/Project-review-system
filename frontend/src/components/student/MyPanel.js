@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const MyPanel = () => {
     const [assignedPanel, setAssignedPanel] = useState(null);
     const [guide, setGuide] = useState(null);
@@ -20,7 +22,7 @@ const MyPanel = () => {
                 return;
             }
             const headers = { Authorization: `Bearer ${token}` };
-            const response = await axios.get('http://localhost:5000/api/teams/my-assigned-panel', { headers });
+            const response = await axios.get(`${SERVER_API_KEY}/api/teams/my-assigned-panel`, { headers });
             setAssignedPanel(response.data.panel);
             setGuide(response.data.guide || null);
         } catch (err) {
@@ -36,7 +38,17 @@ const MyPanel = () => {
     }
 
     if (error) {
-        return <div className="bg-white p-6 rounded-lg shadow text-red-600">Error: {error}</div>;
+        return (
+            <div className="bg-gray-50 flex items-center justify-center p-6 min-h-[300px]">
+                <div className="w-full max-w-3xl bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-8 shadow-sm text-center">
+                    <svg className="w-12 h-12 text-amber-500 mx-auto mb-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <h3 className="text-lg font-bold text-amber-900 mb-2">Notice From Panel Coordinator</h3>
+                    <p className="text-sm leading-relaxed max-w-md mx-auto text-amber-700">{error}</p>
+                </div>
+            </div>
+        );
     }
 
     if (!assignedPanel) {

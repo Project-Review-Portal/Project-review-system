@@ -27,6 +27,16 @@ const configSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    numReviews: {
+        type: Number,
+        default: 3,
+        min: 1,
+        max: 10
+    },
+    vivaRequired: {
+        type: Boolean,
+        default: true
+    },
     createdAt: {
         type: Date,
         default: Date.now

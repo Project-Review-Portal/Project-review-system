@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const AdminTeams = () => {
     const [teams, setTeams] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -14,7 +16,7 @@ const AdminTeams = () => {
         setError('');
         setMessage('');
         try {
-            const res = await axios.get('/api/admin/teams', { headers });
+            const res = await axios.get(`${SERVER_API_KEY}/api/admin/teams`, { headers });
             setTeams(res.data);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to fetch teams');
@@ -30,7 +32,7 @@ const AdminTeams = () => {
         setError('');
         setMessage('');
         try {
-            await axios.delete(`/api/admin/teams/${teamId}`, { headers });
+            await axios.delete(`${SERVER_API_KEY}/api/admin/teams/${teamId}`, { headers });
             setMessage('Team deleted successfully');
             await fetchTeams();
         } catch (err) {
@@ -59,7 +61,8 @@ const AdminTeams = () => {
                                 <th className="px-3 py-2 border">Leader</th>
                                 <th className="px-3 py-2 border">Members</th>
                                 <th className="px-3 py-2 border">Guide</th>
-                                <th className="px-3 py-2 border">Panel</th>
+                                <th className="px-3 py-2 border">Review Panel</th>
+                                <th className="px-3 py-2 border">Viva Panel</th>
                                 <th className="px-3 py-2 border">Actions</th>
                             </tr>
                         </thead>
@@ -69,8 +72,18 @@ const AdminTeams = () => {
                                     <td className="px-3 py-2 border">{team.teamName}</td>
                                     <td className="px-3 py-2 border">{team.teamLeader ? `${team.teamLeader.name} (${team.teamLeader.username})` : '—'}</td>
                                     <td className="px-3 py-2 border">{(team.members || []).map(m => m.username).join(', ') || '—'}</td>
-                                    <td className="px-3 py-2 border">{team.guidePreference ? team.guidePreference.username : '—'}</td>
+                                    {
+                                        console.log('team : ', team)
+                                    }
+                                    <td className="px-3 py-2 border">{
+                                        team.guidePreference ?
+                                        team.status === 'approved'? 
+                                            team.guidePreference.username 
+                                            : team.guidePreference.username + ' (pending)'
+                                            : '—'
+                                    }</td>
                                     <td className="px-3 py-2 border">{team.panel ? team.panel.name : '—'}</td>
+                                    <td className="px-3 py-2 border">{team.vivaPanel ? team.vivaPanel.name : '—'}</td>
                                     <td className="px-3 py-2 border">
                                         <button onClick={() => deleteTeam(team._id)} className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
                                     </td>

@@ -4,7 +4,7 @@ import Navbar from './Navbar';
 import PanelAssignedTeams from './panel/PanelAssignedTeams';
 import PanelReviewSchedules from './panel/PanelReviewSchedules';
 import PanelMarking from './panel/PanelMarking';
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const PanelDashboard = () => {
     const location = useLocation();
     const [user, setUser] = useState(null);
@@ -26,12 +26,12 @@ const PanelDashboard = () => {
             try {
                 // No auth required for config/public, but guide selection needs token
                 const token = localStorage.getItem('token');
-                const configRes = await fetch('http://localhost:5000/api/teams/config/public');
+                const configRes = await fetch(`${SERVER_API_KEY}/api/teams/config/public`);
                 const configData = await configRes.json();
                 setTeamFormationOpen(configData.teamFormationOpen);
                 // Guide selection dates
                 if (token) {
-                    const guideDatesRes = await fetch('http://localhost:5000/api/guide/selection-dates', {
+                    const guideDatesRes = await fetch(`${SERVER_API_KEY}/api/guide/selection-dates`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
                     if (guideDatesRes.ok) {

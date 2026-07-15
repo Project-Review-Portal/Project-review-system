@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626"; 
 const CoordinatorAssignedTeams = () => {
     const [teams, setTeams] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -16,10 +16,16 @@ const CoordinatorAssignedTeams = () => {
                     setLoading(false);
                     return;
                 }
-                const res = await axios.get('http://localhost:5000/api/panels/assigned-teams', {
+                const res = await axios.get(`${SERVER_API_KEY}/api/panels/assigned-teams`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                setTeams(res.data || []);
+                const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+                const selectedProgramme = storedUser.programme;
+                let fetchedTeams = res.data || [];
+                if (selectedProgramme) {
+                    fetchedTeams = fetchedTeams.filter(t => t.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+                }
+                setTeams(fetchedTeams);
             } catch (err) {
                 setError(err.response?.data?.message || 'Failed to load assigned teams');
             } finally {
@@ -43,7 +49,8 @@ const CoordinatorAssignedTeams = () => {
                         <div key={team._id} className="border p-4 rounded-lg shadow-sm">
                             <h3 className="font-semibold text-lg mb-2">Team: {team.teamName}</h3>
                             <p className="text-gray-700">Team Leader: {team.teamLeader?.name || 'N/A'} ({team.teamLeader?.username || 'N/A'})</p>
-                            <p className="text-gray-700">Panel: {team.panel?.name || 'Not Assigned'}</p>
+                            <p className="text-gray-700">Review Panel: {team.panel?.name || 'Not Assigned'}</p>
+                            <p className="text-gray-700">Viva Panel: {team.vivaPanel?.name || 'Not Assigned'}</p>
                             <p className="text-gray-700">Guide: {team.guidePreference?.name || 'Not Assigned'}</p>
                             <div className="mt-2">
                                 <p className="font-medium">Members:</p>

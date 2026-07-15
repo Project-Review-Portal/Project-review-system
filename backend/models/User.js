@@ -30,13 +30,13 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['admin', 'student', 'guide', 'panel', 'coordinator'],
+        enum: ['admin', 'student', 'guide', 'panel', 'coordinator', 'assistant coordinator'],
         default: null
     },
     roles: [{
         role: {
             type: String,
-            enum: ['admin', 'student', 'guide', 'panel', 'coordinator'],
+            enum: ['admin', 'student', 'guide', 'panel', 'coordinator', 'assistant coordinator'],
             required: true
         },
         team: {
@@ -48,6 +48,11 @@ const userSchema = new mongoose.Schema({
         type: String,
         enum: ['internal', 'external', null],
         default: null
+    },
+    seniority: {
+        type: Number,
+        default: null,
+        min: 1
     },
     // OTP fields for forgot-password flow
     otp: {
@@ -69,6 +74,10 @@ const userSchema = new mongoose.Schema({
     reviewPeriodEndDate: {
         type: Date,
         default: null
+    },
+    programme: {
+        type: String,
+        default: 'UG'   // 'UG', 'M.E. Big Data', etc.
     }
 });
 
@@ -76,4 +85,3 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ email: 1 }, { unique: false });
 
 module.exports = mongoose.model('User', userSchema);
- 

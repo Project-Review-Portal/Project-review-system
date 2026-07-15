@@ -3,9 +3,10 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
-
+const morgan = require('morgan');
 const app = express();
-
+app.use(morgan('dev')); // Clean, colored logs outputting timing data
+const path = require('path'); // Make ed, and standardizsure this is required at the top of server.jse
 // Connect to database with default URI if MONGO_URI is not provided
 const connectDB = require('./config/db');
 if (!process.env.MONGO_URI) {
@@ -21,8 +22,35 @@ connectDB();
 // Middleware
 // Enable CORS for frontend dev hosts (adjust ports as needed)
 // Enable CORS for frontend on ports 3001 and 3002
+// Dynamic allowed origins for development and production
+
+// 1. Baseline default origins that are always allowed
+let allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'http://localhost:5024'
+];
+
+// 2. Append extra origins from .env if the variable exists
+if (process.env.ALLOWED_ORIGINS) {
+    const extraOrigins = process.env.ALLOWED_ORIGINS.split(',');
+    allowedOrigins = allowedOrigins.concat(extraOrigins);
+}
+
+// 3. Apply CORS middleware configuration
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like Postman or mobile apps)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            return callback(null, true);
+        } else {
+            const errorMsg = `CORS Policy Error: The Origin '${origin}' is not authorized by this backend configuration.`;
+            return callback(new Error(errorMsg), false);
+        }
+    },
     credentials: true,
 }));
 app.use(express.json());
@@ -45,6 +73,7 @@ const signatureRoutes = require('./routes/signatures');
 const documentRoutes = require('./routes/simpleDocument'); // Using simple version for testing
 // const internalExaminerRoutes = require('./routes/internalExaminer'); // Temporarily disabled
 const externalExaminerRoutes = require('./routes/externalExaminer');
+const programmeRoutes = require('./routes/programme');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
@@ -57,16 +86,17 @@ app.use('/api/signatures', signatureRoutes);
 app.use('/api/documents', documentRoutes);
 // app.use('/api/internal-examiner', internalExaminerRoutes); // Temporarily disabled
 app.use('/api/external-examiner', externalExaminerRoutes);
+app.use('/api/programmes', programmeRoutes);
 
 // Serve static files
 app.use('/uploads', express.static('uploads'));
-
+app.use('/templates', express.static(path.join(__dirname, 'uploads/templates')));
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {
     // ... existing code ...
 }
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3626;
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
@@ -75,6 +105,27 @@ app.listen(PORT, () => {
 // Ensure default admin exists
 (async () => {
     try {
+        // Drop the old indexes on designation limits if they exist
+        const mongoose = require('mongoose');
+        try {
+            await mongoose.connection.db.collection('teams').dropIndex('teamName_1');
+            console.log('✅ Dropped obsolete teamName_1 index from teams collection');
+        } catch (e) {}
+        try {
+            await mongoose.connection.db.collection('panels').dropIndex('name_1');
+            console.log('✅ Dropped obsolete name_1 index from panels collection');
+        } catch (e) {}
+        try {
+            await mongoose.connection.db.collection('panels').dropIndex('name_1_panelType_1');
+            console.log('✅ Dropped obsolete name_1_panelType_1 index from panels collection');
+        } catch (e) {}
+        try {
+            await mongoose.connection.db.collection('designationteamlimits').dropIndex('designation_1');
+        } catch (e) {}
+        try {
+            await mongoose.connection.db.collection('designationteamlimits').dropIndex('designation_1_programmeType_1');
+        } catch (e) {}
+
         const User = require('./models/User');
         const bcrypt = require('bcryptjs');
 
@@ -89,36 +140,12 @@ app.listen(PORT, () => {
                 roles: [{ role: 'admin', team: null }]
             },
             {
-                email: 'student@example.com',
-                username: 'student@example.com',
-                name: 'Default Student',
-                password: 'cseceg@student',
-                role: 'student',
-                roles: [{ role: 'student', team: null }]
-            },
-            {
-                email: 'guide@example.com',
-                username: 'guide@example.com',
-                name: 'Default Guide',
-                password: 'cseceg@guide',
-                role: 'guide',
-                roles: [{ role: 'guide', team: null }]
-            },
-            {
-                email: 'panel@example.com',
-                username: 'panel@example.com',
-                name: 'Default Panel Member',
-                password: 'cseceg@panel',
-                role: 'panel',
-                roles: [{ role: 'panel', team: null }]
-            },
-            {
-                email: 'coordinator@example.com',
-                username: 'coordinator@example.com',
-                name: 'Default Coordinator',
-                password: 'cseceg@coordinator',
-                role: 'coordinator',
-                roles: [{ role: 'coordinator', team: null }]
+                email: 'cseceg@gmail.com',
+                username: 'cseceg@gmail.com',
+                name: 'System Admin',
+                password: '123',
+                role: 'admin',
+                roles: [{ role: 'admin', team: null }] 
             }
         ];
 

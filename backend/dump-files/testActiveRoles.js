@@ -1,8 +1,8 @@
 require('dotenv').config({ path: '../.env' });
 const mongoose = require('mongoose');
-const User = require('./models/User');
-const Team = require('./models/Team');
-const Panel = require('./models/Panel');
+const User = require('../models/User');
+const Team = require('../models/Team');
+const Panel = require('../models/Panel');
 
 const testActiveRoles = async () => {
     const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/labeval_db';

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import '../../styles/GuideSelection.css'; // Import new CSS
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const GuideSelection = () => {
     const [guides, setGuides] = useState([]);
     const [selectedGuide, setSelectedGuide] = useState('');
@@ -21,13 +23,13 @@ const GuideSelection = () => {
                 }
 
                 // First fetch team info
-                const teamRes = await axios.get('http://localhost:5000/api/team/my-team', {
+                const teamRes = await axios.get(`${SERVER_API_KEY}/api/team/my-team`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setTeamInfo(teamRes.data);
 
                 // Then fetch available guides
-                const guidesRes = await axios.get('http://localhost:5000/api/team/guides', {
+                const guidesRes = await axios.get(`${SERVER_API_KEY}/api/team/guides`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setGuides(guidesRes.data);
@@ -66,7 +68,7 @@ const GuideSelection = () => {
         try {
             const token = localStorage.getItem('token');
             const response = await axios.put(
-                `http://localhost:5000/api/team/request-guide/${teamInfo._id}`,
+                `${SERVER_API_KEY}/api/team/request-guide/${teamInfo._id}`,
                 { guideId: selectedGuide },
                 { headers: { Authorization: `Bearer ${token}` } }
             );

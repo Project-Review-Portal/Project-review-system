@@ -5,7 +5,7 @@ const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 
 router.post('/team-size', auth, authorize(['admin']), adminController.setMaxTeamSize);
-router.get('/team-size', auth, authorize(['admin']), adminController.getMaxTeamSize);
+router.get('/team-size', auth, authorize(['admin']), adminController.getMaxTeamSize); 
 
 router.post('/guide-selection-dates', auth, authorize(['admin']), adminController.setGuideSelectionDates);
 router.get('/guide-selection-dates', auth, authorize(['admin']), adminController.getGuideSelectionDates);
@@ -40,9 +40,6 @@ router.get('/panels-with-members', auth, authorize(['admin']), adminController.g
 router.get('/teams', auth, authorize(['admin']), adminController.getAllTeams);
 router.delete('/teams/:teamId', auth, authorize(['admin']), adminController.deleteTeam);
 
-// New route for fetching all user availabilities (guide and panel)
-router.get('/availabilities', auth, authorize(['admin']), adminController.getAllAvailabilities);
-
 // New route for schedule generation
 router.post('/generate-schedules', auth, authorize(['admin']), adminController.generateSchedules);
 
@@ -72,10 +69,24 @@ router.delete('/delete-user/:userId', auth, authorize(['admin']), adminControlle
 router.get('/faculty-list', auth, authorize(['admin']), adminController.getAllFaculty);
 router.get('/student-list', auth, authorize(['admin']), adminController.getAllStudents);
 
+router.get('/designation-team-limits', auth, authorize(['admin']), adminController.getDesignationTeamLimits);
+router.post('/designation-team-limits', auth, authorize(['admin']), adminController.saveDesignationTeamLimits);
+router.delete('/designation-team-limits/all', auth, authorize(['admin']), adminController.deleteAllDesignationTeamLimits);
+router.delete('/designation-team-limits/:designation', auth, authorize(['admin']), adminController.deleteDesignationTeamLimit);
+
 // Danger: Delete all teams and related assignments/schedules
 router.delete('/teams', auth, authorize(['admin']), adminController.deleteAllTeams);
 router.delete('/solo-teams', auth, authorize(['admin']), adminController.deleteSoloTeams);
 router.delete('/students', auth, authorize(['admin']), adminController.deleteAllStudents);
 router.delete('/faculty', auth, authorize(['admin']), adminController.deleteAllFaculty);
 
-module.exports = router; 
+// Reviews / Viva settings
+router.get('/reviews-viva-settings', auth, authorize(['admin']), adminController.getReviewsVivaSettings);
+router.post('/reviews-viva-settings', auth, authorize(['admin']), adminController.setReviewsVivaSettings);
+
+// Team Allocation
+router.put('/allocations/:teamId', auth, authorize(['admin']), adminController.updateTeamAllocation);
+router.post('/auto-assign-panels', auth, authorize(['admin']), adminController.autoAssignPanels);
+router.post('/auto-assign-guides', auth, authorize(['admin']), adminController.autoAssignGuidesFromAllocations);
+
+module.exports = router;  

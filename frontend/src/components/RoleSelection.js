@@ -1,23 +1,19 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// Small sub-component to render a role row with teams (no dropdown)
-const RoleRow = ({ roleObj, loading, getRoleDisplayName, handleRoleSelect, teamNames }) => {
-    // Default to first team id if one or more teams exist
-    const defaultTeam = roleObj.teams && roleObj.teams.length > 0 ? roleObj.teams[0] : null;
-
+// Small sub-component to render a role row (no dropdown, separated by programme)
+const RoleRow = ({ roleObj, loading, getRoleDisplayName, handleRoleSelect }) => {
     const onClick = () => {
-        const payload = { role: roleObj.role, team: defaultTeam };
-        handleRoleSelect(payload);
+        handleRoleSelect(roleObj);
     };
-
-    const teamLabel = roleObj.teams && roleObj.teams.length > 0 ? ` (${roleObj.teams.map(t => teamNames[t] ? teamNames[t] : `Team ${t}`).join(', ')})` : '';
 
     return (
         <div className={`w-full p-4 rounded-lg border-2 ${loading ? 'bg-gray-100 border-gray-200' : 'bg-white border-gray-200'}`}>
             <div className="flex justify-between items-center">
                 <div>
-                    <h3 className="font-semibold text-gray-900">{getRoleDisplayName(roleObj.role)}{teamLabel}</h3>
+                    <h3 className="font-semibold text-gray-900">
+                        {getRoleDisplayName(roleObj.role)} ({roleObj.programme})
+                    </h3>
                 </div>
                 <div>
                     <button
@@ -34,7 +30,6 @@ const RoleRow = ({ roleObj, loading, getRoleDisplayName, handleRoleSelect, teamN
 };
 
 const RoleSelection = () => {
-    const [selectedRole, setSelectedRole] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
@@ -42,49 +37,31 @@ const RoleSelection = () => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const availableRoles = user.roles || [];
     
-    // Aggregate roles -> teams mapping so we can show role with its teams
-    const rolesMap = {};
+    // Group by unique (role, programme) pairs
+    const seenKeys = new Set();
+    const uniqueRoles = [];
     (availableRoles || []).forEach(roleObj => {
+        if (!['guide', 'panel', 'coordinator'].includes(roleObj.role)) return;
         const role = roleObj.role;
-        const team = roleObj.team || null;
-        if (!rolesMap[role]) rolesMap[role] = new Set();
-        if (team) rolesMap[role].add(team);
+        const programme = roleObj.programme || 'UG';
+        const key = `${role}-${programme}`;
+        if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            uniqueRoles.push({ role, programme });
+        }
     });
-    // Convert to array of { role, teams: [] }
-    const uniqueRoles = Object.keys(rolesMap).map(role => ({ role, teams: Array.from(rolesMap[role]) }));
-
-    // Fetch human-friendly team names for any team ids we have in roles
-    const [teamNames, setTeamNames] = useState({});
-    React.useEffect(() => {
-        const allTeamIds = uniqueRoles.flatMap(r => r.teams);
-        if (!allTeamIds || allTeamIds.length === 0) return;
-        const idsParam = allTeamIds.join(',');
-        const fetchNames = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch(`http://localhost:5000/api/teams/by-ids?ids=${idsParam}`, { headers: { Authorization: `Bearer ${token}` } });
-                if (!res.ok) return;
-                const data = await res.json();
-                const map = {};
-                data.forEach(t => { map[t._id] = t.teamName; });
-                setTeamNames(map);
-            } catch (e) {
-                console.warn('Failed to fetch team names', e);
-            }
-        };
-        fetchNames();
-    }, [JSON.stringify(uniqueRoles)]);
 
     const handleRoleSelect = async (roleObj) => {
         setLoading(true);
         try {
-            // Update the user's current role in localStorage
+            // Update the user's current role and programme in localStorage
             const updatedUser = {
                 ...user,
                 role: roleObj.role,
-                team: roleObj.team || null
+                programme: roleObj.programme
             };
             localStorage.setItem('user', JSON.stringify(updatedUser));
+            localStorage.setItem('selectedRole', JSON.stringify({ role: roleObj.role, programme: roleObj.programme }));
 
             // Navigate based on the selected role
             if (roleObj.role === 'coordinator') {
@@ -115,12 +92,6 @@ const RoleSelection = () => {
             default:
                 return role.charAt(0).toUpperCase() + role.slice(1);
         }
-    };
-
-    // Optional helper kept for future display of team context
-    const getTeamDisplayName = (team) => {
-        if (!team) return 'No Team Assigned';
-        return `Team ${team}`;
     };
 
     if (uniqueRoles.length === 0) {
@@ -158,7 +129,6 @@ const RoleSelection = () => {
                             loading={loading}
                             getRoleDisplayName={getRoleDisplayName}
                             handleRoleSelect={handleRoleSelect}
-                            teamNames={teamNames}
                         />
                     ))}
                 </div>
@@ -194,4 +164,4 @@ const RoleSelection = () => {
     );
 };
 
-export default RoleSelection; 
+export default RoleSelection;

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const TeamRules = () => {
     const [maxTeamSize, setMaxTeamSize] = useState(4); // Default, will be updated
     const [loading, setLoading] = useState(true);
@@ -19,7 +21,7 @@ const TeamRules = () => {
                     return;
                 }
                 // Fetch max team size and team formation open status
-                const configRes = await axios.get('http://localhost:5000/api/teams/config/public');
+                const configRes = await axios.get(`${SERVER_API_KEY}/api/teams/config/public`);
                 if (configRes.data && configRes.data.maxTeamSize) {
                     setMaxTeamSize(configRes.data.maxTeamSize);
                 }
@@ -27,7 +29,7 @@ const TeamRules = () => {
                     setTeamFormationOpen(configRes.data.teamFormationOpen);
                 }
                 // Fetch guide selection dates
-                const guideDatesRes = await axios.get('http://localhost:5000/api/guide/selection-dates', {
+                const guideDatesRes = await axios.get(`${SERVER_API_KEY}/api/guide/selection-dates`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 if (guideDatesRes.data) {

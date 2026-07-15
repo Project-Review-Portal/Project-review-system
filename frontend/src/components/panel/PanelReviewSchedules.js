@@ -1,17 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const PanelReviewSchedules = () => {
     const [user, setUser] = useState(null);
     const [reviewSchedules, setReviewSchedules] = useState([]);
-    const [reviewPeriodStartDate, setReviewPeriodStartDate] = useState('');
-    const [reviewPeriodEndDate, setReviewPeriodEndDate] = useState('');
-    const [availableSlots, setAvailableSlots] = useState([]);
-    const [newSlotStartTime, setNewSlotStartTime] = useState('');
-    const [newSlotEndTime, setNewSlotEndTime] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [successMessage, setSuccessMessage] = useState('');
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
@@ -24,15 +20,17 @@ const PanelReviewSchedules = () => {
     const fetchData = async () => {
         try {
             const token = localStorage.getItem('token');
-            const [schedulesRes, userRes, availabilityRes] = await Promise.all([
-                axios.get('/api/panels/review-schedules', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('/api/auth/profile', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('/api/panels/availability', { headers: { Authorization: `Bearer ${token}` } })
+            const [schedulesRes, userRes] = await Promise.all([
+                axios.get(`${SERVER_API_KEY}/api/panels/review-schedules`, { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get(`${SERVER_API_KEY}/api/auth/profile`, { headers: { Authorization: `Bearer ${token}` } })
             ]);
-            setReviewSchedules(schedulesRes.data);
-            setReviewPeriodStartDate(userRes.data.reviewPeriodStartDate || '');
-            setReviewPeriodEndDate(userRes.data.reviewPeriodEndDate || '');
-            setAvailableSlots(availabilityRes.data.availableSlots || []);
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const selectedProgramme = storedUser.programme;
+            let fetchedSchedules = schedulesRes.data || [];
+            if (selectedProgramme) {
+                fetchedSchedules = fetchedSchedules.filter(sch => sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+            }
+            setReviewSchedules(fetchedSchedules);
             setLoading(false);
         } catch (err) {
             console.error('Error fetching data:', err);
@@ -41,40 +39,7 @@ const PanelReviewSchedules = () => {
         }
     };
 
-    const handleAddSlot = () => {
-        if (newSlotStartTime && newSlotEndTime) {
-            const newStart = new Date(newSlotStartTime);
-            const newEnd = new Date(newSlotEndTime);
-            const periodStart = new Date(reviewPeriodStartDate);
-            const periodEnd = new Date(reviewPeriodEndDate);
 
-            if (newStart < periodStart || newEnd > periodEnd || newStart >= newEnd) {
-                alert('Availability slot must be within the global review period and start time must be before end time.');
-                return;
-            }
-            setAvailableSlots([...availableSlots, { startTime: newStart, endTime: newEnd }]);
-            setNewSlotStartTime('');
-            setNewSlotEndTime('');
-        }
-    };
-
-    const handleRemoveSlot = (index) => {
-        setAvailableSlots(availableSlots.filter((_, i) => i !== index));
-    };
-
-    const handleSubmitAvailability = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            await axios.post('/api/panels/availability', { availableSlots }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setSuccessMessage('Availability submitted successfully!');
-            setTimeout(() => setSuccessMessage(''), 3000);
-        } catch (err) {
-            console.error('Error submitting availability:', err);
-            setError('Failed to submit availability');
-        }
-    };
 
     if (loading) return <div className="text-center p-4">Loading review schedules...</div>;
     if (error) return <div className="text-red-500 p-4">{error}</div>;
@@ -111,16 +76,22 @@ const PanelReviewSchedules = () => {
                         };
                         const filtered = isExternal ? reviewSchedules.filter(s => isViva(s)) : reviewSchedules;
                         return filtered.map(schedule => {
-                            const inferFromName = (name) => {
-                                if (!name) return '';
-                                const n = name.toLowerCase();
-                                if (n.includes('review 1') || n.includes('review1')) return 'Review 1';
-                                if (n.includes('review 2') || n.includes('review2')) return 'Review 2';
-                                if (n.includes('review 3') || n.includes('review3')) return 'Review 3';
-                                if (n.includes('viva')) return 'Viva';
-                                return '';
+                            const getDynamicSlotLabel = (s) => {
+                                if (s.slotLabel) return s.slotLabel;
+                                const rawType = (s.slotType || s.type || '').toString().toLowerCase();
+                                if (rawType === 'viva') return 'Viva';
+                                if (rawType.startsWith('review')) {
+                                    return `Review ${rawType.replace('review', '')}`;
+                                }
+                                if (s.name) {
+                                    const n = s.name.toLowerCase();
+                                    if (n.includes('viva')) return 'Viva';
+                                    const match = n.match(/review\s*(\d+)/);
+                                    if (match) return `Review ${match[1]}`;
+                                }
+                                return s.slotType || s.type || 'Review';
                             };
-                            const slotLabel = schedule.slotLabel || (schedule.slotType || schedule.type ? ((schedule.slotType || schedule.type) === 'review1' ? 'Review 1' : (schedule.slotType || schedule.type) === 'review2' ? 'Review 2' : (schedule.slotType || schedule.type) === 'review3' ? 'Review 3' : (schedule.slotType || schedule.type) === 'viva' ? 'Viva' : (schedule.slotType || schedule.type)) : inferFromName(schedule.name) || 'Review');
+                            const slotLabel = getDynamicSlotLabel(schedule);
                             const displayName = schedule.name || slotLabel || 'Review';
                             let duration = schedule.duration;
                             try {
@@ -142,7 +113,11 @@ const PanelReviewSchedules = () => {
                             return (
                                 <div key={schedule._id} className="border rounded-lg p-4 bg-gray-50">
                                     <h4 className="text-lg font-semibold mb-2">{displayName} — {slotLabel}</h4>
-                                    <p className="text-sm text-gray-600">Team: {schedule.team?.teamName || 'N/A'}{studentNames}</p>
+                                    <p className="text-sm text-gray-600">Team: {schedule.team?.teamName || 'N/A'}{studentNames}
+                                        {schedule.team?.programme && (
+                                            <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-indigo-100 text-indigo-700">{schedule.team.programme}</span>
+                                        )}
+                                    </p>
                                     <p className="text-sm text-gray-600">Panel: {schedule.panel?.name || 'N/A'}</p>
                                     {panelMembers && (
                                         <p className="text-sm text-gray-600">Panel Members: {panelMembers}</p>

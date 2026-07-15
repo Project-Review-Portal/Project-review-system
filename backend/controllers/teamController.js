@@ -1,6 +1,11 @@
 const Team = require('../models/Team');
 const User = require('../models/User');
 const Config = require('../models/Config');
+const {
+    buildDesignationLimitMap,
+    getTeamCountsByGuideIds,
+    resolveGuideLimitStatus
+} = require('../utils/guideTeamLimit');
 const TeamPanelAssignment = require('../models/TeamPanelAssignment');
 const FinalReport = require('../models/FinalReport');
 
@@ -9,7 +14,7 @@ exports.getAvailableStudents = async (req, res) => {
     try {
         const currentUserId = req.user.id; // Get the ID of the logged-in user
 
-        // Get all teams and extract both team leaders and members
+        // Get all teams and extract both team leaders and accepted members
         const teams = await Team.find();
         let teamMemberIds = teams.flatMap(team => [
             team.teamLeader,
@@ -17,13 +22,18 @@ exports.getAvailableStudents = async (req, res) => {
         ]);
 
         // Ensure current user is also excluded from available students
-        teamMemberIds = [...new Set([...teamMemberIds.map(id => id.toString()), currentUserId.toString()])];
+        teamMemberIds = [...new Set([...teamMemberIds.filter(Boolean).map(id => id.toString()), currentUserId.toString()])];
         
-        // Find students who are not in any team (neither as leader nor member) and not the current user
+        // Fetch current user to get their programme
+        const currentUser = await User.findById(currentUserId);
+        const userProgramme = currentUser ? (currentUser.programme || 'UG') : 'UG';
+
+        // Find students who are not in any team (neither as leader nor member) and not the current user, and are in the SAME programme
         const availableStudents = await User.find({
             'roles.role': 'student',
+            programme: userProgramme,
             _id: { $nin: teamMemberIds }
-        }).select('username _id name');
+        }).select('username _id name programme');
 
         console.log('Available students found:', availableStudents.length); // Debug log
         res.json(availableStudents);
@@ -53,9 +63,25 @@ exports.getGuides = async (req, res) => {
             'roles.role': 'guide',
             'memberType': 'internal', // Only show internal faculty as guides
             _id: { $nin: rejectedGuideIds }
-        }).select('username name');
-        
-        res.json(guides);
+        }).select('username name designation');
+
+        const isPg = team && team.programme && team.programme !== 'UG';
+        const programmeType = isPg ? 'PG' : 'UG';
+        const limitMap = await buildDesignationLimitMap(programmeType);
+        const guideIds = guides.map((guide) => guide._id);
+        const countMap = await getTeamCountsByGuideIds(guideIds, programmeType);
+
+        const guidesWithStatus = guides.map((guide) => {
+            const currentTeamCount = countMap.get(guide._id.toString()) || 0;
+            const limitStatus = resolveGuideLimitStatus(guide, currentTeamCount, limitMap);
+
+            return {
+                ...guide.toObject(),
+                ...limitStatus
+            };
+        });
+
+        res.json(guidesWithStatus);
     } catch (error) {
         console.error('Error fetching guides:', error); // Added error logging
         res.status(500).json({ message: 'Error fetching guides' });
@@ -80,6 +106,19 @@ exports.createTeam = async (req, res) => {
             return res.status(400).json({ message: 'You are already part of a team' });
         }
 
+        // Check if user has any pending invitations from other teams
+        const pendingInvitations = await Team.findOne({
+            memberStatus: {
+                $elemMatch: {
+                    user: teamLeaderId,
+                    status: 'pending'
+                }
+            }
+        });
+        if (pendingInvitations) {
+            return res.status(400).json({ message: 'You have pending team invitations. You must decline all invitations before creating your own team.' });
+        }
+
         // Get max team size from config
         const config = await Config.findOne();
         // Always allow team formation - no restrictions
@@ -93,14 +132,52 @@ exports.createTeam = async (req, res) => {
         }
 
         // Get the count of existing teams to generate the next sequential team name
-        const teamCount = await Team.countDocuments({});
-        const newTeamName = `Team ${teamCount + 1}`;
+        // const maxTeamNumber = await Team.find({}, {teamName : 1});
+
+        const leader = await User.findById(teamLeaderId);
+        const leaderProgramme = leader.programme || 'UG';
+
+        // Retrieve all existing teams for this programme to generate the next sequential team name
+        const existingTeams = await Team.find({ programme: leaderProgramme }, { teamName: 1 });
+        
+        // Helper function to escape regex special characters in the programme name
+        const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        
+        // Match either "{Programme} Team {Number}" or the legacy "Team {Number}"
+        const teamNameRegex = new RegExp(`^(?:${escapeRegExp(leaderProgramme)}\\s+)?Team\\s+(\\d+)$`, 'i');
+        
+        const existingNumbers = new Set();
+        if (existingTeams) {
+            for (const team of existingTeams) {
+                if (team.teamName) {
+                    const match = team.teamName.match(teamNameRegex);
+                    if (match) {
+                        existingNumbers.add(parseInt(match[1], 10));
+                    }
+                }
+            }
+        }
+        
+        let numberTracker = 1;
+        while (existingNumbers.has(numberTracker)) {
+            numberTracker++;
+        }
+
+        const newTeamName = `${leaderProgramme} Team ${numberTracker}`;
 
         // Create team
         const team = new Team({
             teamName: newTeamName, // Automatically generated team name
             teamLeader: teamLeaderId,
-            members,
+            programme: leaderProgramme,
+            members: [], // Keep empty until invitations are accepted
+            memberStatus : members.map((m) => {
+                return {
+                    user : m,
+                    status : 'pending'
+                }
+            }),
+            isTeamComplete: false,
             status: 'pending'
         });
 
@@ -123,6 +200,10 @@ exports.getUserTeam = async (req, res) => {
                 { members: userId }
             ]
         }).populate('teamLeader members', 'username name')
+          .populate({
+              path: 'memberStatus.user',
+              select: 'username name'
+          })
           .populate({ 
               path: 'guidePreference', 
               select: 'username name'
@@ -158,6 +239,10 @@ exports.requestGuide = async (req, res) => {
             return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
         }
 
+        if (!team.isLocked) {
+            return res.status(400).json({ message: 'You cannot request a guide until your team is locked and finalized.' });
+        }
+
         // Check if there's an existing guide request that is pending or accepted
         if (team.guidePreference && (team.status === 'pending' || team.status === 'approved')) {
             return res.status(400).json({ message: 'You already have an active guide request or an assigned guide.' });
@@ -167,6 +252,17 @@ exports.requestGuide = async (req, res) => {
         const guide = await User.findById(guideId);
         if (!guide || !guide.roles.some(r => r.role === 'guide')) {
             return res.status(400).json({ message: 'Invalid guide selected.' });
+        }
+
+        const isPg = team && team.programme && team.programme !== 'UG';
+        const programmeType = isPg ? 'PG' : 'UG';
+        const limitMap = await buildDesignationLimitMap(programmeType);
+        const countMap = await getTeamCountsByGuideIds([guide._id], programmeType);
+        const currentTeamCount = countMap.get(guide._id.toString()) || 0;
+        const limitStatus = resolveGuideLimitStatus(guide, currentTeamCount, limitMap);
+
+        if (!limitStatus.canRequest && limitStatus.teamLimit !== null) {
+            return res.status(400).json({ message: 'Request not available (limit reached)' });
         }
 
         // Update team with new guide preference and set status to pending
@@ -251,7 +347,7 @@ exports.getTeamsByIds = async (req, res) => {
         const idsParam = req.query.ids;
         if (!idsParam) return res.status(400).json({ message: 'ids query parameter required' });
         const ids = idsParam.split(',').map(id => id.trim()).filter(Boolean);
-        const teams = await Team.find({ _id: { $in: ids } }).select('_id teamName');
+        const teams = await Team.find({ _id: { $in: ids } }).select('_id teamName programme');
         res.json(teams);
     } catch (error) {
         console.error('Error in getTeamsByIds:', error);
@@ -268,13 +364,39 @@ exports.uploadReport = async (req, res) => {
             return res.status(404).json({ message: 'Team not found' });
         }
 
+        if (!team.isLocked) {
+            return res.status(403).json({ message: 'Team must be locked before uploading the final report.' });
+        }
+
         if (!req.file) {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
         const existingReport = await FinalReport.findOne({ team: team._id });
         if (existingReport) {
-            return res.status(400).json({ message: 'Report already uploaded' });
+            if (existingReport.status !== 'rejected') {
+                return res.status(400).json({ message: 'Report already uploaded' });
+            } else {
+                const fs = require('fs');
+                const path = require('path');
+                const oldPath = path.join(__dirname, '..', existingReport.filePath);
+                if (fs.existsSync(oldPath)) {
+                    try {
+                        fs.unlinkSync(oldPath);
+                    } catch (e) {
+                        console.warn('Failed to delete old rejected file:', e);
+                    }
+                }
+                existingReport.filePath = req.file.path;
+                existingReport.fileName = req.file.originalname;
+                existingReport.uploadedBy = userId;
+                existingReport.status = 'uploaded';
+                existingReport.remarks = '';
+                existingReport.rejectedAt = null;
+                existingReport.approvedBy = undefined;
+                await existingReport.save();
+                return res.status(200).json({ message: 'Report updated successfully', report: existingReport });
+            }
         }
 
         const newReport = new FinalReport({
@@ -325,6 +447,10 @@ exports.deleteMyTeam = async (req, res) => {
             return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
         }
 
+        if (team.isLocked) {
+            return res.status(400).json({ message: 'This team is locked and cannot be disbanded. Only an administrator can delete a locked team.' });
+        }
+
         // Clear any schedules and assignments referencing this team
         try {
             const TimeTable = require('../models/TimeTable');
@@ -340,5 +466,280 @@ exports.deleteMyTeam = async (req, res) => {
     } catch (error) {
         console.error('Error deleting team:', error);
         res.status(500).json({ message: 'Error deleting team' });
+    }
+};
+
+// Get all pending team invitations for a student
+exports.getTeamInvitations = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const invitations = await Team.find({
+            memberStatus: {
+                $elemMatch: {
+                    user: userId,
+                    status: 'pending'
+                }
+            }
+        }).populate('teamLeader', 'username name')
+          .populate('memberStatus.user', 'username name');
+        
+        res.json(invitations);
+    } catch (error) {
+        console.error('Error fetching team invitations:', error);
+        res.status(500).json({ message: 'Error fetching team invitations' });
+    }
+};
+
+// Accept or reject a team invitation
+exports.respondToInvitation = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { teamId, action } = req.body;
+
+        if (!['accept', 'reject'].includes(action)) {
+            return res.status(400).json({ message: 'Invalid action. Must be accept or reject.' });
+        }
+
+        const team = await Team.findById(teamId);
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found' });
+        }
+
+        const memberIdx = team.memberStatus.findIndex(m => m.user.toString() === userId && m.status === 'pending');
+        if (memberIdx === -1) {
+            return res.status(400).json({ message: 'No pending invitation found for this team.' });
+        }
+
+        if (action === 'accept') {
+            team.memberStatus[memberIdx].status = 'accepted';
+            if (!team.members.includes(userId)) {
+                team.members.push(userId);
+            }
+            
+            // Recalculate if team is complete
+            const allAccepted = team.memberStatus.length > 0 && team.memberStatus.every(m => m.status === 'accepted');
+            team.isTeamComplete = allAccepted;
+
+            await team.save();
+
+            // Set pending status in all other teams to rejected
+            await Team.updateMany(
+                {
+                    _id: { $ne: teamId },
+                    memberStatus: {
+                        $elemMatch: {
+                            user: userId,
+                            status: 'pending'
+                        }
+                    }
+                },
+                {
+                    $set: { 'memberStatus.$[elem].status': 'rejected' }
+                },
+                {
+                    arrayFilters: [{ 'elem.user': userId, 'elem.status': 'pending' }]
+                }
+            );
+
+            return res.json({ message: 'Invitation accepted successfully', team });
+        } else {
+            // reject
+            team.memberStatus[memberIdx].status = 'rejected';
+            team.members = team.members.filter(m => m.toString() !== userId);
+            
+            // Recalculate complete
+            const allAccepted = team.memberStatus.length > 0 && team.memberStatus.every(m => m.status === 'accepted');
+            team.isTeamComplete = allAccepted;
+
+            await team.save();
+            return res.json({ message: 'Invitation rejected successfully', team });
+        }
+    } catch (error) {
+        console.error('Error responding to invitation:', error);
+        res.status(500).json({ message: 'Error processing response to invitation' });
+    }
+};
+
+// Invite a new member to an existing team (leader only)
+exports.inviteMember = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { studentId } = req.body;
+
+        const team = await Team.findOne({ teamLeader: userId });
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
+        }
+
+        if (team.isLocked) {
+            return res.status(400).json({ message: 'This team is locked and cannot be modified.' });
+        }
+
+        // Get max team size from config
+        const config = await Config.findOne();
+        const maxTeamSize = config ? config.maxTeamSize : 4;
+
+        // Check current number of invited/accepted members + leader (1) (EXCLUDING REJECTED MEMBERS!)
+        const activeInvitesCount = team.memberStatus.filter(m => m.status !== 'rejected').length;
+        const currentTotalSize = activeInvitesCount + 1;
+        if (currentTotalSize >= maxTeamSize) {
+            return res.status(400).json({ message: `Team size cannot exceed ${maxTeamSize} members.` });
+        }
+
+        // Check if student is already in memberStatus
+        const alreadyInvited = team.memberStatus.some(m => m.user.toString() === studentId);
+        if (alreadyInvited) {
+            const member = team.memberStatus.find(m => m.user.toString() === studentId);
+            if (member.status === 'rejected') {
+                member.status = 'pending';
+                team.isTeamComplete = false;
+                await team.save();
+                return res.json({ message: 'Member re-invited successfully!', team });
+            }
+            return res.status(400).json({ message: 'Student is already invited or a member.' });
+        }
+
+        // Check if student is already a team leader or member of a complete team
+        const otherTeam = await Team.findOne({
+            $or: [
+                { teamLeader: studentId },
+                { members: studentId }
+            ]
+        });
+        if (otherTeam) {
+            return res.status(400).json({ message: 'Student is already part of another team.' });
+        }
+
+        // Add to memberStatus
+        team.memberStatus.push({ user: studentId, status: 'pending' });
+        team.isTeamComplete = false;
+        await team.save();
+
+        res.json({ message: 'Invitation sent successfully!', team });
+    } catch (error) {
+        console.error('Error inviting member:', error);
+        res.status(500).json({ message: 'Error inviting member.' });
+    }
+};
+
+// Remove a member from the team (leader only)
+exports.removeMember = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { studentId } = req.body;
+
+        const team = await Team.findOne({ teamLeader: userId });
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
+        }
+
+        if (team.isLocked) {
+            return res.status(400).json({ message: 'This team is locked and cannot be modified.' });
+        }
+
+        // Remove from members
+        team.members = team.members.filter(m => m.toString() !== studentId);
+
+        // Remove from memberStatus
+        team.memberStatus = team.memberStatus.filter(m => m.user.toString() !== studentId);
+
+        // Recalculate completeness
+        const allAccepted = team.memberStatus.length > 0 && team.memberStatus.every(m => m.status === 'accepted');
+        team.isTeamComplete = allAccepted;
+
+        await team.save();
+        res.json({ message: 'Member removed successfully!', team });
+    } catch (error) {
+        console.error('Error removing member:', error);
+        res.status(500).json({ message: 'Error removing member.' });
+    }
+};
+
+// Request to lock the team (leader only)
+exports.requestLock = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const team = await Team.findOne({ teamLeader: userId });
+        
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
+        }
+
+        if (team.isLocked) {
+            return res.status(400).json({ message: 'The team is already locked.' });
+        }
+
+        // CRITICAL CHECK: Enforce that no pending invitations exist before locking is authorized
+        const hasPendingInvites = team.memberStatus.some(m => m.status === 'pending');
+        if (hasPendingInvites) {
+            return res.status(400).json({ 
+                message: 'Cannot lock team. You have pending invitations. Please wait for them to respond or remove them before locking.' 
+            });
+        }
+
+        // Filter out accepted partners
+        const acceptedMembers = team.memberStatus.filter(m => m.status === 'accepted');
+        team.members = acceptedMembers.map(m => m.user);
+        team.isTeamComplete = true; 
+        team.isLocked = true;
+        team.lockRequested = false;
+        
+        // Reset lock approval consensus flags
+        team.memberStatus.forEach(m => {
+            if (m.status === 'accepted') {
+                m.lockApproved = true;
+            }
+        });
+
+        await team.save();
+        return res.json({ 
+            message: 'Your team configuration has been finalized and locked successfully!', 
+            team 
+        });
+    } catch (error) {
+        console.error('Error locking team:', error);
+        res.status(500).json({ message: 'Error locking team.' });
+    }
+};
+
+// Cancel lock request (leader only)
+exports.cancelLockRequest = async (req, res) => {
+    return res.status(400).json({ message: 'Team lock is immediate. There is no pending lock request to cancel.' });
+};
+
+// Approve lock request (member only)
+exports.approveLock = async (req, res) => {
+    return res.status(400).json({ message: 'Team lock is immediate. Member approval is not required.' });
+};
+
+// Cancel guide request (leader only)
+exports.cancelGuideRequest = async (req, res) => {
+    try {
+        const teamLeaderId = req.user.id;
+
+        // Find the team where the current user is the team leader
+        const team = await Team.findOne({ teamLeader: teamLeaderId });
+
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
+        }
+
+        if (!team.guidePreference) {
+            return res.status(400).json({ message: 'No active guide request to cancel.' });
+        }
+
+        if (team.status !== 'pending') {
+            return res.status(400).json({ message: 'Only pending guide requests can be cancelled.' });
+        }
+
+        // Cancel the guide request
+        team.guidePreference = null;
+        team.status = 'pending';
+        await team.save();
+
+        res.json({ message: 'Guide request cancelled successfully!', team });
+    } catch (error) {
+        console.error('Error cancelling guide request:', error);
+        res.status(500).json({ message: 'Server error' });
     }
 };

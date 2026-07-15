@@ -157,7 +157,6 @@ const GuideMe = ({ userRole, memberType }) => {
                             description: "Manage review schedules",
                             features: [
                                 "View review schedules",
-                                "Set availability",
                                 "Coordinate with panels",
                                 "Track review progress"
                             ]
@@ -214,7 +213,6 @@ const GuideMe = ({ userRole, memberType }) => {
                             description: "Manage your review schedule",
                             features: [
                                 "View scheduled reviews",
-                                "Set availability",
                                 "Coordinate with teams",
                                 "Track review dates"
                             ]

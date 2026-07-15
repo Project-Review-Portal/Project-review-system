@@ -2,8 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const TemplatePreparator = require('./utils/templatePreparator');
-const AdvancedDocumentProcessor = require('./utils/advancedDocumentProcessor');
+const TemplatePreparator = require('../utils/templatePreparator');
+const AdvancedDocumentProcessor = require('../utils/advancedDocumentProcessor');
 
 class DocumentSystemSetup {
     constructor() {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626"; 
 const ResetPassword = () => {
   const [form, setForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [status, setStatus] = useState({ type: '', message: '' });
@@ -33,7 +33,7 @@ const ResetPassword = () => {
         setTimeout(() => { window.location.href = '/'; }, 1000);
         return;
       }
-      const res = await axios.post('http://localhost:5000/api/auth/reset-password', form, {
+      const res = await axios.post(`${SERVER_API_KEY}/api/auth/reset-password`, form, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setStatus({ type: 'success', message: res.data.message || 'Password updated successfully. Please sign in again.' });

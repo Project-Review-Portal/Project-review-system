@@ -1,0 +1,6 @@
+PanelController.js
+
+in this file, we are temporarily assinging panel names as panel 1, panel 2, panel 3, and so on. In the future, 
+we can modify this to assign meaningful names based on the actual panels being used in the application.
+So hence we have to update this code to check if the two panels are the same or not, 
+if they are the same then we have to return an error message saying "Panel Name already exists, please choose a different name." where N is the panel number that is being assigned.

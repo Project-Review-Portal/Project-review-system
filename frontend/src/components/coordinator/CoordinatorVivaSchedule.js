@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626"; 
 const DURATION_OPTIONS = [15, 20, 30, 45, 60];
 
 const CoordinatorVivaSchedule = () => {
   const [user, setUser] = useState(null);
+  const [slotTypes, setSlotTypes] = useState(['review1', 'review2', 'review3', 'viva']);
+  const [vivaRequired, setVivaRequired] = useState(true);
   const [form, setForm] = useState({
     date: '',
     startTime: '',
@@ -28,7 +30,22 @@ const CoordinatorVivaSchedule = () => {
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
+    fetchSettings();
   }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const settingsRes = await axios.get(`${SERVER_API_KEY}/api/auth/review-settings`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const validSlots = settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva'];
+      setSlotTypes(validSlots);
+      setVivaRequired(settingsRes.data.vivaRequired !== false);
+    } catch (err) {
+      console.error('Failed to fetch review settings:', err);
+    }
+  };
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -73,7 +90,7 @@ const CoordinatorVivaSchedule = () => {
       const token = localStorage.getItem('token');
       // Fetch teams and slots as before
       const res = await axios.post(
-        'http://localhost:5000/api/panels/coordinator/generate-slots',
+        `${SERVER_API_KEY}/api/panels/coordinator/generate-slots`,
         {
           slotType: 'viva',
           date: form.date,
@@ -86,35 +103,25 @@ const CoordinatorVivaSchedule = () => {
       setSlots(res.data.slots);
       setTeams(res.data.teams);
       setAssignments(res.data.teams.map((team) => ({ teamId: team._id, slot: null })));
-      // Fetch attendance status for all three reviews
-      const attRes = await axios.post(
-        'http://localhost:5000/api/panels/attendance/check',
-        {
-          teamIds: res.data.teams.map(t => t._id),
-          reviewType: 'review1',
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const attRes2 = await axios.post(
-        'http://localhost:5000/api/panels/attendance/check',
-        {
-          teamIds: res.data.teams.map(t => t._id),
-          reviewType: 'review2',
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const attRes3 = await axios.post(
-        'http://localhost:5000/api/panels/attendance/check',
-        {
-          teamIds: res.data.teams.map(t => t._id),
-          reviewType: 'review3',
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      // Only allow teams with all three reviews marked
+      
+      // Fetch attendance status for all configured reviews (exclude viva itself)
+      const reviews = slotTypes.filter(s => s !== 'viva');
+      const attendanceRequests = reviews.map(reviewType => {
+        return axios.post(
+          `${SERVER_API_KEY}/api/panels/attendance/check`,
+          {
+            teamIds: res.data.teams.map(t => t._id),
+            reviewType: reviewType,
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      });
+      const attendanceResults = await Promise.all(attendanceRequests);
+
+      // Only allow teams with all reviews marked
       const status = {};
       res.data.teams.forEach(team => {
-        status[team._id] = attRes.data[team._id] && attRes2.data[team._id] && attRes3.data[team._id];
+        status[team._id] = attendanceResults.every(resObj => resObj.data[team._id]);
       });
       setAttendanceStatus(status);
       // Also check previous review schedules for viva
@@ -163,7 +170,7 @@ const CoordinatorVivaSchedule = () => {
         usedSlots.add(slotKey);
       }
       await axios.post(
-        'http://localhost:5000/api/panels/coordinator/assign-slots',
+        `${SERVER_API_KEY}/api/panels/coordinator/assign-slots`,
         {
           slotType: 'viva',
           date: form.date,
@@ -191,7 +198,7 @@ const CoordinatorVivaSchedule = () => {
       setLoadingSchedules(true);
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get('http://localhost:5000/api/panels/coordinator/allotted-schedules', {
+        const res = await axios.get(`${SERVER_API_KEY}/api/panels/coordinator/allotted-schedules`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setAllottedSchedules(res.data.filter(s => s.slotType === 'viva'));
@@ -214,6 +221,15 @@ const CoordinatorVivaSchedule = () => {
       <div className="bg-white p-6 rounded-lg shadow text-center">
         <h2 className="text-2xl font-bold mb-2">Access Restricted</h2>
         <p className="text-red-600">You are not a coordinator for any team.</p>
+      </div>
+    );
+  }
+
+  if (!vivaRequired) {
+    return (
+      <div className="bg-white p-6 rounded-lg shadow text-center">
+        <h2 className="text-2xl font-bold mb-2 text-red-600">Viva is not required</h2>
+        <p className="text-red-500 font-semibold">The administrator has configured the system such that Viva is not required.</p>
       </div>
     );
   }
@@ -297,10 +313,10 @@ const CoordinatorVivaSchedule = () => {
                             })}
                           </select>
                         ) : (
-                          <span className="text-red-600">Attendance not marked for all three reviews</span>
+                          <span className="text-red-600">Attendance not marked for all reviews</span>
                         )
                       ) : (
-                        <span className="text-red-600">Cannot schedule viva before scheduling all three reviews</span>
+                        <span className="text-red-600">Cannot schedule viva before scheduling all reviews</span>
                       )}
                     </td>
                   </tr>

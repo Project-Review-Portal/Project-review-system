@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const InternalExaminerGenerator = () => {
     const [formData, setFormData] = useState({});
     const [templateStructure, setTemplateStructure] = useState(null);
@@ -19,7 +21,7 @@ const InternalExaminerGenerator = () => {
 
     const fetchTemplateStructure = async () => {
         try {
-            const response = await axios.get('/api/internal-examiner/structure', {
+            const response = await axios.get(`${SERVER_API_KEY}/api/internal-examiner/structure`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             
@@ -39,7 +41,7 @@ const InternalExaminerGenerator = () => {
 
     const checkTemplateStatus = async () => {
         try {
-            const response = await axios.get('/api/internal-examiner/status', {
+            const response = await axios.get(`${SERVER_API_KEY}/api/internal-examiner/status`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             setTemplateStatus(response.data);
@@ -51,7 +53,7 @@ const InternalExaminerGenerator = () => {
     const loadSampleData = async () => {
         try {
             setLoading(true);
-            const response = await axios.get('/api/internal-examiner/sample-data', {
+            const response = await axios.get(`${SERVER_API_KEY}/api/internal-examiner/sample-data`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             setFormData(response.data.sampleData);
@@ -65,7 +67,7 @@ const InternalExaminerGenerator = () => {
 
     const showPreparationGuide = async () => {
         try {
-            const response = await axios.get('/api/internal-examiner/guide', {
+            const response = await axios.get(`${SERVER_API_KEY}/api/internal-examiner/guide`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             setPreparationGuide(response.data.guide);
@@ -113,7 +115,7 @@ const InternalExaminerGenerator = () => {
             setError('');
             setSuccess('');
 
-            const response = await axios.post('/api/internal-examiner/generate', {
+            const response = await axios.post(`${SERVER_API_KEY}/api/internal-examiner/generate`, {
                 data: formData
             }, {
                 headers: {

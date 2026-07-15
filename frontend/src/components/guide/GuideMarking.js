@@ -1,27 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const GuideMarking = () => {
     const [teams, setTeams] = useState([]);
     const [marks, setMarks] = useState({}); // { studentId: { review1: {...}, review2: {...}, review3: {...}, viva: {...} } }
+    const [slotTypes, setSlotTypes] = useState(['review1', 'review2', 'review3', 'viva']);
     const [activeSlotType, setActiveSlotType] = useState('review1');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [submittingTeamId, setSubmittingTeamId] = useState(null);
 
     useEffect(() => {
-        fetchData();
+        fetchSettingsAndData();
     }, []);
 
-    const fetchData = async () => {
+    const fetchSettingsAndData = async () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
-            const teamsRes = await axios.get('/api/guide/assigned-teams', { headers });
-            setTeams(teamsRes.data);
+            
+            const settingsRes = await axios.get(`${SERVER_API_KEY}/api/auth/review-settings`, { headers });
+            const validSlots = (settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva']).filter(s => s !== 'review0');
+            setSlotTypes(validSlots);
+            if (validSlots.length > 0) {
+                setActiveSlotType(validSlots[0]);
+            }
 
-            const marksRes = await axios.get('/api/guide/marks', { headers });
+            const teamsRes = await axios.get(`${SERVER_API_KEY}/api/guide/assigned-teams`, { headers });
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const selectedProgramme = storedUser.programme;
+            let fetchedTeams = teamsRes.data || [];
+            if (selectedProgramme) {
+                fetchedTeams = fetchedTeams.filter(t => t.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+            }
+            setTeams(fetchedTeams);
+
+            const marksRes = await axios.get(`${SERVER_API_KEY}/api/guide/marks`, { headers });
             setMarks(marksRes.data);
             setLoading(false);
         } catch (err) {
@@ -55,11 +72,11 @@ const GuideMarking = () => {
                 const studentId = stu._id;
                 const studentMarks = ((marks[studentId] || {})[activeSlotType]) || {};
                 const { mark1 = 0, mark2 = 0, mark3 = 0, mark4 = 0 } = studentMarks;
-                return axios.post('/api/guide/marks', { teamId: team._id, studentId, mark1, mark2, mark3, mark4, slotType: activeSlotType }, { headers });
+                return axios.post(`${SERVER_API_KEY}/api/guide/marks`, { teamId: team._id, studentId, mark1, mark2, mark3, mark4, slotType: activeSlotType }, { headers });
             });
             await Promise.all(requests);
             alert('All marks submitted successfully!');
-            await fetchData();
+            await fetchSettingsAndData();
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to submit marks.');
         } finally {
@@ -75,14 +92,21 @@ const GuideMarking = () => {
             <h2 className="text-2xl font-bold">Mark Teams</h2>
             {/* Slot type tabs */}
             <div className="flex space-x-2">
-                {['review1','review2','review3','viva'].map(st => (
-                    <button key={st} onClick={() => setActiveSlotType(st)} className={`px-3 py-1 rounded ${activeSlotType===st?'bg-indigo-600 text-white':'bg-gray-200 text-gray-800'}`}>{st.toUpperCase()}</button>
+                {slotTypes.map(st => (
+                    <button key={st} onClick={() => setActiveSlotType(st)} className={`px-3 py-1 rounded ${activeSlotType===st?'bg-indigo-600 text-white':'bg-gray-200 text-gray-800'}`}>
+                        {st === 'viva' ? 'VIVA' : `REVIEW ${st.replace('review', '')}`}
+                    </button>
                 ))}
             </div>
 
             {teams.map(team => (
                 <div key={team._id} className="p-6 bg-white rounded-lg shadow">
-                    <h3 className="text-xl font-semibold mb-4">{team.teamName}</h3>
+                    <div className="flex items-center gap-3 mb-4">
+                        <h3 className="text-xl font-semibold">{team.teamName}</h3>
+                        <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                            {team.programme || 'UG'}
+                        </span>
+                    </div>
                     <div className="overflow-x-auto">
                         <table className="min-w-full">
                             <thead>

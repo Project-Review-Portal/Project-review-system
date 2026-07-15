@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const GuideRequestManagement = () => {
     const [user, setUser] = useState(null);
     const [guideSelectionDates, setGuideSelectionDates] = useState({ startDate: null, endDate: null });
@@ -37,7 +39,7 @@ const GuideRequestManagement = () => {
             const headers = { Authorization: `Bearer ${token}` };
 
             // Fetch guide selection dates from the new public endpoint
-            const datesRes = await axios.get('http://localhost:5000/api/guide/selection-dates', { headers });
+            const datesRes = await axios.get(`${SERVER_API_KEY}/api/guide/selection-dates`, { headers });
             const { startDate, endDate } = datesRes.data;
             setGuideSelectionDates({ startDate, endDate });
             const now = new Date();
@@ -47,7 +49,7 @@ const GuideRequestManagement = () => {
             setIsRequestPeriodActive(activePeriod);
 
             // Fetch user's team and existing request
-            const teamRes = await axios.get('http://localhost:5000/api/teams/my-team', { headers });
+            const teamRes = await axios.get(`${SERVER_API_KEY}/api/teams/my-team`, { headers });
             setMyTeam(teamRes.data);
             console.log('--- fetchData Debug ---'); // Added debug separator
             console.log('fetchData: myTeam after fetch:', teamRes.data); // Debug log
@@ -67,7 +69,7 @@ const GuideRequestManagement = () => {
             if (teamRes.data && teamRes.data.teamLeader && teamRes.data.teamLeader._id && currentUser?.id && teamRes.data.teamLeader._id === currentUser.id && activePeriod) { 
                 // Only fetch guides if there's no current accepted/pending request, or if it's rejected
                 if (!teamRes.data.guidePreference || teamRes.data.status === 'rejected') {
-                    const guidesRes = await axios.get('http://localhost:5000/api/teams/guides', { headers });
+                    const guidesRes = await axios.get(`${SERVER_API_KEY}/api/teams/guides`, { headers });
                     setGuides(guidesRes.data);
                 } else {
                     setGuides([]); // Clear guides if there's an active request
@@ -87,6 +89,12 @@ const GuideRequestManagement = () => {
         console.log('Guide ID to request:', guideId); // Debug log
         console.log('Current user ID:', user?.id); // Debug log
         console.log('My team object:', myTeam); // Debug log
+
+        const selectedGuide = guides.find((guide) => guide._id === guideId);
+        if (selectedGuide && selectedGuide.canRequest === false) {
+            setError('Request not available (limit reached) for this guide.');
+            return;
+        }
 
         if (!myTeam || myTeam.teamLeader._id !== user?.id) {
             setError('Only team leaders can send guide requests.');
@@ -110,13 +118,37 @@ const GuideRequestManagement = () => {
             const headers = { Authorization: `Bearer ${token}` };
             
             console.log('Sending POST request to /api/teams/request-guide with guideId:', guideId); // Debug log
-            await axios.post('http://localhost:5000/api/teams/request-guide', { guideId }, { headers });
+            await axios.post(`${SERVER_API_KEY}/api/teams/request-guide`, { guideId }, { headers });
             setMessage('Guide request sent successfully!');
             console.log('Request sent successfully, re-fetching data.'); // Debug log
             fetchData(user); // Re-fetch data to update request status
         } catch (err) {
             console.error('Error sending request:', err);
             setError(err.response?.data?.message || 'Failed to send request.');
+        }
+    };
+
+    const handleCancelRequest = async () => {
+        if (!window.confirm('Are you sure you want to cancel your guide request?')) {
+            return;
+        }
+
+        setMessage('');
+        setError('');
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('Unable to cancel request: Authentication token not found.');
+                return;
+            }
+            const headers = { Authorization: `Bearer ${token}` };
+            await axios.post(`${SERVER_API_KEY}/api/teams/cancel-guide-request`, {}, { headers });
+            setMessage('Guide request cancelled successfully!');
+            fetchData(user);
+        } catch (err) {
+            console.error('Error cancelling request:', err);
+            const errMsg = err.response?.data?.message || 'Failed to cancel request.';
+            alert(`Unable to cancel request: ${errMsg}`);
         }
     };
 
@@ -130,6 +162,17 @@ const GuideRequestManagement = () => {
 
     if (!myTeam) {
         return <div className="bg-white p-6 rounded-lg shadow text-gray-700">You must be part of a team to request a guide.</div>;
+    }
+
+    if (!myTeam.isLocked) {
+        return (
+            <div className="bg-white p-6 rounded-lg shadow space-y-4">
+                <h2 className="text-2xl font-semibold">Guide Request Management</h2>
+                <div className="p-4 bg-yellow-50 text-yellow-800 border-l-4 border-yellow-400 rounded text-sm font-medium">
+                    <strong>Notice:</strong> Your team is currently unlocked. You must lock and finalize your team on the <b>My Team</b> page before you can request a guide.
+                </div>
+            </div>
+        );
     }
 
     const isTeamLeader = myTeam.teamLeader._id === user?.id; // Use optional chaining for user.id
@@ -199,6 +242,19 @@ const GuideRequestManagement = () => {
                                  myTeam.status}
                             </span>
                         </p>
+                        {myTeam.guidePreference && isTeamLeader && (
+                            <button
+                                onClick={handleCancelRequest}
+                                disabled={myTeam.status === 'approved'}
+                                className={`mt-2 px-4 py-2 text-sm text-white rounded-md transition-colors ${
+                                    myTeam.status === 'approved'
+                                        ? 'bg-gray-400 cursor-not-allowed'
+                                        : 'bg-red-600 hover:bg-red-700'
+                                }`}
+                            >
+                                Cancel Request
+                            </button>
+                        )}
                         {myTeam.status === 'rejected' && isTeamLeader && isRequestPeriodActive && (
                             <button
                                 onClick={() => {
@@ -227,17 +283,50 @@ const GuideRequestManagement = () => {
                         <p className="text-gray-500">No guides available at this time.</p>
                     ) : (
                         <ul className="space-y-3">
-                            {guides.map(guide => (
-                                <li key={guide._id} className="flex justify-between items-center p-2 border rounded-md bg-gray-50">
-                                    <span className="font-medium">{guide.name}</span>
-                                    <button
-                                        onClick={() => handleSendRequest(guide._id)}
-                                        className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                            {guides.map(guide => {
+                                const limitReached = guide.canRequest === false;
+                                return (
+                                    <li
+                                        key={guide._id}
+                                        className={`flex justify-between items-center p-3 border rounded-md ${
+                                            limitReached
+                                                ? 'bg-gray-200 border-gray-300 opacity-80'
+                                                : 'bg-gray-50 border-gray-200'
+                                        }`}
                                     >
-                                        Send Request
-                                    </button>
-                                </li>
-                            ))}
+                                        <div>
+                                            <span className={`font-medium ${limitReached ? 'text-gray-600' : 'text-gray-900'}`}>
+                                                {guide.name}
+                                            </span>
+                                            {guide.designation && (
+                                                <span className="text-sm text-gray-500 ml-2">({guide.designation})</span>
+                                            )}
+                                            {guide.teamLimit != null && (
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Accepted teams: {guide.currentTeamCount}/{guide.teamLimit}
+                                                </p>
+                                            )}
+                                            {limitReached && (
+                                                <p className="text-sm text-red-600 mt-1 font-medium">
+                                                    Guide has reached their team limit
+                                                </p>
+                                            )}
+                                        </div>
+                                        {limitReached ? (
+                                            <span className="text-sm text-gray-500 italic px-4 py-2">
+                                                Request not available
+                                            </span>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleSendRequest(guide._id)}
+                                                className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                                            >
+                                                Send Request
+                                            </button>
+                                        )}
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                 </div>

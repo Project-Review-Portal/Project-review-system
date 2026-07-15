@@ -11,51 +11,32 @@ const FacultyDashboard = () => {
   const user = JSON.parse(localStorage.getItem('user'));
   const navigate = useNavigate();
 
-  // Aggregate faculty roles with their teams
-  const roleMap = {};
-  (user.roles || []).forEach(r => {
+  // Aggregate faculty roles with their programmes
+  const seenKeys = new Set();
+  const facultyRoles = [];
+  (user?.roles || []).forEach(r => {
     if (!['guide','panel','coordinator'].includes(r.role)) return;
-    if (!roleMap[r.role]) roleMap[r.role] = new Set();
-    if (r.team) roleMap[r.role].add(r.team);
+    const programme = r.programme || 'UG';
+    const key = `${r.role}-${programme}`;
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      facultyRoles.push({ role: r.role, programme });
+    }
   });
-  const facultyRoles = Object.keys(roleMap).map(role => ({ role, teams: Array.from(roleMap[role]) }));
-
-  // Fetch team names for display
-  const [teamNames, setTeamNames] = React.useState({});
-  React.useEffect(() => {
-    const allTeamIds = facultyRoles.flatMap(r => r.teams);
-    if (!allTeamIds || allTeamIds.length === 0) return;
-    const idsParam = allTeamIds.join(',');
-    const fetchNames = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`http://localhost:5000/api/teams/by-ids?ids=${idsParam}`, { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) return;
-        const data = await res.json();
-        const map = {};
-        data.forEach(t => { map[t._id] = t.teamName; });
-        setTeamNames(map);
-      } catch (e) {
-        console.warn('Failed to fetch team names', e);
-      }
-    };
-    fetchNames();
-  }, [JSON.stringify(facultyRoles)]);
 
   const handleSelect = (roleObj) => {
-    // roleObj may be a string (legacy) or { role, teams }
-    const role = typeof roleObj === 'string' ? roleObj : roleObj.role;
-    // If teams array present and exactly one, pick that team; otherwise leave team unset
-  // Default to first team id if teams exist
-  const team = (roleObj && roleObj.teams && roleObj.teams.length > 0) ? roleObj.teams[0] : null;
+    const role = roleObj.role;
+    const programme = roleObj.programme;
 
-    // Save selected role in localStorage for use in dashboards
-    localStorage.setItem('selectedRole', JSON.stringify({ role, team }));
+    // Save selected role and programme in localStorage for use in dashboards
+    localStorage.setItem('selectedRole', JSON.stringify({ role, programme }));
+    
     // Also update user object in localStorage for ProtectedRoute
     const storedUser = JSON.parse(localStorage.getItem('user')) || {};
     storedUser.role = role;
-    if (team) storedUser.team = team;
+    storedUser.programme = programme;
     localStorage.setItem('user', JSON.stringify(storedUser));
+    
     // Redirect to the appropriate dashboard
     if (role === 'guide') navigate('/guide-dashboard');
     else if (role === 'panel') navigate('/panel-dashboard');
@@ -69,19 +50,19 @@ const FacultyDashboard = () => {
           Welcome
         </h2>
         <p className="text-center text-gray-700 mb-6">
-          You have multiple roles. Please select which dashboard you want to access:
+          Please select which dashboard you want to access:
         </p>
         <div className="space-y-4">
-          {facultyRoles.map((roleObj) => (
+          {facultyRoles.map((roleObj, index) => (
             <button
-              key={roleObj.role}
+              key={index}
               className="w-full py-3 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700 focus:outline-none text-lg font-semibold flex justify-between items-center"
               onClick={() => handleSelect(roleObj)}
             >
-              <span>{roleLabels[roleObj.role]}</span>
-              {roleObj.teams && roleObj.teams.length > 0 && (
-                <span className="text-sm opacity-90">{roleObj.teams.map(t => teamNames[t] ? teamNames[t] : `Team ${t}`).join(', ')}</span>
-              )}
+              <span>{roleLabels[roleObj.role]} ({roleObj.programme})</span>
+              <svg className="w-5 h-5 text-indigo-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
             </button>
           ))}
         </div>

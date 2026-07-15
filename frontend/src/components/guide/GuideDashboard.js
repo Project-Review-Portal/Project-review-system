@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+
 const GuideDashboard = () => {
   const [teamFormationOpen, setTeamFormationOpen] = useState(true);
   const [guideSelectionStart, setGuideSelectionStart] = useState(null);
@@ -12,11 +14,11 @@ const GuideDashboard = () => {
     const fetchRules = async () => {
       try {
         const token = localStorage.getItem('token');
-        const configRes = await fetch('http://localhost:5000/api/teams/config/public');
+        const configRes = await fetch(`${SERVER_API_KEY}/api/teams/config/public`);
         const configData = await configRes.json();
         setTeamFormationOpen(configData.teamFormationOpen);
         if (token) {
-          const guideDatesRes = await fetch('http://localhost:5000/api/guide/selection-dates', {
+          const guideDatesRes = await fetch(`${SERVER_API_KEY}/api/guide/selection-dates`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (guideDatesRes.ok) {
@@ -47,7 +49,7 @@ const GuideDashboard = () => {
             <ul className="list-disc list-inside space-y-2 text-gray-700 mb-4">
               <li>You can only approve or reject guide requests during the guide selection period.</li>
               <li>You are responsible for reviewing and approving teams that request you as a guide.</li>
-              <li>Submit your availability for review periods as required.</li>
+
               <li>Mark and upload attendance for your assigned teams.</li>
               <li>You cannot change team compositions; only approve or reject requests.</li>
             </ul>

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const teamController = require('../controllers/teamController');
 const auth = require('../middleware/auth');
-const upload = require('../middleware/upload');
+const { reportUpload } = require('../middleware/upload');
 const Config = require('../models/Config');
 
 // Catch-all logger for team routes
@@ -17,9 +17,19 @@ router.post('/create', auth, teamController.createTeam);
 router.get('/my-team', auth, teamController.getUserTeam);
 router.get('/my-assigned-panel', auth, teamController.getAssignedPanel);
 router.post('/request-guide', auth, teamController.requestGuide);
+router.post('/cancel-guide-request', auth, teamController.cancelGuideRequest);
 router.delete('/my-team', auth, teamController.deleteMyTeam);
 
-router.post('/report/upload', auth, upload, teamController.uploadReport);
+router.post('/report/upload', auth, reportUpload, teamController.uploadReport);
+router.get('/invitations', auth, teamController.getTeamInvitations);
+router.post('/respond-invitation', auth, teamController.respondToInvitation);
+router.post('/invite', auth, teamController.inviteMember);
+router.post('/remove-member', auth, teamController.removeMember);
+router.post('/request-lock', auth, teamController.requestLock);
+router.post('/cancel-lock', auth, teamController.cancelLockRequest);
+router.post('/approve-lock', auth, teamController.approveLock);
+
+// router.post('/report/upload', auth, upload, teamController.uploadReport);
 router.get('/report/status', auth, teamController.getReportStatus);
 
 // New route for fetching max team size for public (student) view

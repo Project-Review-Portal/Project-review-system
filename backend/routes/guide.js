@@ -13,9 +13,7 @@ router.post('/team-requests/reject', auth, authorize(['guide', 'admin']), guideC
 router.get('/approved-teams', auth, authorize(['guide', 'admin']), guideController.getApprovedTeams);
 router.post('/request-timetable', auth, authorize(['guide', 'admin']), guideController.requestTimeTable);
 
-// Availability routes (allow both guide and admin)
-router.get('/availability', auth, authorize(['guide', 'admin']), guideController.getGuideAvailability);
-router.post('/availability', auth, authorize(['guide', 'admin']), guideController.submitGuideAvailability);
+
 
 // New route to get review schedules for a guide (allow both guide and admin)
 router.get('/review-schedules', auth, authorize(['guide', 'admin']), guideController.getGuideReviewSchedules);
@@ -24,16 +22,20 @@ router.get('/review-schedules', auth, authorize(['guide', 'admin']), guideContro
 router.get('/selection-dates', auth, guideController.getGuideSelectionDatesPublic);
 
 // New route for getting assigned teams
-router.get('/assigned-teams', auth, guideController.getAssignedTeams);
+router.get('/assigned-teams', auth, authorize(['guide', 'panel', 'coordinator', 'admin']), guideController.getAssignedTeams);
 
 // New route for getting review period dates
 router.get('/review-period-dates', auth, guideController.getReviewPeriodDatesPublic);
 
 // New route for getting daily attendance
-router.get('/daily-attendance', auth, guideController.getDailyAttendance);
+router.get('/daily-attendance', auth, authorize(['guide', 'panel', 'coordinator', 'admin']), guideController.getDailyAttendance);
 
 // New route for uploading attendance
-router.post('/upload-attendance', auth, guideController.uploadAttendance);
+router.post('/upload-attendance', auth, authorize(['panel', 'coordinator']), guideController.uploadAttendance);
+
+// New routes for locking/unlocking attendance
+router.post('/lock-attendance', auth, authorize(['coordinator', 'admin']), guideController.lockAttendance);
+router.post('/unlock-attendance', auth, authorize(['admin']), guideController.unlockAttendance);
 
 // New route for submitting marks (allow both guide and admin)
 router.post('/marks', auth, authorize(['guide', 'admin']), guideController.submitMarks);
@@ -44,6 +46,7 @@ router.get('/marks', auth, authorize(['guide', 'admin']), guideController.getMar
 // Final report routes (allow both guide and admin)
 router.get('/reports', auth, authorize(['guide', 'admin']), guideController.getReportsForGuide);
 router.put('/reports/:reportId/approve', auth, authorize(['guide', 'admin']), guideController.approveReport);
+router.put('/reports/:reportId/reject', auth, authorize(['guide', 'admin']), guideController.rejectReport);
 router.get('/reports/:reportId/download', auth, authorize(['guide', 'admin']), guideController.downloadReport);
-
+router.get('/capacity',auth,authorize(['guide']),guideController.getGuideCapacity);
 module.exports = router; 

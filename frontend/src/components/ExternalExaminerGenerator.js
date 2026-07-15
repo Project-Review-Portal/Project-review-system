@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const ExternalExaminerGenerator = () => {
     const [formData, setFormData] = useState({});
     const [templateStructure, setTemplateStructure] = useState(null);
@@ -17,7 +17,7 @@ const ExternalExaminerGenerator = () => {
 
     const fetchTemplateStructure = async () => {
         try {
-            const response = await axios.get('http://localhost:5000/api/external-examiner/structure');
+            const response = await axios.get(`${SERVER_API_KEY}/api/external-examiner/structure`);
             setTemplateStructure(response.data.structure);
             
             // Initialize form data with default values
@@ -34,7 +34,7 @@ const ExternalExaminerGenerator = () => {
 
     const checkTemplateStatus = async () => {
         try {
-            const response = await axios.get('http://localhost:5000/api/external-examiner/status');
+            const response = await axios.get(`${SERVER_API_KEY}/api/external-examiner/status`);
             setTemplateStatus(response.data);
         } catch (error) {
             console.error('Error checking template status:', error);
@@ -43,7 +43,7 @@ const ExternalExaminerGenerator = () => {
 
     const loadSampleData = async () => {
         try {
-            const response = await axios.get('http://localhost:5000/api/external-examiner/sample-data');
+            const response = await axios.get(`${SERVER_API_KEY}/api/external-examiner/sample-data`);
             const sampleData = response.data.sampleData;
             
             setFormData({
@@ -166,7 +166,7 @@ const ExternalExaminerGenerator = () => {
                 students: students
             };
 
-            const response = await axios.post('http://localhost:5000/api/external-examiner/generate', {
+            const response = await axios.post(`${SERVER_API_KEY}/api/external-examiner/generate`, {
                 data: documentData,
                 filename: `Viva_Claim_External_Examiner_${formData.examinerName?.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.docx`
             }, {
@@ -236,7 +236,7 @@ const ExternalExaminerGenerator = () => {
                             )}
                         </ul>
                         <button
-                            onClick={() => window.open('http://localhost:5000/api/external-examiner/guide', '_blank')}
+                            onClick={() => window.open(`${SERVER_API_KEY}/api/external-examiner/guide`, '_blank')}
                             className="mt-2 text-sm underline hover:no-underline"
                         >
                             View Preparation Guide

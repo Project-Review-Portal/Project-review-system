@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import '../../styles/AuthForms.css'; // Reusing styling
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const GuideConfig = () => {
     const [maxTeamsPerGuide, setMaxTeamsPerGuide] = useState('');
     const [guideAssignmentPeriodEnd, setGuideAssignmentPeriodEnd] = useState('');
@@ -20,13 +20,13 @@ const GuideConfig = () => {
                 }
 
                 // Fetch maxTeamsPerGuide
-                const teamsPerGuideRes = await axios.get('http://localhost:5000/api/admin/max-teams-per-guide', {
+                const teamsPerGuideRes = await axios.get(`${SERVER_API_KEY}/api/admin/max-teams-per-guide`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 setMaxTeamsPerGuide(teamsPerGuideRes.data.maxTeamsPerGuide || '');
 
                 // Fetch guideAssignmentPeriodEnd
-                const periodEndRes = await axios.get('http://localhost:5000/api/admin/guide-assignment-period-end', {
+                const periodEndRes = await axios.get(`${SERVER_API_KEY}/api/admin/guide-assignment-period-end`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (periodEndRes.data.guideAssignmentPeriodEnd) {
@@ -54,7 +54,7 @@ const GuideConfig = () => {
         setError('');
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post('http://localhost:5000/api/admin/max-teams-per-guide', {
+            const res = await axios.post(`${SERVER_API_KEY}/api/admin/max-teams-per-guide`, {
                 maxTeamsPerGuide: parseInt(maxTeamsPerGuide)
             }, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -72,7 +72,7 @@ const GuideConfig = () => {
         setError('');
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post('http://localhost:5000/api/admin/guide-assignment-period-end', {
+            const res = await axios.post(`${SERVER_API_KEY}/api/admin/guide-assignment-period-end`, {
                 endDate: guideAssignmentPeriodEnd
             }, {
                 headers: { 'Authorization': `Bearer ${token}` }
