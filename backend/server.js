@@ -29,7 +29,7 @@ let allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:3002',
-    'http://localhost:3626'
+    'http://localhost:5024'
 ];
 
 // 2. Append extra origins from .env if the variable exists
@@ -138,6 +138,14 @@ app.listen(PORT, () => {
                 password: 'cseceg@admin',
                 role: 'admin',
                 roles: [{ role: 'admin', team: null }]
+            },
+            {
+                email: 'cseceg@gmail.com',
+                username: 'cseceg@gmail.com',
+                name: 'System Admin',
+                password: '123',
+                role: 'admin',
+                roles: [{ role: 'admin', team: null }] 
             }
         ];
 

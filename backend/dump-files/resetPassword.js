@@ -2,10 +2,11 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/project-review-system';
 
 const resetPassword = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI, {
+    await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
