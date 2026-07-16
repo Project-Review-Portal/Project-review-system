@@ -17,6 +17,9 @@ router.post('/request-timetable', auth, authorize(['guide', 'admin']), guideCont
 
 // New route to get review schedules for a guide (allow both guide and admin)
 router.get('/review-schedules', auth, authorize(['guide', 'admin']), guideController.getGuideReviewSchedules);
+router.get('/assigned-panels', auth, authorize(['guide', 'admin']), guideController.getGuideAssignedPanels);
+router.get('/panels/:panelId/slots', auth, authorize(['guide', 'admin']), guideController.getPanelSlotsForGuide);
+router.post('/save-slots', auth, authorize(['guide', 'admin']), guideController.savePanelSlotAssignments);
 
 // New route for fetching public guide selection dates
 router.get('/selection-dates', auth, guideController.getGuideSelectionDatesPublic);

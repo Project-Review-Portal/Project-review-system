@@ -651,6 +651,7 @@ exports.generateSlotsForCoordinator = async (req, res) => {
         if (!endTime) errors.push('End time is required.');
         const durationNum = Number(duration);
         if (!durationNum || durationNum <= 0) errors.push('Duration must be a positive number.');
+        let totalMin = 0;
         if (startTime && endTime) {
             try {
                 const [sh, sm] = startTime.split(':').map(Number);
@@ -658,8 +659,8 @@ exports.generateSlotsForCoordinator = async (req, res) => {
                 const startMin = sh * 60 + sm;
                 const endMin = eh * 60 + em;
                 if (endMin <= startMin) errors.push('End time must be after start time.');
-                const windowMinutes = endMin - startMin;
-                if (durationNum > windowMinutes) errors.push('Duration cannot exceed the time window between start and end.');
+                totalMin = endMin - startMin;
+                if (durationNum > totalMin) errors.push('Duration cannot exceed the time window between start and end.');
             } catch (e) {
                 errors.push('Invalid time format.');
             }
@@ -679,16 +680,6 @@ exports.generateSlotsForCoordinator = async (req, res) => {
         }
         
         console.log('✅ Found panel for coordinator:', panel._id, panel.name);
-        
-        // Get all teams for this panel
-        const teams = await Team.find({ panel: panel._id })
-            .populate('teamLeader', 'username name')
-            .populate('members', 'username name')
-            .populate('guidePreference', 'username name');
-        
-        console.log('✅ Found teams for panel:', teams.length);
-
-        // No review sequence validation: coordinators can generate slots regardless of prior reviews
 
         // Generate slots
         const slots = [];
@@ -709,12 +700,94 @@ exports.generateSlotsForCoordinator = async (req, res) => {
             });
             current = slotEnd;
         }
+
+        // Calculate if there are extra minutes left over
+        const extraMin = totalMin % durationNum;
+        let extraMinutesMessage = '';
+        if (extraMin > 0) {
+            extraMinutesMessage = `There are extra ${extraMin} minutes left over at the end of the specified time range.`;
+        }
         
-        console.log('✅ Generated slots:', slots.length);
-        res.json({ slots, teams });
+        console.log('✅ Generated slots:', slots.length, '| Extra mins message:', extraMinutesMessage);
+        res.json({ slots, extraMinutesMessage });
     } catch (error) {
         console.error('Error generating slots:', error);
         res.status(500).json({ message: 'Server error generating slots' });
+    }
+};
+
+// Coordinator: Save generated free slots
+exports.saveFreeSlotsForCoordinator = async (req, res) => {
+    try {
+        const { slotType, slots, date: providedDate } = req.body;
+        // slots: [{ start, end }]
+        const coordinatorId = req.user.id;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
+        const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
+        const panel = await Panel.findOne({ coordinator: coordinatorId, programme });
+        if (!panel) {
+            return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
+        }
+
+        if (!slots || !Array.isArray(slots) || slots.length === 0) {
+            return res.status(400).json({ message: 'No slots provided to save.' });
+        }
+
+        // Create free schedules
+        for (const slot of slots) {
+            let scheduleDate = null;
+            if (providedDate) {
+                scheduleDate = new Date(providedDate);
+            } else if (slot.start) {
+                scheduleDate = new Date(slot.start);
+            }
+            if (!scheduleDate || isNaN(scheduleDate.getTime())) {
+                return res.status(400).json({ message: `Invalid or missing date.` });
+            }
+
+            // Normalize date field to midnight (date-only)
+            const dateOnly = new Date(scheduleDate);
+            dateOnly.setHours(0, 0, 0, 0);
+
+            // Validate slot times
+            if (!slot.start || !slot.end) {
+                return res.status(400).json({ message: `Missing slot start/end times.` });
+            }
+            const startD = new Date(slot.start);
+            const endD = new Date(slot.end);
+            if (isNaN(startD.getTime()) || isNaN(endD.getTime())) {
+                return res.status(400).json({ message: `Invalid slot time.` });
+            }
+            if (endD <= startD) {
+                return res.status(400).json({ message: `End time must be after start time.` });
+            }
+            
+            // Compose period as HH:mm-HH:mm
+            const pad = (n) => String(n).padStart(2, '0');
+            const period = `${pad(startD.getHours())}:${pad(startD.getMinutes())}-${pad(endD.getHours())}:${pad(endD.getMinutes())}`;
+
+            // Create free schedule slot (team is null)
+            await TimeTable.create({
+                name: `${slotType} (Free)`,
+                description: `${slotType} free slot created by coordinator`,
+                panel: panel._id,
+                team: null,
+                date: dateOnly,
+                period,
+                startTime: slot.start,
+                endTime: slot.end,
+                duration: (endD - startD) / 60000,
+                slotType,
+                slotAssignedBy: coordinatorId,
+                type: 'Team Review',
+                status: 'scheduled',
+                isNotified: true
+            });
+        }
+        res.json({ message: 'Free slots saved successfully!' });
+    } catch (error) {
+        console.error('Error saving free slots:', error);
+        res.status(500).json({ message: 'Server error saving free slots' });
     }
 };
 

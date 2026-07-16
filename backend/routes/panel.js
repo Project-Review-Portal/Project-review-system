@@ -77,6 +77,7 @@ router.get('/marks', auth, authorize(['panel', 'guide', 'admin']), panelControll
 
 // Coordinator scheduling routes (allow both coordinator and admin)
 router.post('/coordinator/generate-slots', auth, authorize(['coordinator', 'admin']), panelController.generateSlotsForCoordinator);
+router.post('/coordinator/save-free-slots', auth, authorize(['coordinator', 'admin']), panelController.saveFreeSlotsForCoordinator);
 router.post('/coordinator/assign-slots', auth, authorize(['coordinator', 'admin']), panelController.assignSlotsForCoordinator);
 router.get('/coordinator/allotted-schedules', auth, authorize(['coordinator', 'admin']), panelController.getAllottedSchedulesForCoordinator);
 // Allow coordinator (or admin) to delete an allotted schedule they created
