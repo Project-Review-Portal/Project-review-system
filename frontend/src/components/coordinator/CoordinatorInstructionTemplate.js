@@ -104,7 +104,7 @@ const CoordinatorInstructionTemplate = () => {
           {/* Section Header */}
           <div className="border-b border-gray-100 pb-4 mb-6">
             <h1 className="text-xl font-bold text-gray-900">Announcement to Student Teams</h1>
-            {isReadOnly && (
+            {window.isReadOnly && (
               <div className="mt-4 p-3 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded font-medium text-center">
                 ℹ️ You are viewing this page in Read-Only Mode as an Assistant Coordinator.
               </div>

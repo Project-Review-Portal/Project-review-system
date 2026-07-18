@@ -14,6 +14,7 @@ router.delete('/settings/:id', auth, authorize(['coordinator']), materialControl
 // Student Routes
 router.get('/student/requirements', auth, authorize(['student']), materialController.getStudentRequirements);
 router.post('/student/upload/:settingId', auth, authorize(['student']), materialUpload, materialController.uploadMaterial);
+router.put('/student/submit', auth, authorize(['student']), materialController.submitMaterials);
 
 // Guide / Coordinator Review Routes
 router.get('/review/teams', auth, authorize(['coordinator', 'assistant coordinator', 'guide']), materialController.getTeamsMaterials);

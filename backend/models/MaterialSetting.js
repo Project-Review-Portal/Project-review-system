@@ -17,8 +17,9 @@ const MaterialSettingSchema = new mongoose.Schema({
     required: true,
   },
   fileType: {
-    type: String,
+    type: [String],
     required: true,
+    default: [],
   },
   isRequired: {
     type: Boolean,

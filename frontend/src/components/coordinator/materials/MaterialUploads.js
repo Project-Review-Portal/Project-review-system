@@ -72,7 +72,7 @@ const UploadActionCard = ({ setting, upload, onAction, onDownload }) => {
             <div>
                 <div className="font-semibold mb-1 text-gray-800">{setting.name}</div>
                 <div className="text-xs text-gray-400 mb-3">
-                    Required: {setting.isRequired ? 'Yes' : 'No'} | Type: {setting.fileType}
+                    Required: {setting.isRequired ? 'Yes' : 'No'} | Types: {Array.isArray(setting.fileType) ? setting.fileType.map(t => `.${t}`).join(', ') : setting.fileType}
                 </div>
                 
                 {upload ? (
