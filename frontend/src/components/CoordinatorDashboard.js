@@ -200,8 +200,8 @@ const CoordinatorDashboard = () => {
         window.location.href = '/';
     };
 
-    // Guard: Only allow users with coordinator role to view this dashboard
-    const hasCoordinatorRole = Array.isArray(user?.roles) && user.roles.some(r => r.role === 'coordinator');
+    // Guard: Only allow users with coordinator or assistant coordinator role to view this dashboard
+    const hasCoordinatorRole = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
     if (!hasCoordinatorRole) {
         return (
             <div className="p-6">
@@ -222,9 +222,11 @@ const CoordinatorDashboard = () => {
         );
     }
 
+    const currentRole = user?.role === 'assistant coordinator' ? 'assistant coordinator' : 'coordinator';
+
     return (
         <div>
-            <Navbar user={{ ...user, role: 'coordinator' }} onLogout={handleLogout} />
+            <Navbar user={{ ...user, role: currentRole }} onLogout={handleLogout} />
             
          
             

@@ -997,7 +997,14 @@ exports.getCoordinatorVivaPanel = async (req, res) => {
         const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
         
         // Find the review panel where the user is coordinator
-        const reviewPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'review', programme })
+        const reviewPanel = await Panel.findOne({ 
+            $or: [
+                { coordinator: coordinatorId },
+                { assistantCoordinators: coordinatorId }
+            ],
+            panelType: 'review', 
+            programme 
+        })
             .populate('members', 'username name memberType designation')
             .populate('coordinator', 'username name memberType designation')
             .populate('assistantCoordinators', 'username name memberType designation');
@@ -1007,7 +1014,14 @@ exports.getCoordinatorVivaPanel = async (req, res) => {
         }
 
         // Find the viva panel if it exists
-        const vivaPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'viva', programme })
+        const vivaPanel = await Panel.findOne({ 
+            $or: [
+                { coordinator: coordinatorId },
+                { assistantCoordinators: coordinatorId }
+            ],
+            panelType: 'viva', 
+            programme 
+        })
             .populate('members', 'username name memberType designation')
             .populate('coordinator', 'username name memberType designation')
             .populate('assistantCoordinators', 'username name memberType designation');
@@ -1136,7 +1150,10 @@ exports.getCoordinatedTeams = async (req, res) => {
 
         // 4. Find the panel matching the coordinator and ANY of the clean regex options
         const panel = await Panel.findOne({ 
-            coordinator: coordinatorId, 
+            $or: [
+                { coordinator: coordinatorId },
+                { assistantCoordinators: coordinatorId }
+            ],
             programme: { $in: regexFilters } 
         });
         

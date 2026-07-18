@@ -5,6 +5,7 @@ const roleLabels = {
   guide: 'Guide',
   panel: 'Panel Member',
   coordinator: 'Coordinator',
+  'assistant coordinator': 'Assistant Coordinator',
 };
 
 const FacultyDashboard = () => {
@@ -15,7 +16,7 @@ const FacultyDashboard = () => {
   const seenKeys = new Set();
   const facultyRoles = [];
   (user?.roles || []).forEach(r => {
-    if (!['guide','panel','coordinator'].includes(r.role)) return;
+    if (!['guide','panel','coordinator', 'assistant coordinator'].includes(r.role)) return;
     const programme = r.programme || 'UG';
     const key = `${r.role}-${programme}`;
     if (!seenKeys.has(key)) {
@@ -40,7 +41,7 @@ const FacultyDashboard = () => {
     // Redirect to the appropriate dashboard
     if (role === 'guide') navigate('/guide-dashboard');
     else if (role === 'panel') navigate('/panel-dashboard');
-    else if (role === 'coordinator') navigate('/coordinator-dashboard/review-schedule');
+    else if (role === 'coordinator' || role === 'assistant coordinator') navigate('/coordinator-dashboard/review-schedule');
   };
 
   return (

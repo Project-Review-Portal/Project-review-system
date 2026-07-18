@@ -79,16 +79,16 @@ router.get('/marks', auth, authorize(['panel', 'guide', 'admin']), panelControll
 router.post('/coordinator/generate-slots', auth, authorize(['coordinator', 'admin']), panelController.generateSlotsForCoordinator);
 router.post('/coordinator/save-free-slots', auth, authorize(['coordinator', 'admin']), panelController.saveFreeSlotsForCoordinator);
 router.post('/coordinator/assign-slots', auth, authorize(['coordinator', 'admin']), panelController.assignSlotsForCoordinator);
-router.get('/coordinator/allotted-schedules', auth, authorize(['coordinator', 'admin']), panelController.getAllottedSchedulesForCoordinator);
+router.get('/coordinator/allotted-schedules', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), panelController.getAllottedSchedulesForCoordinator);
 // Allow coordinator (or admin) to delete an allotted schedule they created
 router.delete('/coordinator/allotted-schedules/:scheduleId', auth, authorize(['coordinator', 'admin']), panelController.deleteAllottedSchedule);
 
 // Coordinator Viva Panel endpoints
-router.get('/coordinator/viva-panel', auth, authorize(['coordinator']), panelController.getCoordinatorVivaPanel);
+router.get('/coordinator/viva-panel', auth, authorize(['coordinator', 'assistant coordinator']), panelController.getCoordinatorVivaPanel);
 router.post('/coordinator/viva-panel', auth, authorize(['coordinator']), panelController.saveCoordinatorVivaPanel);
 
 // Debug route for coordinators to check their panel assignment
-router.get('/coordinator/panel-status', auth, authorize(['coordinator', 'admin']), async (req, res) => {
+router.get('/coordinator/panel-status', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), async (req, res) => {
     try {
         const coordinatorId = req.user.id;
         
@@ -98,13 +98,15 @@ router.get('/coordinator/panel-status', auth, authorize(['coordinator', 'admin']
         const Panel = require('../models/Panel');
         const Team = require('../models/Team');
         
-        // 2. Filter panels by BOTH coordinator identity AND the specific program context
         const panels = await Panel.find({ 
-            coordinator: coordinatorId,
-            programme: userProgramme // Assumes your Panel model maps a 'programme' string field
-        })
-        .populate('members', 'username name')
-        .populate('coordinator', 'username name');
+                    programme: userProgramme, // Assumes your Panel model maps a 'programme' string field
+                    $or: [
+                        { coordinator: coordinatorId },
+                        { assistantCoordinators: coordinatorId }
+                    ]
+                })
+                .populate('members', 'username name')
+                .populate('coordinator', 'username name');
         
         if (!panels || panels.length === 0) {
             return res.json({
@@ -157,7 +159,7 @@ router.post('/attendance/check', auth, attendanceController.checkAttendanceForTe
 // New route for checking schedule existence
 router.post('/check-schedule-exists', auth, attendanceController.checkPreviousScheduleExists);
 
-router.get('/coordinator/coordinated-teams', auth, authorize(['coordinator']), panelController.getCoordinatedTeams);
+router.get('/coordinator/coordinated-teams', auth, authorize(['coordinator', 'assistant coordinator']), panelController.getCoordinatedTeams);
 
 router.post('/coordinator/instruction-template',auth,authorize(['coordinator']),templateUpload,panelController.createInstructionTemplate)
 module.exports = router; 

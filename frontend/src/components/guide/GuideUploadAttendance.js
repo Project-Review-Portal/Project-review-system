@@ -161,6 +161,11 @@ const GuideUploadAttendance = ({ programme }) => {
 
     return (
         <div className="bg-slate-50 p-6 sm:p-8 rounded-2xl border border-slate-100 shadow-sm space-y-8 relative">
+            {userRole === 'assistant coordinator' && (
+                <div className="p-3 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded font-medium text-center">
+                    ℹ️ You are viewing this page in Read-Only Mode as an Assistant Coordinator.
+                </div>
+            )}
             
             {/* Custom Notification Toast */}
             {notification.isOpen && (
@@ -224,7 +229,7 @@ const GuideUploadAttendance = ({ programme }) => {
                                                         type="datetime-local"
                                                         value={reviewDates[team._id]?.[event] || ''}
                                                         onChange={(e) => handleReviewDateChange(team._id, event, e.target.value)}
-                                                        disabled={userRole === 'admin'}
+                                                        disabled={userRole === 'admin' || userRole === 'assistant coordinator'}
                                                         className="block mx-auto p-1 text-[11px] font-normal border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[140px] text-slate-800 bg-white disabled:bg-slate-100 disabled:text-slate-400"
                                                     />
                                                 </th>
@@ -245,7 +250,7 @@ const GuideUploadAttendance = ({ programme }) => {
                                                                 type="checkbox"
                                                                 checked={isPresent}
                                                                 onChange={(e) => handleAttendanceChange(team.teamLeader._id, event, e.target.checked)}
-                                                                disabled={userRole === 'admin'}
+                                                                disabled={userRole === 'admin' || userRole === 'assistant coordinator'}
                                                                 className="form-checkbox h-5 w-5 rounded border-slate-300 focus:ring-indigo-500 transition duration-200 text-indigo-600 disabled:opacity-60"
                                                             />
                                                         </td>
@@ -268,7 +273,7 @@ const GuideUploadAttendance = ({ programme }) => {
                                                                 type="checkbox"
                                                                 checked={isPresent}
                                                                 onChange={(e) => handleAttendanceChange(member._id, event, e.target.checked)}
-                                                                disabled={userRole === 'admin'}
+                                                                disabled={userRole === 'admin' || userRole === 'assistant coordinator'}
                                                                 className="form-checkbox h-5 w-5 rounded border-slate-300 focus:ring-indigo-500 transition duration-200 text-indigo-600 disabled:opacity-60"
                                                             />
                                                         </td>
@@ -283,7 +288,7 @@ const GuideUploadAttendance = ({ programme }) => {
                                 </table>
                             </div>
                             
-                            {userRole !== 'admin' && (
+                            {userRole !== 'admin' && userRole !== 'assistant coordinator' && (
                                 <div className="mt-4 flex flex-col sm:flex-row gap-4">
                                     <button
                                         onClick={() => handleSubmitAttendance(team._id)}

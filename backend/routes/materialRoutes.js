@@ -6,7 +6,7 @@ const authorize = require('../middleware/authorize');
 const { materialUpload } = require('../middleware/upload');
 
 // Setting Routes (Coordinator only)
-router.get('/settings', auth, authorize(['coordinator']), materialController.getMaterialSettings);
+router.get('/settings', auth, authorize(['coordinator', 'assistant coordinator']), materialController.getMaterialSettings);
 router.post('/settings', auth, authorize(['coordinator']), materialController.createMaterialSetting);
 router.put('/settings/:id', auth, authorize(['coordinator']), materialController.updateMaterialSetting);
 router.delete('/settings/:id', auth, authorize(['coordinator']), materialController.deleteMaterialSetting);
@@ -17,8 +17,8 @@ router.post('/student/upload/:settingId', auth, authorize(['student']), material
 router.put('/student/submit', auth, authorize(['student']), materialController.submitMaterials);
 
 // Guide / Coordinator Review Routes
-router.get('/review/teams', auth, authorize(['coordinator', 'guide']), materialController.getTeamsMaterials);
+router.get('/review/teams', auth, authorize(['coordinator', 'assistant coordinator', 'guide']), materialController.getTeamsMaterials);
 router.put('/review/:uploadId/status', auth, authorize(['coordinator', 'guide']), materialController.updateUploadStatus);
-router.get('/download/:uploadId', auth, authorize(['coordinator', 'guide', 'student']), materialController.downloadMaterial);
+router.get('/download/:uploadId', auth, authorize(['coordinator', 'assistant coordinator', 'guide', 'student']), materialController.downloadMaterial);
 
 module.exports = router;

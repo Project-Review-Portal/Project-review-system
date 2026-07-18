@@ -26,10 +26,12 @@ const DocumentGeneratorPage = () => {
         fetchTemplates();
     }, []);
     
-    // Redirect if not coordinator
-    if (!token || !user || user.role !== 'coordinator') {
+    // Redirect if not coordinator or assistant coordinator
+    if (!token || !user || !['coordinator', 'assistant coordinator'].includes(user.role)) {
         return <Navigate to="/coordinator-dashboard/dashboard" replace />;
     }
+
+    const isReadOnly = user?.role === 'assistant coordinator';
 
     const fetchTemplates = async () => {
         try {
@@ -343,6 +345,11 @@ const DocumentGeneratorPage = () => {
         <div className="max-w-6xl mx-auto p-6">
             <div className="bg-white rounded-lg shadow-lg p-6">
                 <h1 className="text-3xl font-bold text-gray-800 mb-6">Document Generator</h1>
+                {isReadOnly && (
+                    <div className="mb-4 p-3 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded font-medium text-center">
+                        ℹ️ You are viewing this page in Read-Only Mode as an Assistant Coordinator.
+                    </div>
+                )}
 
                 {/* Template Selection */}
                 <div className="mb-6">
@@ -353,7 +360,7 @@ const DocumentGeneratorPage = () => {
                         value={selectedTemplate}
                         onChange={(e) => handleTemplateSelect(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        disabled={loading}
+                        disabled={loading || isReadOnly}
                     >
                         <option value="">Select a template...</option>
                         {templates.map(template => (
@@ -437,6 +444,7 @@ const DocumentGeneratorPage = () => {
                                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             rows="3"
                                             required={field.required}
+                                            disabled={isReadOnly}
                                         />
                                     ) : (
                                         <input
@@ -445,6 +453,7 @@ const DocumentGeneratorPage = () => {
                                             onChange={(e) => handleFieldChange(field.name, e.target.value)}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             required={field.required}
+                                            disabled={isReadOnly}
                                         />
                                     )}
                                 </div>
@@ -460,7 +469,8 @@ const DocumentGeneratorPage = () => {
                             <h3 className="text-lg font-semibold text-gray-800">{table.label}</h3>
                             <button
                                 onClick={() => addTableRow(table.name)}
-                                className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={isReadOnly}
                             >
                                 Add Row
                             </button>
@@ -496,6 +506,7 @@ const DocumentGeneratorPage = () => {
                                                         onChange={(e) => handleTableChange(table.name, rowIndex, column.name, e.target.value)}
                                                         className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                                         placeholder={column.label}
+                                                        disabled={isReadOnly}
                                                     />
                                                 </td>
                                             ))}
@@ -507,7 +518,8 @@ const DocumentGeneratorPage = () => {
                                                                 <h4 className="text-sm font-medium text-gray-700">{nestedTable.label}</h4>
                                                                 <button
                                                                     onClick={() => addNestedTableRow(table.name, rowIndex, nestedTable.name)}
-                                                                    className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+                                                                    className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                    disabled={isReadOnly}
                                                                 >
                                                                     Add
                                                                 </button>
@@ -528,8 +540,8 @@ const DocumentGeneratorPage = () => {
                                                                         ))}
                                                                         <button
                                                                             onClick={() => removeNestedTableRow(table.name, rowIndex, nestedTable.name, nestedRowIndex)}
-                                                                            className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
-                                                                            disabled={(row[nestedTable.name] || []).length <= 1}
+                                                                            className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                            disabled={(row[nestedTable.name] || []).length <= 1 || isReadOnly}
                                                                         >
                                                                             ×
                                                                         </button>
@@ -543,8 +555,8 @@ const DocumentGeneratorPage = () => {
                                             <td className="px-4 py-2">
                                                 <button
                                                     onClick={() => removeTableRow(table.name, rowIndex)}
-                                                    className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 focus:outline-none focus:ring-1 focus:ring-red-500"
-                                                    disabled={tableData[table.name].length <= 1}
+                                                    className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 focus:outline-none focus:ring-1 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    disabled={tableData[table.name].length <= 1 || isReadOnly}
                                                 >
                                                     Remove
                                                 </button>
@@ -562,7 +574,7 @@ const DocumentGeneratorPage = () => {
                     <div className="mt-6">
                         <button
                             onClick={generateDocument}
-                            disabled={loading}
+                            disabled={loading || isReadOnly}
                             className="w-full md:w-auto px-6 py-3 bg-blue-500 text-white font-semibold rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {loading ? 'Generating...' : 'Generate Document'}
