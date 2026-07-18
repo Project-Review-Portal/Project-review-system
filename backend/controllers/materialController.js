@@ -31,8 +31,9 @@ exports.getMaterialSettings = async (req, res) => {
     try {
         const userId = req.user.id;
         const programme = req.headers['programme'] || req.user.programme || 'UG';
-        // console.log(req.user.programme , req.headers['programme'] , 'UG');
-        const settings = await MaterialSetting.find({
+        const { panelId } = req.query;
+
+        const query = {
             createdBy: userId,
             programme: programmeRegex(programme)
         };
@@ -58,13 +59,26 @@ exports.createMaterialSetting = async (req, res) => {
     try {
         const { name, fileType, isRequired, panelId } = req.body;
         const userId = req.user.id;
-        const programme =  req.headers['programme'] || req.user.programme ||'UG';
-        console.log(req.headers['programme'] , req.user.programme ,'UG')
-        // Try to find the coordinator's panel for this programme — optional
-        const panel = await Panel.findOne({
-            coordinator: userId,
-            programme: programmeRegex(programme)
-        });
+        const rawProgramme = req.headers['programme'] || req.user.programme;
+        const programme = normalizeProgramme(rawProgramme);
+
+        // Normalise fileType — always store as an array of lowercase strings
+        const normalisedFileType = Array.isArray(fileType)
+            ? fileType.map(t => t.trim().toLowerCase()).filter(Boolean)
+            : typeof fileType === 'string'
+                ? fileType.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
+                : [];
+
+        let resolvedPanelId = panelId || null;
+
+        // If no panelId provided, auto-lookup the coordinator's panel for this programme
+        if (!resolvedPanelId) {
+            const panel = await Panel.findOne({
+                coordinator: userId,
+                programme: programmeRegex(programme)
+            });
+            resolvedPanelId = panel ? panel._id : null;
+        }
 
         const setting = new MaterialSetting({
             panel: resolvedPanelId,
@@ -176,6 +190,7 @@ exports.getStudentRequirements = async (req, res) => {
             // Strict path: find settings specifically for this team's panel
             settings = await MaterialSetting.find({
                 createdBy: team.panel.coordinator,
+                panel: team.panel._id,
                 programme: programmeRegex(team.programme || 'UG')
             });
 
@@ -389,8 +404,8 @@ exports.getTeamsMaterials = async (req, res) => {
     try {
         const userId = req.user?._id || req.user?.id;
         const role = req.headers['role'] || (req.user && req.user.role);
-
         const targetProgramme = req.headers['programme'] || req.user?.programme || 'UG';
+        console.log(req.headers['programme'])
         const progRegex = programmeRegex(targetProgramme);
 
         let teams = [];
