@@ -17,7 +17,7 @@ const FacultyDashboard = () => {
   const facultyRoles = [];
   (user?.roles || []).forEach(r => {
     if (!['guide','panel','coordinator', 'assistant coordinator'].includes(r.role)) return;
-    const programme = r.programme || 'UG';
+    const programme = r.programme || 'B.E COMPUTER SCIENCE AND ENGINEERING';
     const key = `${r.role}-${programme}`;
     if (!seenKeys.has(key)) {
       seenKeys.add(key);

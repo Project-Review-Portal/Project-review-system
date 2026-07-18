@@ -5,6 +5,7 @@ const auth = require('../middleware/auth');
 const { templateUpload } = require('../middleware/upload');
 const authorize = require('../middleware/authorize');
 const attendanceController = require('../controllers/attendanceController');
+const attendanceExportController = require('../controllers/attendanceExportController');
 
 // Admin-only routes for panel management
 router.get('/', auth, authorize(['admin']), panelController.getAllPanels);
@@ -151,6 +152,8 @@ router.post('/attendance/check', auth, attendanceController.checkAttendanceForTe
 router.post('/check-schedule-exists', auth, attendanceController.checkPreviousScheduleExists);
 
 router.get('/coordinator/coordinated-teams', auth, authorize(['coordinator', 'assistant coordinator']), panelController.getCoordinatedTeams);
+
+router.get('/coordinator/export-zeroth-attendance', auth, authorize(['coordinator', 'assistant coordinator']), attendanceExportController.exportZerothReviewAttendance);
 
 router.post('/coordinator/instruction-template',auth,authorize(['coordinator']),templateUpload,panelController.createInstructionTemplate)
 module.exports = router; 

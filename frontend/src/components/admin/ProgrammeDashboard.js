@@ -19,7 +19,7 @@ const ProgrammeDashboard = () => {
     const location = useLocation();
 
     // Decode the programme name from URL encoding
-    const decodedProgramme = decodeURIComponent(programmeName || 'UG');
+    const decodedProgramme = decodeURIComponent(programmeName || 'B.E. CSE');
 
     // Extract the sub-section from the path after the programme segment
     // e.g. /admin-dashboard/programme/UG/review-panels  → section = 'review-panels'
@@ -50,7 +50,7 @@ const ProgrammeDashboard = () => {
                 return (
                     <div className="bg-white p-6 rounded-lg shadow mt-4">
                         <h2 className="text-2xl font-bold mb-2 text-gray-800">
-                            {decodedProgramme === 'UG' ? '📚 UG Programme' : `🎓 ${decodedProgramme}`}
+                            {(decodedProgramme === 'UG' || decodedProgramme === 'B.E COMPUTER SCIENCE AND ENGINEERING' || decodedProgramme === 'B.E. CSE') ? '📚 B.E. CSE Programme' : `🎓 ${decodedProgramme}`}
                         </h2>
                         <p className="text-gray-500">
                             Welcome to the <strong>{decodedProgramme}</strong> programme dashboard. 

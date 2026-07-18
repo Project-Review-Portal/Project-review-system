@@ -13,6 +13,15 @@ function programmeRegex(programme) {
     return new RegExp(`^${escaped}$`, 'i');
 }
 
+const normalizeProgramme = (prog) => {
+    if (!prog) return 'B.E. CSE';
+    const clean = String(prog).trim();
+    if (clean.toLowerCase() === 'ug' || clean === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
+        return 'B.E. CSE';
+    }
+    return clean;
+};
+
 // ---------------------------------------------------------------------------
 // GET /api/materials/settings
 // Coordinator only — returns settings they created for their current programme
@@ -20,8 +29,8 @@ function programmeRegex(programme) {
 exports.getMaterialSettings = async (req, res) => {
     try {
         const userId = req.user.id;
-        const programme = req.headers['programme'] || req.user.programme || 'UG';
-        // console.log(req.user.programme , req.headers['programme'] , 'UG');
+        const rawProgramme = req.headers['programme'] || req.user.programme;
+        const programme = normalizeProgramme(rawProgramme);
         const settings = await MaterialSetting.find({
             createdBy: userId,
             programme: programmeRegex(programme)
@@ -42,8 +51,8 @@ exports.createMaterialSetting = async (req, res) => {
     try {
         const { name, fileType, isRequired } = req.body;
         const userId = req.user.id;
-        const programme =  req.headers['programme'] || req.user.programme ||'UG';
-        console.log(req.headers['programme'] , req.user.programme ,'UG')
+        const rawProgramme = req.headers['programme'] || req.user.programme;
+        const programme = normalizeProgramme(rawProgramme);
         // Try to find the coordinator's panel for this programme — optional
         const panel = await Panel.findOne({
             coordinator: userId,
@@ -150,13 +159,13 @@ exports.getStudentRequirements = async (req, res) => {
             // Primary path: find settings created by the panel coordinator for this programme
             settings = await MaterialSetting.find({
                 createdBy: team.panel.coordinator,
-                programme: programmeRegex(team.programme || 'UG')
+                programme: programmeRegex(normalizeProgramme(team.programme))
             });
         } else {
             // Fallback: no panel yet — try to find settings by programme only
             // (returns nothing if no coordinator has configured settings for this programme)
             settings = await MaterialSetting.find({
-                programme: programmeRegex(team.programme || 'UG')
+                programme: programmeRegex(normalizeProgramme(team.programme))
             });
         }
 
@@ -276,7 +285,8 @@ exports.getTeamsMaterials = async (req, res) => {
         // ── READ ROLE FROM HEADER WITH REQ.USER FALLBACK ───────────────────
         const role = req.headers['role'] || (req.user && req.user.role);
 
-        const targetProgramme = req.headers['programme'] || req.user?.programme || 'UG';
+        const rawProgramme = req.headers['programme'] || req.user?.programme;
+        const targetProgramme = normalizeProgramme(rawProgramme);
         const progRegex = programmeRegex(targetProgramme);
 
         let teams = [];

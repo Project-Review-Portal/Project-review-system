@@ -82,11 +82,11 @@ const AdminHome = () => {
                         <div className="flex flex-col">
                             {/* UG always present */}
                             <ListItem
-                                title="UG"
-                                subtitle="Undergraduate programme"
+                                title="B.E. CSE"
+                                subtitle="B.E. Computer Science and Engineering programme"
                                 icon="📚"
                                 color="bg-white border-gray-200 hover:border-emerald-300"
-                                onClick={() => navigate('/admin-dashboard/programme/UG')}
+                                onClick={() => navigate('/admin-dashboard/programme/B.E.%20CSE')}
                             />
                             {programmes.map(pg => (
                                 <ListItem

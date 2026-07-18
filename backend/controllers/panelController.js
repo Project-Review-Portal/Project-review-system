@@ -8,7 +8,14 @@ const Config = require('../models/Config');
 const Mark = require('../models/Mark');
 const InstructionTemplate = require('../models/InstructionTemplate'); 
 const { getReviewSettings } = require('../utils/reviewSettings');
-// Get all panels
+const normalizeProgramme = (prog) => {
+    if (!prog) return 'B.E. CSE';
+    const clean = String(prog).trim();
+    if (clean.toLowerCase() === 'ug' || clean === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
+        return 'B.E. CSE';
+    }
+    return clean;
+};
 exports.getAllPanels = async (req, res) => {
     try {
         // Support filtering by panelType query param
@@ -78,7 +85,7 @@ exports.createPanel = async (req, res) => {
     try {
         const { members, coordinator, assistantCoordinators, panelType, programme } = req.body;
         const resolvedPanelType = panelType === 'viva' ? 'viva' : 'review';
-        const targetProgramme = programme || 'UG';
+        const targetProgramme = normalizeProgramme(programme);
         console.log('Received members for createPanel:', members);
         console.log('Received coordinator for createPanel:', coordinator);
         console.log('Received assistantCoordinators for createPanel:', assistantCoordinators);
@@ -410,8 +417,8 @@ exports.getAssignedTeamsForPanel = async (req, res) => {
         } else if (userRole === 'coordinator' || rolesArray.includes('coordinator')) {
             // For coordinators, find teams assigned to their coordinated panel
             console.log('User is a coordinator, finding teams for their panel');
-            const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
-            const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
+            const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+            const programme = normalizeProgramme(selectedProgramme);
             const panel = await Panel.findOne({ coordinator: userId, programme });
             if (!panel) {
                 console.log('No panel found for coordinator');
@@ -671,8 +678,8 @@ exports.generateSlotsForCoordinator = async (req, res) => {
 
         // Find the coordinator's panel
         const coordinatorId = req.user.id;
-        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
-        const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+        const programme = normalizeProgramme(selectedProgramme);
         const panel = await Panel.findOne({ coordinator: coordinatorId, programme });
         if (!panel) {
             console.log('❌ No panel found for coordinator:', coordinatorId, 'programme:', programme);
@@ -722,8 +729,8 @@ exports.saveFreeSlotsForCoordinator = async (req, res) => {
         const { slotType, slots, date: providedDate } = req.body;
         // slots: [{ start, end }]
         const coordinatorId = req.user.id;
-        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
-        const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+        const programme = normalizeProgramme(selectedProgramme);
         const panel = await Panel.findOne({ coordinator: coordinatorId, programme });
         if (!panel) {
             return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
@@ -797,8 +804,8 @@ exports.assignSlotsForCoordinator = async (req, res) => {
         const { slotType, assignments, date: providedDate } = req.body;
         // assignments: [{ teamId, slot: { start, end } }]
         const coordinatorId = req.user.id;
-        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
-        const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+        const programme = normalizeProgramme(selectedProgramme);
         const panel = await Panel.findOne({ coordinator: coordinatorId, programme });
         if (!panel) {
             return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
@@ -993,8 +1000,8 @@ exports.createInstructionTemplate = async (req, res) => {
 exports.getCoordinatorVivaPanel = async (req, res) => {
     try {
         const coordinatorId = req.user.id;
-        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
-        const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+        const programme = normalizeProgramme(selectedProgramme);
         
         // Find the review panel where the user is coordinator
         const reviewPanel = await Panel.findOne({ 
@@ -1039,8 +1046,8 @@ exports.getCoordinatorVivaPanel = async (req, res) => {
 exports.saveCoordinatorVivaPanel = async (req, res) => {
     try {
         const coordinatorId = req.user.id;
-        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
-        const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+        const programme = normalizeProgramme(selectedProgramme);
         const { externalMemberIds } = req.body; // Array of external examiner IDs
 
         if (!Array.isArray(externalMemberIds)) {
@@ -1130,7 +1137,8 @@ exports.getCoordinatedTeams = async (req, res) => {
         const coordinatorId = req.user.id;
         
         // 1. Get the raw value from headers or user object
-        let rawProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
+        let rawProgramme = req.headers['x-selected-programme'] || req.user.programme;
+        rawProgramme = normalizeProgramme(rawProgramme);
         
         // 2. If it's a comma-separated string like "UG, UG", clean it up into an array of clean values
         let programmeArray = [];

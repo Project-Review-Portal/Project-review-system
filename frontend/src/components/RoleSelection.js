@@ -43,7 +43,7 @@ const RoleSelection = () => {
     (availableRoles || []).forEach(roleObj => {
         if (!['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(roleObj.role)) return;
         const role = roleObj.role;
-        const programme = roleObj.programme || 'UG';
+        const programme = roleObj.programme || 'B.E COMPUTER SCIENCE AND ENGINEERING';
         const key = `${role}-${programme}`;
         if (!seenKeys.has(key)) {
             seenKeys.add(key);

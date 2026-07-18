@@ -72,7 +72,7 @@ exports.acceptRequest = async (req, res) => {
             resolveGuideLimitStatus
         } = require('../utils/guideTeamLimit');
 
-        const isPg = team.programme && team.programme !== 'UG';
+        const isPg = team.programme && team.programme !== 'UG' && team.programme !== 'B.E COMPUTER SCIENCE AND ENGINEERING' && team.programme !== 'B.E. CSE';
         const programmeType = isPg ? 'PG' : 'UG';
 
         const guide = await User.findById(guideId);

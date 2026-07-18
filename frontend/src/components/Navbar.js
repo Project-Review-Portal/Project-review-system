@@ -97,7 +97,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                             if (user.role === 'admin') {
                                 text = `Admin${activeProgramme ? ` (${activeProgramme})` : ''}`;
                             } else if (['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(user.role)) {
-                                const displayProg = user.programme || 'UG';
+                                const displayProg = user.programme || 'B.E COMPUTER SCIENCE AND ENGINEERING';
                                 const roleLabel = user.role === 'panel' 
                                     ? 'Panel Member' 
                                     : user.role === 'assistant coordinator'
