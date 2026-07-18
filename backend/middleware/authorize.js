@@ -54,7 +54,7 @@ const authorize = (roles = []) => {
             return res.status(403).json({ message: 'Forbidden: You do not have permission to access this resource.' });
         }
 
-        // console.log('✅ Authorization successful');
+        console.log('✅ Authorization successful');
         // console.log('🔍 === End Authorization Debug ===');
         // authentication and authorization successful
         next();

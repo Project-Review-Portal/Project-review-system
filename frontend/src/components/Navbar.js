@@ -23,7 +23,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     { label: 'Guide Requests', path: '/student-dashboard/guide-requests' },
                     { label: 'My Panel', path: '/student-dashboard/my-panel' },
                     { label: 'Review Schedules', path: '/student-dashboard/review-schedules' },
-                    { label: 'Final Report', path: '/student-dashboard/final-report' },
+                    { label: 'Uploads', path: '/student-dashboard/final-report' },
                     { label: 'Announcements', path: '/student-dashboard/coordinator-instructions' },
                     { label: 'Guide Me', path: '/student-dashboard/guide-me' }
                 ];
@@ -34,7 +34,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     { label: 'My Teams', path: '/guide-dashboard/my-teams' },
                     { label: 'Review Schedules', path: '/guide-dashboard/review-schedules' },
                     { label: 'Mark Teams', path: '/guide-dashboard/mark-teams' },
-                    { label: 'Final Reports', path: '/guide-dashboard/final-reports' },
+                    { label: 'Uploads', path: '/guide-dashboard/final-reports' },
                     { label: 'Guide Me', path: '/guide-dashboard/guide-me' }
                 ];
             case 'panel':
@@ -73,6 +73,8 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     { label: 'Upload Attendance', path: '/coordinator-dashboard/upload-attendance' },
                     { label: 'Review Schedule', path: '/coordinator-dashboard/review-schedule' },
                     { label: 'Viva Schedule', path: '/coordinator-dashboard/viva-schedule' },
+                    { label: 'Materials - Settings', path: '/coordinator-dashboard/materials/settings' },
+                    { label: 'Materials - Uploads', path: '/coordinator-dashboard/materials/uploads' },
                     { label: 'Letter Generation', path: '/coordinator-dashboard/letter-generation' },
                     { label: 'Broadcasts', path: '/coordinator-dashboard/instruction-template' },
                     { label: 'Guide Me', path: '/coordinator-dashboard/guide-me' }

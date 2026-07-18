@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 
-const SERVER_URL = process.env.REACT_APP_SERVER_API_KEY || "http://localhost:3626";
+const SERVER_API_KEY = process.env.REACT_APP_SERVER_API_KEY || "http://localhost:3626";
 
 // Rejection Modal Sub-component
 const RejectionModal = ({ isOpen, onClose, onSubmit }) => {
@@ -54,7 +54,7 @@ const RejectionModal = ({ isOpen, onClose, onSubmit }) => {
     );
 };
 
-// 1. Isolated Sub-component to prevent parent re-renders on keystrokes
+// Isolated Sub-component to prevent parent re-renders on keystrokes
 const UploadActionCard = ({ setting, upload, onAction, onDownload }) => {
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
 
@@ -66,9 +66,6 @@ const UploadActionCard = ({ setting, upload, onAction, onDownload }) => {
         onAction(upload._id, 'rejected', remarks);
         setIsRejectModalOpen(false);
     };
-
-    // Determine if the item is currently in a state that requires admin review
-    const needsAction = upload && (upload.status === 'pending' || upload.status === 'uploaded' || !upload.status);
 
     return (
         <div className="bg-white border rounded p-4 shadow-sm flex flex-col justify-between min-h-[160px]">
@@ -85,11 +82,10 @@ const UploadActionCard = ({ setting, upload, onAction, onDownload }) => {
                                 upload.status === 'approved' ? 'bg-green-100 text-green-800' : 
                                 upload.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
                             }`}>
-                                {upload.status || 'uploaded'}
+                                {upload.status}
                             </span>
                         </div>
                         
-                        {/* More focused Download UI */}
                         <div className="mb-3">
                             <button 
                                 onClick={() => onDownload(upload)}
@@ -109,8 +105,7 @@ const UploadActionCard = ({ setting, upload, onAction, onDownload }) => {
                 )}
             </div>
 
-            {/* FIXED: Action panel now shows up for 'pending', 'uploaded', or undefined/empty status strings */}
-            {needsAction && (
+            {upload && upload.status === 'pending' && (
                 <div className="flex space-x-2 mt-2 pt-2 border-t border-gray-50">
                     <button 
                         onClick={handleApprove}
@@ -149,7 +144,8 @@ const UploadActionCard = ({ setting, upload, onAction, onDownload }) => {
     );
 };
 
-const FinalReports = () => {
+// Main MaterialUploads Component matching Layout Variant 2 UI exactly
+const MaterialUploads = () => {
     const [teams, setTeams] = useState([]);
     const [settings, setSettings] = useState([]);
     const [uploads, setUploads] = useState([]);
@@ -163,10 +159,10 @@ const FinalReports = () => {
     const fetchData = async () => {
         try {
             const token = localStorage.getItem('token');
+            const rawUser = localStorage.getItem('user');
             let userProgramme = 'UG';
             let userRole = '';
-            const rawUser = localStorage.getItem('user');
-            
+
             if (rawUser) {
                 try {
                     const storedUser = JSON.parse(rawUser);
@@ -175,8 +171,8 @@ const FinalReports = () => {
                 } catch (_) {}
             }
 
-            const res = await axios.get(`${SERVER_URL}/api/materials/review/teams`, {
-                headers: {
+            const res = await axios.get(`${SERVER_API_KEY}/api/materials/review/teams`, {
+                headers: { 
                     Authorization: `Bearer ${token}`,
                     programme: userProgramme,
                     role: userRole
@@ -192,16 +188,16 @@ const FinalReports = () => {
         }
     };
 
-    const handleAction = async (uploadId, status, remarks) => {
+    const handleAction = async (uploadId, status, remarks = '') => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.put(`${SERVER_URL}/api/materials/review/${uploadId}/status`, {
+            const res = await axios.put(`${SERVER_API_KEY}/api/materials/review/${uploadId}/status`, {
                 status,
                 remarks
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            
+
             setUploads(prev => prev.map(u => u._id === uploadId ? res.data : u));
         } catch (error) {
             console.error('Error updating status', error);
@@ -212,18 +208,18 @@ const FinalReports = () => {
     const handleDownload = async (upload) => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get(`${SERVER_URL}/api/materials/download/${upload._id}`, {
+            const response = await axios.get(`${SERVER_API_KEY}/api/materials/download/${upload._id}`, {
                 headers: { Authorization: `Bearer ${token}` },
                 responseType: 'blob'
             });
-            
+
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
             link.setAttribute('download', upload.fileName);
             document.body.appendChild(link);
             link.click();
-            
+
             link.parentNode.removeChild(link);
             window.URL.revokeObjectURL(url);
         } catch (error) {
@@ -232,7 +228,7 @@ const FinalReports = () => {
         }
     };
 
-    // 4. Memoize lookups for massive performance gains over nested .find() loops
+    // Fast indexed O(1) tracking array mapping logic
     const uploadMap = useMemo(() => {
         const map = {};
         uploads.forEach(u => {
@@ -243,7 +239,7 @@ const FinalReports = () => {
         return map;
     }, [uploads]);
 
-    // Apply Upload Status Filtering before grouping data
+    // Filter teams based on selected filter layout options
     const filteredTeams = useMemo(() => {
         return teams.filter(team => {
             const teamSettings = settings.filter(s => s.programme === (team.programme || 'UG'));
@@ -251,11 +247,11 @@ const FinalReports = () => {
 
             if (filterType === 'uploaded') return hasAnyUpload;
             if (filterType === 'not_uploaded') return !hasAnyUpload;
-            return true; 
+            return true;
         });
     }, [teams, settings, uploadMap, filterType]);
 
-    // 3. Memoize team grouping data so it doesn't recalculate unless filtered changes
+    // Matrix computation structure mapping groups sequentially
     const grouped = useMemo(() => {
         const data = {};
         filteredTeams.forEach(team => {
@@ -268,16 +264,17 @@ const FinalReports = () => {
         return data;
     }, [filteredTeams]);
 
-    if (loading) return <div className="p-6">Loading...</div>;
+    if (loading) return <div className="bg-white p-6 rounded-lg shadow mb-6 mx-4 mt-4 text-center font-medium text-gray-500">Loading...</div>;
 
     return (
         <div className="bg-white p-6 rounded-lg shadow mb-6 mx-4 mt-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-100 pb-4 mb-6">
                 <div>
-                    <h2 className="text-xl font-semibold text-gray-800">Review Materials / Uploads</h2>
+                    <h2 className="text-xl font-semibold text-gray-800">Team Document Uploads Review</h2>
                     <p className="text-xs text-gray-500 mt-0.5">Manage and audit team artifact requirements.</p>
                 </div>
                 
+                {/* Unified Selection Filter UI Element */}
                 <div className="mt-4 sm:mt-0 flex items-center space-x-2">
                     <label htmlFor="uploadFilter" className="text-xs font-medium text-gray-600">Filter Status:</label>
                     <select
@@ -311,7 +308,9 @@ const FinalReports = () => {
                                     </h3>
                                     <div className="space-y-6">
                                         {grouped[prog][panelName].map(team => {
-                                            const filteredSettings = settings.filter(s => s.programme === (team.programme || 'UG'));
+                                            const filteredSettings = settings.filter(s => 
+                                                s.programme?.toLowerCase() === (team.programme || 'UG').toLowerCase()
+                                            );
                                             
                                             return (
                                                 <div key={team._id} className="border border-indigo-100 p-4 rounded bg-gray-50 shadow-sm ml-4">
@@ -353,4 +352,4 @@ const FinalReports = () => {
     );
 };
 
-export default FinalReports;
+export default MaterialUploads;

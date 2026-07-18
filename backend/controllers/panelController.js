@@ -1110,3 +1110,60 @@ exports.saveCoordinatorVivaPanel = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+// Get all teams coordinated by the logged-in coordinator 
+exports.getCoordinatedTeams = async (req, res) => {
+    try {
+        const coordinatorId = req.user.id;
+        
+        // 1. Get the raw value from headers or user object
+        let rawProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
+        
+        // 2. If it's a comma-separated string like "UG, UG", clean it up into an array of clean values
+        let programmeArray = [];
+        if (typeof rawProgramme === 'string') {
+            programmeArray = rawProgramme.split(',').map(p => p.trim());
+        } else if (Array.isArray(rawProgramme)) {
+            programmeArray = rawProgramme.map(p => p.toString().trim());
+        } else {
+            programmeArray = [rawProgramme.toString().trim()];
+        }
+
+        // Remove any duplicates (turns ["UG", "UG"] into ["UG"])
+        programmeArray = [...new Set(programmeArray)];
+
+        // 3. Build a regex array for case-insensitive matching
+        const regexFilters = programmeArray.map(prog => new RegExp(`^${prog}$`, 'i'));
+
+        // 4. Find the panel matching the coordinator and ANY of the clean regex options
+        const panel = await Panel.findOne({ 
+            coordinator: coordinatorId, 
+            programme: { $in: regexFilters } 
+        });
+        
+        if (!panel) {
+            return res.status(404).json({ 
+                message: `No panel found where you are assigned as a coordinator for programme matching "${rawProgramme}".` 
+            });
+        }
+
+        // 5. Find all teams assigned to this specific panel ID
+        const coordinatedTeams = await Team.find({ panel: panel._id })
+            .populate('teamLeader', 'username name')
+            .populate('members', 'username name')
+            .populate('guidePreference', 'username name')
+            .populate('vivaPanel', 'name');
+
+        // 6. Inject the panel name context for frontend convenience
+        const formattedTeams = coordinatedTeams.map(team => ({
+            ...team.toObject(),
+            panelName: panel.name
+        }));
+
+        console.log(`Found ${formattedTeams.length} coordinated teams for Panel: ${panel.name}`);
+        res.json(formattedTeams);
+
+    } catch (error) {
+        console.error('Error fetching coordinated teams:', error);
+        res.status(500).json({ message: 'Server error while fetching coordinated teams', error: error.message });
+    }
+};

@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+const SERVER_API_KEY = process.env.REACT_APP_SERVER_API_KEY || "http://localhost:3626";
 
 const FinalReport = () => {
-    const [file, setFile] = useState(null);
-    const [reportStatus, setReportStatus] = useState(null);
-    const [error, setError] = useState('');
-    const [message, setMessage] = useState('');
+    const [settings, setSettings] = useState([]);
+    const [uploads, setUploads] = useState([]);
+    const [files, setFiles] = useState({});
     const [team, setTeam] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [message, setMessage] = useState('');
+    const [error, setError] = useState('');
 
-    const fetchTeamAndReport = async () => {
+    const fetchData = async () => {
         try {
             setLoading(true);
             const headers = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
@@ -20,17 +21,17 @@ const FinalReport = () => {
                 const teamRes = await axios.get(`${SERVER_API_KEY}/api/teams/my-team`, { headers });
                 setTeam(teamRes.data);
             } catch (err) {
-                // Ignore if team not found
+                // ignore
             }
 
             try {
-                const res = await axios.get(`${SERVER_API_KEY}/api/teams/report/status`, { headers });
-                setReportStatus(res.data);
+                const reqsRes = await axios.get(`${SERVER_API_KEY}/api/materials/student/requirements`, { headers });
+                setSettings(reqsRes.data.settings);
+                setUploads(reqsRes.data.uploads);
             } catch (err) {
                 if (err.response && err.response.status !== 404) {
-                    setError('Error fetching report status');
+                    setError('Error fetching requirements');
                 }
-                setReportStatus(null);
             }
         } finally {
             setLoading(false);
@@ -38,35 +39,42 @@ const FinalReport = () => {
     };
 
     useEffect(() => {
-        fetchTeamAndReport();
+        fetchData();
     }, []);
 
-    const onFileChange = (e) => {
-        setFile(e.target.files[0]);
+    const onFileChange = (settingId, e) => {
+        setFiles({ ...files, [settingId]: e.target.files[0] });
     };
 
-    const onSubmit = async (e) => {
+    const onSubmit = async (settingId, e) => {
         e.preventDefault();
+        const file = files[settingId];
         if (!file) {
             setError('Please select a file to upload.');
             return;
         }
 
         const formData = new FormData();
-        formData.append('report', file);
+        formData.append('material', file);
 
         try {
-            const res = await axios.post(`${SERVER_API_KEY}/api/teams/report/upload`, formData, {
+            await axios.post(`${SERVER_API_KEY}/api/materials/student/upload/${settingId}`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 },
             });
-            setMessage('Report uploaded successfully!');
+            setMessage('Material uploaded successfully!');
             setError('');
-            fetchTeamAndReport();
+            // clear selected file
+            setFiles(prev => {
+                const newFiles = { ...prev };
+                delete newFiles[settingId];
+                return newFiles;
+            });
+            fetchData();
         } catch (err) {
-            setError(err.response?.data?.message || 'Error uploading report');
+            setError(err.response?.data?.message || 'Error uploading material');
             setMessage('');
         }
     };
@@ -87,127 +95,99 @@ const FinalReport = () => {
     }
 
     return (
-        <div className="container mx-auto p-4">
-            <h2 className="text-2xl font-bold mb-4">Final Report Submission</h2>
+        <div className="container mx-auto p-4 max-w-4xl">
+            <h2 className="text-2xl font-bold mb-4">Required Materials / Uploads</h2>
             {message && <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">{message}</div>}
             {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">{error}</div>}
 
-            {reportStatus ? (
-                <div>
-                    <h3 className="text-xl font-semibold mb-3">Report Status</h3>
-                    <div className={`p-4 rounded-lg mb-6 ${
-                        reportStatus.status === 'approved' 
-                            ? 'bg-green-50 border border-green-200 text-green-800' 
-                            : reportStatus.status === 'rejected'
-                                ? 'bg-red-50 border border-red-200 text-red-800'
-                                : 'bg-yellow-50 border border-yellow-200 text-yellow-800'
-                    }`}>
-                        <p className="mb-2"><strong>File Name:</strong> {reportStatus.fileName}</p>
-                        <p className="mb-2"><strong>Status:</strong> <span className="capitalize font-bold">{reportStatus.status}</span></p>
-                        <p className="mb-2"><strong>Uploaded At:</strong> {new Date(reportStatus.createdAt).toLocaleString()}</p>
-                        {reportStatus.status === 'rejected' && reportStatus.rejectedAt && (
-                            <p className="mb-2"><strong>Rejected At:</strong> {new Date(reportStatus.rejectedAt).toLocaleString()}</p>
-                        )}
-                        {reportStatus.status === 'rejected' && reportStatus.remarks && (
-                            <div className="mt-3 bg-white p-3 rounded-lg border border-red-200 text-red-800 shadow-sm text-sm">
-                                <strong>Rejection Remarks from Guide:</strong> {reportStatus.remarks}
-                            </div>
-                        )}
-                    </div>
-                    {reportStatus.status === 'rejected' && (
-                        <div className="mt-6 border-t pt-6">
-                            <h4 className="text-lg font-semibold mb-4 text-gray-900">Upload Revised Report</h4>
-                            {!team.isLocked ? (
-                                <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
-                                    <strong className="font-bold">Notice: </strong>
-                                    <span className="block sm:inline">Your team must be locked to upload a revised report.</span>
-                                </div>
-                            ) : (
-                                <form onSubmit={onSubmit}>
-                                    <div className="mb-4">
-                                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="report">
-                                            Select Revised Report (PDF only)
-                                        </label>
-                                        <input
-                                            type="file"
-                                            id="report"
-                                            onChange={onFileChange}
-                                            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white"
-                                            accept="application/pdf"
-                                        />
-                                    </div>
-                                    <button
-                                        type="submit"
-                                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-                                    >
-                                        Upload Revised Report
-                                    </button>
-                                </form>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Rejection History List for Students */}
-                    {reportStatus.rejections && reportStatus.rejections.length > 0 && (
-                        <div className="mt-8 border-t pt-6 bg-white p-5 rounded-lg shadow-sm">
-                            <h4 className="text-md font-bold text-gray-900 mb-4 flex items-center gap-1.5 border-b pb-2">
-                                <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Rejection History Log
-                            </h4>
-                            <div className="space-y-3">
-                                {reportStatus.rejections.map((rej, idx) => (
-                                    <div key={idx} className="border-l-4 border-red-200 pl-4 py-2 bg-gray-50/50 rounded-r-lg">
-                                        <div className="flex flex-wrap justify-between items-center text-xs text-gray-500 mb-1 gap-1">
-                                            <span className="font-semibold text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-100">
-                                                Attempt #{idx + 1}
-                                            </span>
-                                            <span className="font-medium text-gray-400">
-                                                {new Date(rej.rejectedAt).toLocaleString()}
-                                            </span>
-                                        </div>
-                                        <p className="text-sm text-gray-700 mb-1">
-                                            <strong>File:</strong> <span className="text-gray-600 font-mono text-xs">{rej.fileName}</span>
-                                        </p>
-                                        <p className="text-sm text-gray-700 italic bg-white p-2.5 rounded border border-gray-150">
-                                            "{rej.remarks || 'No remarks provided.'}"
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            ) : !team.isLocked ? (
-                <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
+            {!team.isLocked && (
+                <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4" role="alert">
                     <strong className="font-bold">Notice: </strong>
-                    <span className="block sm:inline">Your team must be locked before you can upload the final report.</span>
+                    <span className="block sm:inline">Your team must be locked before you can upload materials.</span>
+                </div>
+            )}
+
+            {settings.length === 0 ? (
+                <div className="bg-blue-50 border border-blue-200 p-4 rounded text-blue-700">
+                    No materials have been requested by your coordinator yet.
                 </div>
             ) : (
-                <form onSubmit={onSubmit}>
-                    <div className="mb-4">
-                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="report">
-                            Upload Report (PDF only)
-                        </label>
-                        <input
-                            type="file"
-                            id="report"
-                            onChange={onFileChange}
-                            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                            accept="application/pdf"
-                        />
-                    </div>
-                    <button
-                        type="submit"
-                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-                    >
-                        Upload
-                    </button>
-                </form>
+                <div className="space-y-6">
+                    {settings.map(setting => {
+                        const upload = uploads.find(u => {
+                            // materialSetting may be a populated object or a bare ID string
+                            const settingId = u.materialSetting?._id
+                                ? u.materialSetting._id.toString()
+                                : u.materialSetting?.toString();
+                            return settingId === setting._id.toString();
+                        });
+                        
+                        return (
+                            <div key={setting._id} className="bg-white border rounded-lg shadow-sm p-5">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h3 className="text-lg font-semibold">{setting.name}</h3>
+                                        <div className="text-sm text-gray-500">
+                                            Required: {setting.isRequired ? 'Yes' : 'No'} | Format: {setting.fileType}
+                                        </div>
+                                    </div>
+                                    {upload && (
+                                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+                                            upload.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                            upload.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                            'bg-yellow-100 text-yellow-800'
+                                        }`}>
+                                            {upload.status}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {upload && (
+                                    <div className="bg-gray-50 p-3 rounded mb-4 text-sm">
+                                        <div className="mb-1"><strong>File:</strong> {upload.fileName}</div>
+                                        <div className="mb-1"><strong>Uploaded:</strong> {new Date(upload.createdAt).toLocaleString()}</div>
+                                        
+                                        {upload.status === 'rejected' && upload.remarks && (
+                                            <div className="mt-2 text-red-700 bg-red-50 p-2 border border-red-200 rounded">
+                                                <strong>Rejection Remarks:</strong> {upload.remarks}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {(!upload || upload.status !== 'approved') && team.isLocked && (
+                                    <form onSubmit={(e) => onSubmit(setting._id, e)} className="mt-4 border-t pt-4">
+                                        <div className="flex items-center space-x-4">
+                                            <div className="flex-grow">
+                                                <input
+                                                    type="file"
+                                                    onChange={(e) => onFileChange(setting._id, e)}
+                                                    className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                                    accept={`.${setting.fileType}, ${setting.fileType}/*`}
+                                                />
+                                            </div>
+                                            <button
+                                                type="submit"
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline whitespace-nowrap"
+                                            >
+                                                {upload ? 'Upload Revision' : 'Upload File'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+
+                                {upload && upload.status === 'approved' && (
+                                    <div className="text-green-600 text-sm italic border-t pt-3 mt-3">
+                                        This material has been approved and can no longer be modified.
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
             )}
         </div>
     );
 };
 
-export default FinalReport; 
+export default FinalReport;

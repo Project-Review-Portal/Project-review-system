@@ -10,6 +10,8 @@ import GuideMe from './GuideMe';
 import CoordinatorLetterLiveEditorCK from './CoordinatorLetterLiveEditorCK';
 import GuideUploadAttendance from './guide/GuideUploadAttendance';
 import CoordinatorVivaPanelFormation from './coordinator/CoordinatorVivaPanelFormation';
+import MaterialSettings from './coordinator/materials/MaterialSettings';
+import MaterialUploads from './coordinator/materials/MaterialUploads';
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const CoordinatorRulesDashboard = () => {
     const [teamFormationOpen, setTeamFormationOpen] = useState(true);
@@ -238,6 +240,8 @@ const CoordinatorDashboard = () => {
                     <Route path="upload-attendance" element={<GuideUploadAttendance />} />
                     <Route path="review-schedule" element={<CoordinatorReviewSchedule />} />
                     <Route path="viva-schedule" element={<CoordinatorVivaSchedule />} />
+                    <Route path="materials/settings" element={<MaterialSettings />} />
+                    <Route path="materials/uploads" element={<MaterialUploads />} />
                     <Route path="instruction-template" element={<CoordinatorInstructionTemplate />} />
                     <Route path="*" element={<Navigate to="dashboard" replace />} />
                 </Routes>

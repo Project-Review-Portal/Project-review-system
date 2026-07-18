@@ -144,5 +144,8 @@ router.post('/attendance/check', auth, attendanceController.checkAttendanceForTe
 
 // New route for checking schedule existence
 router.post('/check-schedule-exists', auth, attendanceController.checkPreviousScheduleExists);
+
+router.get('/coordinator/coordinated-teams', auth, authorize(['coordinator']), panelController.getCoordinatedTeams);
+
 router.post('/coordinator/instruction-template',auth,authorize(['coordinator']),templateUpload,panelController.createInstructionTemplate)
 module.exports = router; 

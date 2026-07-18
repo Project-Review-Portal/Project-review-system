@@ -6,6 +6,11 @@ const FinalReportSchema = new mongoose.Schema({
     ref: 'Team',
     required: true,
   },
+  materialSetting: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'MaterialSetting',
+    required: true,
+  },
   filePath: {
     type: String,
     required: true,

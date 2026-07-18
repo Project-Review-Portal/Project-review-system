@@ -68,6 +68,7 @@ const teamRoutes = require('./routes/team');
 const panelRoutes = require('./routes/panel');
 const panelAssignmentRoutes = require('./routes/panelAssignment');
 const guideRoutes = require('./routes/guide');
+const materialRoutes = require('./routes/materialRoutes');
 const studentRoutes = require('./routes/student');
 const signatureRoutes = require('./routes/signatures');
 const documentRoutes = require('./routes/simpleDocument'); // Using simple version for testing
@@ -80,6 +81,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/panels', panelRoutes);
 app.use('/api/panel-assignments', panelAssignmentRoutes);
+app.use('/api/materials', materialRoutes);
 app.use('/api/guide', guideRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/signatures', signatureRoutes);
