@@ -46,6 +46,8 @@ const MaterialSettings = () => {
     };
 
     const handleAddRow = () => {
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        if (storedUser.role === 'assistant coordinator') return;
         setSettings([...settings, { _id: 'new', name: '', fileType: 'pdf', isRequired: true }]);
         setEditingId('new');
         setEditData({ name: '', fileType: 'pdf', isRequired: true });
@@ -64,6 +66,8 @@ const MaterialSettings = () => {
     };
 
     const handleSave = async (id) => {
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        if (storedUser.role === 'assistant coordinator') return;
         try {
             const config = getRequestConfig();
             if (id === 'new') {
@@ -81,6 +85,8 @@ const MaterialSettings = () => {
     };
 
     const handleDelete = async (id) => {
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        if (storedUser.role === 'assistant coordinator') return;
         if (!window.confirm('Are you sure you want to delete this requirement? All related student uploads will be removed.')) return;
         try {
             await axios.delete(`${SERVER_API_KEY}/api/materials/settings/${id}`, getRequestConfig());
@@ -91,11 +97,19 @@ const MaterialSettings = () => {
         }
     };
 
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const isReadOnly = storedUser.role === 'assistant coordinator';
+
     if (loading) return <div>Loading...</div>;
 
     return (
         <div className="bg-white p-6 rounded-lg shadow mb-6">
             <h2 className="text-xl font-semibold mb-4">Material Request Settings</h2>
+            {isReadOnly && (
+                <div className="mb-4 p-3 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded font-medium text-center">
+                    ℹ️ You are viewing this page in Read-Only Mode as an Assistant Coordinator.
+                </div>
+            )}
             <p className="mb-4 text-gray-600">Specify the materials you require from the teams you coordinate.</p>
             
             <table className="min-w-full divide-y divide-gray-200">
@@ -154,8 +168,8 @@ const MaterialSettings = () => {
                                     </>
                                 ) : (
                                     <>
-                                        <button onClick={() => handleEdit(setting)} className="text-indigo-600 hover:text-indigo-900">Edit</button>
-                                        <button onClick={() => handleDelete(setting._id)} className="text-red-600 hover:text-red-900">Delete</button>
+                                        <button onClick={() => handleEdit(setting)} className="text-indigo-600 hover:text-indigo-900 disabled:opacity-50" disabled={isReadOnly}>Edit</button>
+                                        <button onClick={() => handleDelete(setting._id)} className="text-red-600 hover:text-red-900 disabled:opacity-50" disabled={isReadOnly}>Delete</button>
                                     </>
                                 )}
                             </td>
@@ -172,7 +186,7 @@ const MaterialSettings = () => {
             <div className="mt-4">
                 <button 
                     onClick={handleAddRow} 
-                    disabled={editingId === 'new'}
+                    disabled={editingId === 'new' || isReadOnly}
                     className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:bg-gray-400"
                 >
                     Add Requirement

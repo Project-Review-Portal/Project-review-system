@@ -46,15 +46,15 @@ const Login = () => {
                 return;
             }
             
-            if (primaryRole === 'coordinator') {
+            if (primaryRole === 'coordinator' || primaryRole === 'assistant coordinator') {
                 navigate('/coordinator-dashboard/review-schedule');
             } else if (primaryRole === 'admin') {
                 navigate('/admin-dashboard');
             } else if (primaryRole === 'student') {
                 navigate('/student-dashboard');
-            } else if (['guide', 'panel'].includes(primaryRole)) {
+            } else if (['guide', 'panel', 'assistant coordinator'].includes(primaryRole)) {
                 // Check if user has multiple roles - if yes, show role selection
-                const facultyRoles = user.roles?.filter(r => ['guide', 'panel', 'coordinator'].includes(r.role));
+                const facultyRoles = user.roles?.filter(r => ['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(r.role));
                 if (facultyRoles && facultyRoles.length > 1) {
                     navigate('/role-selection');
                 } else {

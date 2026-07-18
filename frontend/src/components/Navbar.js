@@ -65,6 +65,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     { label: 'Schedules', path: `${prefix}/manage-review-schedules` },
                     { label: 'Guide Me', path: `${prefix}/guide-me` }
                 ];
+            case 'assistant coordinator':
             case 'coordinator':
                 return [
                     { label: 'Dashboard', path: '/coordinator-dashboard/dashboard' },
@@ -95,9 +96,13 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                             let text = '';
                             if (user.role === 'admin') {
                                 text = `Admin${activeProgramme ? ` (${activeProgramme})` : ''}`;
-                            } else if (['guide', 'panel', 'coordinator'].includes(user.role)) {
+                            } else if (['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(user.role)) {
                                 const displayProg = user.programme || 'UG';
-                                const roleLabel = user.role === 'panel' ? 'Panel Member' : user.role.charAt(0).toUpperCase() + user.role.slice(1);
+                                const roleLabel = user.role === 'panel' 
+                                    ? 'Panel Member' 
+                                    : user.role === 'assistant coordinator'
+                                        ? 'Assistant Coordinator'
+                                        : user.role.charAt(0).toUpperCase() + user.role.slice(1);
                                 text = `${roleLabel} (${displayProg})`;
                             } else if (user.role === 'student') {
                                 text = `${user.username} - ${user.name}`;
@@ -146,7 +151,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                         {/* <span className="text-white text-xs lg:text-sm hidden sm:block truncate max-w-32">Welcome!</span> */}
                         
                         {/* Switch Role button for faculty users with multiple roles */}
-                        {['guide', 'panel', 'coordinator'].includes(user.role) && user.roles && user.roles.length > 1 && (
+                        {['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(user.role) && user.roles && user.roles.length > 1 && (
                             <button
                                 onClick={() => navigate('/role-selection')}
                                 className="bg-indigo-500 text-white px-2 py-2 rounded-md text-xs sm:text-sm font-medium hover:bg-indigo-600 whitespace-nowrap"

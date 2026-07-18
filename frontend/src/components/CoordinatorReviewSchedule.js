@@ -91,9 +91,15 @@ const CoordinatorReviewSchedule = () => {
     setLoading(true);
     
     // Check if user is coordinator before making API call
-    const isCoordinator = Array.isArray(user?.roles) && user.roles.some(r => r.role === 'coordinator');
+    const isCoordinator = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
     if (!isCoordinator) {
       setError('You are not a coordinator for any team.');
+      setLoading(false);
+      return;
+    }
+    const isReadOnly = user?.role === 'assistant coordinator';
+    if (isReadOnly) {
+      setError('Action forbidden in Read-Only Mode.');
       setLoading(false);
       return;
     }
@@ -131,9 +137,15 @@ const CoordinatorReviewSchedule = () => {
     setMessage('');
     setLoading(true);
     
-    const isCoordinator = Array.isArray(user?.roles) && user.roles.some(r => r.role === 'coordinator');
+    const isCoordinator = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
     if (!isCoordinator) {
       setError('You are not a coordinator for any team.');
+      setLoading(false);
+      return;
+    }
+    const isReadOnly = user?.role === 'assistant coordinator';
+    if (isReadOnly) {
+      setError('Action forbidden in Read-Only Mode.');
       setLoading(false);
       return;
     }
@@ -193,13 +205,18 @@ const CoordinatorReviewSchedule = () => {
         setLoadingSchedules(false);
       }
     };
-    const hasCoordinatorRole = Array.isArray(user?.roles) && user.roles.some(r => r.role === 'coordinator');
+    const hasCoordinatorRole = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
     if (hasCoordinatorRole) {
       fetchAllottedSchedules();
     }
   }, [user]);
 
   const handleDeleteSchedule = async (scheduleId) => {
+    const isReadOnly = user?.role === 'assistant coordinator';
+    if (isReadOnly) {
+      setError('Action forbidden in Read-Only Mode.');
+      return;
+    }
     if (!window.confirm('Are you sure you want to delete this schedule? This will remove it everywhere.')) return;
     setLoadingSchedules(true);
     try {
@@ -223,7 +240,7 @@ const CoordinatorReviewSchedule = () => {
   };
 
   // Check if user has coordinator role in roles array
-  const isCoordinator = Array.isArray(user?.roles) && user.roles.some(r => r.role === 'coordinator');
+  const isCoordinator = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
   if (user && !isCoordinator) {
     return (
       <div className="bg-white p-6 rounded-lg shadow text-center">
@@ -233,9 +250,16 @@ const CoordinatorReviewSchedule = () => {
     );
   }
 
+  const isReadOnly = user?.role === 'assistant coordinator';
+
   return (
     <div className="bg-white p-6 rounded-lg shadow max-w-3xl mx-auto">
       <h2 className="text-2xl font-bold mb-4">Review Schedule</h2>
+      {isReadOnly && (
+        <div className="mb-4 p-3 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded font-medium text-center">
+          ℹ️ You are viewing this page in Read-Only Mode as an Assistant Coordinator.
+        </div>
+      )}
       {message && <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">{message}</div>}
       {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
       
@@ -244,7 +268,7 @@ const CoordinatorReviewSchedule = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Review Type</label>
-              <select name="reviewType" value={form.reviewType} onChange={handleChange} className="w-full border rounded px-2 py-1">
+              <select name="reviewType" value={form.reviewType} onChange={handleChange} className="w-full border rounded px-2 py-1" disabled={isReadOnly}>
                 {reviewTypes.map((rt) => (
                   <option key={rt.value} value={rt.value}>{rt.label}</option>
                 ))}
@@ -252,19 +276,19 @@ const CoordinatorReviewSchedule = () => {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Date</label>
-              <input type="date" name="date" value={form.date} onChange={handleChange} className="w-full border rounded px-2 py-1" required />
+              <input type="date" name="date" value={form.date} onChange={handleChange} className="w-full border rounded px-2 py-1" required disabled={isReadOnly} />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Start Time</label>
-              <input type="time" name="startTime" value={form.startTime} onChange={handleChange} className="w-full border rounded px-2 py-1" required />
+              <input type="time" name="startTime" value={form.startTime} onChange={handleChange} className="w-full border rounded px-2 py-1" required disabled={isReadOnly} />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">End Time</label>
-              <input type="time" name="endTime" value={form.endTime} onChange={handleChange} className="w-full border rounded px-2 py-1" required />
+              <input type="time" name="endTime" value={form.endTime} onChange={handleChange} className="w-full border rounded px-2 py-1" required disabled={isReadOnly} />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Slot Duration (minutes)</label>
-              <select name="duration" value={form.duration} onChange={handleChange} className="w-full border rounded px-2 py-1">
+              <select name="duration" value={form.duration} onChange={handleChange} className="w-full border rounded px-2 py-1" disabled={isReadOnly}>
                 {DURATION_OPTIONS.map((d) => (
                   <option key={d} value={d}>{d}</option>
                 ))}
@@ -276,7 +300,7 @@ const CoordinatorReviewSchedule = () => {
               {validationErrors.map((e, i) => (<div key={i}>{e}</div>))}
             </div>
           )}
-          <button type="submit" className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-400 font-semibold" disabled={loading || formInvalid}>
+          <button type="submit" className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-400 font-semibold" disabled={loading || formInvalid || isReadOnly}>
             {loading ? 'Generating...' : 'Generate Slots'}
           </button>
         </form>
@@ -395,9 +419,9 @@ const CoordinatorReviewSchedule = () => {
                         <td className="px-3 py-2 border text-sm">{duration ? `${duration} min` : 'N/A'}</td>
                         <td className="px-3 py-2 border text-sm">
                           <button
-                            className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                            className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                             onClick={() => handleDeleteSchedule(schedule._id)}
-                            disabled={loadingSchedules}
+                            disabled={loadingSchedules || isReadOnly}
                           >
                             Delete
                           </button>

@@ -43,6 +43,13 @@ const CoordinatorInstructionTemplate = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const isReadOnly = storedUser.role === 'assistant coordinator';
+    if (isReadOnly) {
+      alert("Action forbidden in Read-Only Mode.");
+      return;
+    }
+
     if (!instructions.trim() && !selectedFile) {
       alert("Please enter detailed review instructions or attach a resource.");
       return;
@@ -71,6 +78,8 @@ const CoordinatorInstructionTemplate = () => {
   };
 
   const handleCancel = () => {
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    if (storedUser.role === 'assistant coordinator') return;
     setInstructions('');
     setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -84,9 +93,22 @@ const CoordinatorInstructionTemplate = () => {
         {/* Centralized Form Block Frame matching the exact width and clean alignment rules */}
         <div className="max-w-4xl mx-auto bg-white rounded border border-gray-200 shadow-sm p-6 mb-6">
           
+          {/* Read user role context */}
+          {(() => {
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const isReadOnly = storedUser.role === 'assistant coordinator';
+            window.isReadOnly = isReadOnly; // temp share with component markup below
+            return null;
+          })()}
+          
           {/* Section Header */}
           <div className="border-b border-gray-100 pb-4 mb-6">
             <h1 className="text-xl font-bold text-gray-900">Announcement to Student Teams</h1>
+            {isReadOnly && (
+              <div className="mt-4 p-3 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded font-medium text-center">
+                ℹ️ You are viewing this page in Read-Only Mode as an Assistant Coordinator.
+              </div>
+            )}
             <p className="text-sm text-gray-500 mt-1">
               {/*Publish review guidelines, grading structures, and baseline templates ahead of the scheduled project review.*/}
             </p>
@@ -106,6 +128,7 @@ const CoordinatorInstructionTemplate = () => {
                 rows={6}
                 className="w-full px-3 py-2 text-sm rounded border border-gray-300 shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-gray-700 placeholder-gray-400 transition-all duration-200 resize-y min-h-[120px]"
                 placeholder="Provide instructions, review expectations, presentation guidelines, and important updates for student teams"
+                disabled={window.isReadOnly}
               />
             </div>
 
@@ -116,14 +139,16 @@ const CoordinatorInstructionTemplate = () => {
               </label>
               
               <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`mt-1 flex justify-center px-6 pt-6 pb-6 border-2 border-dashed rounded cursor-pointer relative group transition-all duration-200 ${
-                  isDragging 
-                    ? 'border-indigo-500 bg-indigo-50/30' 
-                    : 'border-gray-300 hover:border-indigo-400 bg-gray-50/50'
+                onDragOver={window.isReadOnly ? undefined : handleDragOver}
+                onDragLeave={window.isReadOnly ? undefined : handleDragLeave}
+                onDrop={window.isReadOnly ? undefined : handleDrop}
+                onClick={window.isReadOnly ? undefined : () => fileInputRef.current?.click()}
+                className={`mt-1 flex justify-center px-6 pt-6 pb-6 border-2 border-dashed rounded relative group transition-all duration-200 ${
+                  window.isReadOnly 
+                    ? 'border-gray-200 bg-gray-50/50 cursor-not-allowed'
+                    : isDragging 
+                      ? 'border-indigo-500 bg-indigo-50/30 cursor-pointer' 
+                      : 'border-gray-300 hover:border-indigo-400 bg-gray-50/50 cursor-pointer'
                 }`}
               >
                 <input
@@ -132,6 +157,7 @@ const CoordinatorInstructionTemplate = () => {
                   ref={fileInputRef}
                   onChange={handleFileChange}
                   className="hidden"
+                  disabled={window.isReadOnly}
                 />
                 
                 <div className="space-y-2 text-center pointer-events-none">
@@ -169,13 +195,15 @@ const CoordinatorInstructionTemplate = () => {
               <button
                 type="button"
                 onClick={handleCancel}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-all duration-200 shadow-sm"
+                disabled={window.isReadOnly}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Clear Changes
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 text-sm font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-all duration-200 shadow-sm"
+                disabled={window.isReadOnly}
+                className="px-5 py-2 text-sm font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Broadcast to Teams
               </button>

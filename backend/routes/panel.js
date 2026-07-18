@@ -79,22 +79,27 @@ router.get('/marks', auth, authorize(['panel', 'guide', 'admin']), panelControll
 router.post('/coordinator/generate-slots', auth, authorize(['coordinator', 'admin']), panelController.generateSlotsForCoordinator);
 router.post('/coordinator/save-free-slots', auth, authorize(['coordinator', 'admin']), panelController.saveFreeSlotsForCoordinator);
 router.post('/coordinator/assign-slots', auth, authorize(['coordinator', 'admin']), panelController.assignSlotsForCoordinator);
-router.get('/coordinator/allotted-schedules', auth, authorize(['coordinator', 'admin']), panelController.getAllottedSchedulesForCoordinator);
+router.get('/coordinator/allotted-schedules', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), panelController.getAllottedSchedulesForCoordinator);
 // Allow coordinator (or admin) to delete an allotted schedule they created
 router.delete('/coordinator/allotted-schedules/:scheduleId', auth, authorize(['coordinator', 'admin']), panelController.deleteAllottedSchedule);
 
 // Coordinator Viva Panel endpoints
-router.get('/coordinator/viva-panel', auth, authorize(['coordinator']), panelController.getCoordinatorVivaPanel);
+router.get('/coordinator/viva-panel', auth, authorize(['coordinator', 'assistant coordinator']), panelController.getCoordinatorVivaPanel);
 router.post('/coordinator/viva-panel', auth, authorize(['coordinator']), panelController.saveCoordinatorVivaPanel);
 
 // Debug route for coordinators to check their panel assignment
-router.get('/coordinator/panel-status', auth, authorize(['coordinator', 'admin']), async (req, res) => {
+router.get('/coordinator/panel-status', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), async (req, res) => {
     try {
         const coordinatorId = req.user.id;
         const Panel = require('../models/Panel');
         const Team = require('../models/Team');
         
-        const panel = await Panel.findOne({ coordinator: coordinatorId })
+        const panel = await Panel.findOne({ 
+            $or: [
+                { coordinator: coordinatorId },
+                { assistantCoordinators: coordinatorId }
+            ]
+        })
             .populate('members', 'username name')
             .populate('coordinator', 'username name');
         
@@ -145,7 +150,7 @@ router.post('/attendance/check', auth, attendanceController.checkAttendanceForTe
 // New route for checking schedule existence
 router.post('/check-schedule-exists', auth, attendanceController.checkPreviousScheduleExists);
 
-router.get('/coordinator/coordinated-teams', auth, authorize(['coordinator']), panelController.getCoordinatedTeams);
+router.get('/coordinator/coordinated-teams', auth, authorize(['coordinator', 'assistant coordinator']), panelController.getCoordinatedTeams);
 
 router.post('/coordinator/instruction-template',auth,authorize(['coordinator']),templateUpload,panelController.createInstructionTemplate)
 module.exports = router; 
