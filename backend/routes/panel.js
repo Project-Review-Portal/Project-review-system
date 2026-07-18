@@ -91,31 +91,43 @@ router.post('/coordinator/viva-panel', auth, authorize(['coordinator']), panelCo
 router.get('/coordinator/panel-status', auth, authorize(['coordinator', 'admin']), async (req, res) => {
     try {
         const coordinatorId = req.user.id;
+        
+        // 1. Extract the program context from the headers (default to 'UG' if missing)
+        const userProgramme = req.headers['x-selected-programme'] || 'UG';
+        // console.log(req.headers['x-selected-programme'] , 'UG')
         const Panel = require('../models/Panel');
         const Team = require('../models/Team');
         
-        const panel = await Panel.findOne({ coordinator: coordinatorId })
-            .populate('members', 'username name')
-            .populate('coordinator', 'username name');
+        // 2. Filter panels by BOTH coordinator identity AND the specific program context
+        const panels = await Panel.find({ 
+            coordinator: coordinatorId,
+            programme: userProgramme // Assumes your Panel model maps a 'programme' string field
+        })
+        .populate('members', 'username name')
+        .populate('coordinator', 'username name');
         
-        if (!panel) {
+        if (!panels || panels.length === 0) {
             return res.json({
                 hasPanel: false,
-                message: 'No panel assigned to this coordinator',
-                coordinatorId: coordinatorId
+                message: `No panels assigned to this coordinator for the ${userProgramme} program context`,
+                coordinatorId: coordinatorId,
+                programme: userProgramme
             });
         }
         
-        const teams = await Team.find({ panel: panel._id })
+        // 3. Find only teams belonging to this filtered slice of panels
+        const teams = await Team.find({ panel: { $in: panels.map(p => p._id) } })
             .populate('teamLeader', 'username name')
             .populate('members', 'username name')
             .populate('guidePreference', 'username name');
         
         res.json({
             hasPanel: true,
-            panel: panel,
+            panel: panels[0],
+            panels: panels,
             teams: teams,
-            coordinatorId: coordinatorId
+            coordinatorId: coordinatorId,
+            programme: userProgramme
         });
     } catch (error) {
         console.error('Error checking coordinator panel status:', error);

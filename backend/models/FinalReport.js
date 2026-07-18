@@ -26,8 +26,8 @@ const FinalReportSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['uploaded', 'approved', 'rejected'],
-    default: 'uploaded',
+    enum: ['draft', 'pending', 'uploaded', 'approved', 'rejected'],
+    default: 'draft',
   },
   approvedBy: {
     type: mongoose.Schema.Types.ObjectId,

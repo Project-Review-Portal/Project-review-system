@@ -11,6 +11,7 @@ const FinalReport = () => {
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
+    const [submitting, setSubmitting] = useState(false);
 
     const fetchData = async () => {
         try {
@@ -21,13 +22,13 @@ const FinalReport = () => {
                 const teamRes = await axios.get(`${SERVER_API_KEY}/api/teams/my-team`, { headers });
                 setTeam(teamRes.data);
             } catch (err) {
-                // ignore
+                // Ignore fallback if team fetch fails
             }
 
             try {
                 const reqsRes = await axios.get(`${SERVER_API_KEY}/api/materials/student/requirements`, { headers });
-                setSettings(reqsRes.data.settings);
-                setUploads(reqsRes.data.uploads);
+                setSettings(reqsRes.data.settings || []);
+                setUploads(reqsRes.data.uploads || []);
             } catch (err) {
                 if (err.response && err.response.status !== 404) {
                     setError('Error fetching requirements');
@@ -64,9 +65,10 @@ const FinalReport = () => {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 },
             });
-            setMessage('Material uploaded successfully!');
+            setMessage('Material uploaded successfully as draft!');
             setError('');
-            // clear selected file
+            
+            // Clear selected file slot
             setFiles(prev => {
                 const newFiles = { ...prev };
                 delete newFiles[settingId];
@@ -76,6 +78,25 @@ const FinalReport = () => {
         } catch (err) {
             setError(err.response?.data?.message || 'Error uploading material');
             setMessage('');
+        }
+    };
+
+    const handleFinalSubmit = async () => {
+        if (!window.confirm("Are you sure you want to submit all draft files to the coordinator/guide? Once submitted, you won't be able to edit them unless they are rejected.")) {
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const headers = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
+            const res = await axios.put(`${SERVER_API_KEY}/api/materials/student/submit`, {}, { headers });
+            setMessage(res.data.message || 'All drafts submitted successfully!');
+            setError('');
+            fetchData();
+        } catch (err) {
+            setError(err.response?.data?.message || 'Error submitting materials');
+            setMessage('');
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -93,6 +114,22 @@ const FinalReport = () => {
             </div>
         );
     }
+
+    // Check if there are any current drafts that can be submitted
+    const hasDrafts = uploads.some(u => u.status === 'draft');
+
+    // Business Logic Validation: A required file is missing if there is no upload record OR its status is 'rejected'
+    const missingRequiredFiles = settings
+        .filter(setting => setting.isRequired)
+        .some(setting => {
+            return !uploads.some(u => {
+                const uploadedSettingId = u.materialSetting?._id
+                    ? u.materialSetting._id.toString()
+                    : u.materialSetting?.toString();
+                
+                return uploadedSettingId === setting._id.toString() && u.status !== 'rejected';
+            });
+        });
 
     return (
         <div className="container mx-auto p-4 max-w-4xl">
@@ -115,7 +152,6 @@ const FinalReport = () => {
                 <div className="space-y-6">
                     {settings.map(setting => {
                         const upload = uploads.find(u => {
-                            // materialSetting may be a populated object or a bare ID string
                             const settingId = u.materialSetting?._id
                                 ? u.materialSetting._id.toString()
                                 : u.materialSetting?.toString();
@@ -126,15 +162,19 @@ const FinalReport = () => {
                             <div key={setting._id} className="bg-white border rounded-lg shadow-sm p-5">
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
-                                        <h3 className="text-lg font-semibold">{setting.name}</h3>
+                                        <h3 className="text-lg font-semibold">
+                                            {setting.name} 
+                                            {setting.isRequired && <span className="text-red-500 ml-1" title="Required">*</span>}
+                                        </h3>
                                         <div className="text-sm text-gray-500">
-                                            Required: {setting.isRequired ? 'Yes' : 'No'} | Format: {setting.fileType}
+                                            Required: {setting.isRequired ? 'Yes' : 'No'} | Format: {Array.isArray(setting.fileType) ? setting.fileType.map(t => `.${t}`).join(', ') : setting.fileType}
                                         </div>
                                     </div>
                                     {upload && (
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
                                             upload.status === 'approved' ? 'bg-green-100 text-green-800' :
                                             upload.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                            upload.status === 'draft' ? 'bg-blue-100 text-blue-800' :
                                             'bg-yellow-100 text-yellow-800'
                                         }`}>
                                             {upload.status}
@@ -155,7 +195,7 @@ const FinalReport = () => {
                                     </div>
                                 )}
 
-                                {(!upload || upload.status !== 'approved') && team.isLocked && (
+                                {(!upload || upload.status === 'draft' || upload.status === 'rejected') && team.isLocked && (
                                     <form onSubmit={(e) => onSubmit(setting._id, e)} className="mt-4 border-t pt-4">
                                         <div className="flex items-center space-x-4">
                                             <div className="flex-grow">
@@ -163,14 +203,14 @@ const FinalReport = () => {
                                                     type="file"
                                                     onChange={(e) => onFileChange(setting._id, e)}
                                                     className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                                    accept={`.${setting.fileType}, ${setting.fileType}/*`}
+                                                    accept={Array.isArray(setting.fileType) ? setting.fileType.map(t => `.${t}`).join(',') : `.${setting.fileType}`}
                                                 />
                                             </div>
                                             <button
                                                 type="submit"
                                                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline whitespace-nowrap"
                                             >
-                                                {upload ? 'Upload Revision' : 'Upload File'}
+                                                {upload ? 'Upload Revision (Draft)' : 'Upload File (Draft)'}
                                             </button>
                                         </div>
                                     </form>
@@ -181,9 +221,50 @@ const FinalReport = () => {
                                         This material has been approved and can no longer be modified.
                                     </div>
                                 )}
+
+                                {upload && (upload.status === 'uploaded' || upload.status === 'pending') && (
+                                    <div className="text-yellow-600 text-sm italic border-t pt-3 mt-3">
+                                        Submitted to coordinator. Awaiting review.
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
+
+                    {hasDrafts && (
+                        <div className={`mt-8 p-4 border rounded-lg flex flex-col sm:flex-row justify-between items-center gap-4 transition-colors duration-200 ${
+                            missingRequiredFiles 
+                                ? 'bg-red-50 border-red-200' 
+                                : 'bg-indigo-50 border-indigo-200'
+                        }`}>
+                            <div>
+                                <h3 className={`font-semibold text-base ${missingRequiredFiles ? 'text-red-900' : 'text-indigo-900'}`}>
+                                    {missingRequiredFiles ? 'Submission Incomplete' : 'Ready to Submit?'}
+                                </h3>
+                                {missingRequiredFiles ? (
+                                    <p className="text-sm text-red-700 font-medium">
+                                        Please re-upload a revision for any rejected file(s) and complete all required documents before final submission.
+                                    </p>
+                                ) : (
+                                    <p className="text-sm text-indigo-700">
+                                        You have files saved as draft. Click submit to send them to the coordinator/guide.
+                                    </p>
+                                )}
+                            </div>
+                            <button
+                                id="submit-materials-btn"
+                                onClick={handleFinalSubmit}
+                                disabled={submitting || missingRequiredFiles}
+                                className={`font-bold py-2.5 px-6 rounded-lg shadow-md transition-all duration-150 whitespace-nowrap text-white ${
+                                    missingRequiredFiles || submitting 
+                                        ? 'bg-gray-400 cursor-not-allowed opacity-70 shadow-none' 
+                                        : 'bg-indigo-600 hover:bg-indigo-700'
+                                }`}
+                            >
+                                {submitting ? 'Submitting...' : 'Submit to Coordinator'}
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
