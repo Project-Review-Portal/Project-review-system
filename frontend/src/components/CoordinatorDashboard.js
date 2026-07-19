@@ -11,6 +11,7 @@ import CoordinatorLetterLiveEditorCK from './CoordinatorLetterLiveEditorCK';
 import GuideUploadAttendance from './guide/GuideUploadAttendance';
 import CoordinatorVivaPanelFormation from './coordinator/CoordinatorVivaPanelFormation';
 import MaterialsTab from './coordinator/materials/MaterialsTab';
+import ReviewRail from './ReviewRail';
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const CoordinatorRulesDashboard = () => {
     const [teamFormationOpen, setTeamFormationOpen] = useState(true);
@@ -86,7 +87,8 @@ const CoordinatorRulesDashboard = () => {
 
     return (
         <div className="bg-white p-6 rounded-lg shadow mb-6">
-            <h2 className="text-xl font-semibold mb-4">Coordinator Dashboard Rules & Info</h2>
+            <div className="dashboard-title-row"><div><p className="page-kicker">Coordinator desk</p><h2 className="text-xl font-semibold mb-1">Review operations</h2><p className="text-gray-600">Keep the programme record moving with a single source of truth.</p></div><span className="status-chip status-open">Cycle in progress</span></div>
+            <ReviewRail current={2} scores={['78', '81']} label="Programme review cycle" />
             {loadingRules ? (
                 <div className="mb-4 text-blue-700">Loading rules...</div>
             ) : rulesError ? (
@@ -99,11 +101,11 @@ const CoordinatorRulesDashboard = () => {
                         <li>You cannot change team compositions or guide assignments.</li>
                         <li>You are responsible for scheduling reviews and vivas.</li>
                     </ul>
-                    <div className="p-4 bg-blue-50 rounded-md space-y-2">
-                        <div className="text-blue-700">
+                    <div className="institution-note p-4 rounded-md space-y-2">
+                        <div>
                             <strong>Team Formation:</strong> {teamFormationOpen ? 'Open' : 'Closed'}
                         </div>
-                        <div className="text-blue-700">
+                        <div>
                             <strong>Guide Selection:</strong> {guideSelectionStart ? (
                                 <>
                                     Starts on <span className="font-semibold">{new Date(guideSelectionStart).toLocaleString()}</span>
@@ -225,12 +227,12 @@ const CoordinatorDashboard = () => {
     const currentRole = user?.role === 'assistant coordinator' ? 'assistant coordinator' : 'coordinator';
 
     return (
-        <div>
+        <div className="app-shell">
             <Navbar user={{ ...user, role: currentRole }} onLogout={handleLogout} />
             
          
             
-            <div className="p-4">
+            <div className="app-content">
                 <Routes>
                     <Route path="dashboard" element={<CoordinatorRulesDashboard />} />
                     {/* Show the new live editor on the existing letter-generation route */}

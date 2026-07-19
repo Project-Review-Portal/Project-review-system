@@ -20,9 +20,9 @@ const StudentDashboard = () => {
     };
 
     return (
-        <div>
+        <div className="app-shell">
             <Navbar user={user} onLogout={handleLogout} />
-            <main className="p-4">
+            <main className="app-content">
                 <Routes>
                     <Route index element={<TeamRules />} />
                     <Route path="team" element={<TeamFormation />} />

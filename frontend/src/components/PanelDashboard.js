@@ -63,10 +63,10 @@ const PanelDashboard = () => {
     const isBasePanelDashboard = location.pathname === '/panel-dashboard' || location.pathname === '/panel-dashboard/';
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="app-shell">
             <Navbar user={user} onLogout={handleLogout} />
-            <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-                <div className="px-4 py-6 sm:px-0">
+            <div className="app-content">
+                <div>
                     {isBasePanelDashboard && (
                         <div className="bg-white p-6 rounded-lg shadow mb-6">
                             <h2 className="text-xl font-semibold mb-4">Panel Member Dashboard</h2>

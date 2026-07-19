@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReviewRail from './ReviewRail';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const GuideDashboardHome = () => {
@@ -36,7 +37,8 @@ const GuideDashboardHome = () => {
 
     return (
         <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-2xl font-bold mb-6">Guide Dashboard</h2>
+            <div className="dashboard-title-row"><div><p className="page-kicker">Guide desk</p><h2 className="text-2xl font-bold mb-1">Review ledger</h2><p className="text-gray-600">A clear view of the teams and milestones in your care.</p></div><span className="status-chip status-open">Active term</span></div>
+            <ReviewRail current={1} scores={['82']} label="Current review cycle" />
             <div className="space-y-4 mb-6">
                 <p className="text-gray-700">
                     Welcome to the Guide Dashboard! Here you can manage your assigned teams, handle guide requests, and oversee review schedules.
@@ -54,11 +56,11 @@ const GuideDashboardHome = () => {
             ) : error ? (
                 <div className="mb-4 text-red-700">{error}</div>
             ) : (
-                <div className="p-4 bg-blue-50 rounded-md space-y-2 mb-6">
-                    <div className="text-blue-700">
+                <div className="institution-note p-4 rounded-md space-y-2 mb-6">
+                    <div>
                         <strong>Team Formation:</strong> {teamFormationOpen ? 'Open' : 'Closed'}
                     </div>
-                    <div className="text-blue-700">
+                    <div>
                         <strong>Guide Selection:</strong> {guideSelectionStart ? (
                             <>
                                 Starts on <span className="font-semibold">{new Date(guideSelectionStart).toLocaleString()}</span>

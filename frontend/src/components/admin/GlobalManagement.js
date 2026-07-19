@@ -1,44 +1,39 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import UserManagement from './UserManagement';
 import ProgrammeManagement from './ProgrammeManagement';
+import ReviewRail from '../ReviewRail';
 
 const TABS = [
-    { key: 'faculty', label: '👥 Faculty & Designation Limits' },
-    { key: 'programmes', label: '🎓 PG Programmes' },
+    { key: 'faculty', label: 'Faculty register', detail: 'Faculty records & designation limits', index: '01' },
+    { key: 'programmes', label: 'Programme register', detail: 'Postgraduate programme catalogue', index: '02' },
 ];
 
 const GlobalManagement = () => {
     const [activeTab, setActiveTab] = useState('faculty');
-    const navigate = useNavigate();
+    const active = TABS.find((tab) => tab.key === activeTab);
 
     return (
-        <div>
-            <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-800 mb-1">Global Management</h2>
-                <p className="text-gray-500 text-sm">Manage shared resources across all programmes.</p>
-            </div>
+        <main className="global-workspace">
+            <header className="global-hero">
+                <div><p className="page-kicker">Institutional administration</p><h1>Global management</h1><p>Maintain the shared registers that support every project-review programme.</p></div>
+                <div className="global-mark"><small>REVIEW RAIL</small><strong>Central<br />register</strong></div>
+            </header>
 
-            {/* Tab Bar */}
-            <div className="flex gap-2 mb-6 border-b border-gray-200">
-                {TABS.map(tab => (
-                    <button
-                        key={tab.key}
-                        onClick={() => setActiveTab(tab.key)}
-                        className={`px-5 py-2 text-sm font-medium rounded-t-md border-b-2 transition-colors ${
-                            activeTab === tab.key
-                                ? 'border-indigo-600 text-indigo-700 bg-indigo-50'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                        }`}
-                    >
-                        {tab.label}
+            <ReviewRail current={0} label="Academic year setup" />
+
+            <div className="global-tabs" role="tablist" aria-label="Global management sessions">
+                {TABS.map((tab) => (
+                    <button key={tab.key} role="tab" aria-selected={activeTab === tab.key} onClick={() => setActiveTab(tab.key)} className={activeTab === tab.key ? 'global-tab active' : 'global-tab'}>
+                        <span>{tab.index}</span><div><strong>{tab.label}</strong><small>{tab.detail}</small></div><b>→</b>
                     </button>
                 ))}
             </div>
 
-            {activeTab === 'faculty' && <UserManagement globalOnly />}
-            {activeTab === 'programmes' && <ProgrammeManagement />}
-        </div>
+            <section className="global-session" key={activeTab}>
+                <div className="session-caption"><span>{active.index}</span><div><p className="page-kicker">{active.label}</p><p>{active.detail}</p></div></div>
+                {activeTab === 'faculty' ? <UserManagement globalOnly /> : <ProgrammeManagement />}
+            </section>
+        </main>
     );
 };
 

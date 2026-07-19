@@ -8,7 +8,7 @@ const RoleRow = ({ roleObj, loading, getRoleDisplayName, handleRoleSelect }) => 
     };
 
     return (
-        <div className={`w-full p-4 rounded-lg border-2 ${loading ? 'bg-gray-100 border-gray-200' : 'bg-white border-gray-200'}`}>
+        <div className={`role-option w-full p-4 ${loading ? 'bg-gray-100 opacity-70' : ''}`}>
             <div className="flex justify-between items-center">
                 <div>
                     <h3 className="font-semibold text-gray-900">
@@ -19,7 +19,7 @@ const RoleRow = ({ roleObj, loading, getRoleDisplayName, handleRoleSelect }) => 
                     <button
                         onClick={onClick}
                         disabled={loading}
-                        className={`text-indigo-600 ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:underline'}`}
+                        className={`auth-link ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         Continue
                     </button>
@@ -98,28 +98,31 @@ const RoleSelection = () => {
 
     if (uniqueRoles.length === 0) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
+            <div className="auth-shell">
+                <aside className="auth-aside"><div className="brand-lockup"><div className="brand-mark">PR</div><div className="auth-aside-copy"><h1>Your review workspace awaits.</h1><p>Select an assigned role to open the right tools, context, and responsibilities.</p></div></div></aside>
+                <div className="auth-panel"><div className="selection-card space-y-8">
                     <div className="text-center">
                         <h2 className="text-2xl font-bold text-gray-900 mb-4">No Roles Available</h2>
                         <p className="text-gray-600 mb-4">You don't have any assigned roles in the system.</p>
                         <button
-                            onClick={() => navigate('/login')}
-                            className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+                            onClick={() => navigate('/')}
+                            className="auth-primary text-white px-4 py-2 text-sm font-medium"
                         >
                             Back to Login
                         </button>
                     </div>
-                </div>
+                </div></div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
+        <div className="auth-shell">
+            <aside className="auth-aside"><div className="brand-lockup"><div className="brand-mark">PR</div><div className="auth-aside-copy"><h1>Choose your workspace.</h1><p>Each role brings its own review tools and programme context.</p></div></div><div className="auth-aside-meta"><span className="w-2 h-2 rounded-full bg-emerald-300"></span> Role-based access</div></aside>
+            <div className="auth-panel"><div className="selection-card space-y-8">
                 <div className="text-center">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome</h2>
+                    <p className="auth-eyebrow">Project review system</p>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome, {user.name || 'Faculty'}</h2>
                     <p className="text-gray-600 mb-6">Please select the role you want to use for this session:</p>
                 </div>
 
@@ -147,7 +150,7 @@ const RoleSelection = () => {
                         onClick={() => {
                             localStorage.removeItem('token');
                             localStorage.removeItem('user');
-                            navigate('/login');
+                            navigate('/');
                         }}
                         className="text-sm text-gray-500 hover:text-gray-700 underline"
                     >
@@ -155,12 +158,11 @@ const RoleSelection = () => {
                     </button>
                    
                 </div>
-               <p className="mt-6">
-  <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-md text-center font-semibold">
-    EXTERNAL MEMBERS! <br /> Choose panel member as your role.
-  </div>
-</p>
+                <div className="border border-amber-200 bg-amber-50 text-amber-800 px-4 py-3 rounded-xl text-center text-sm font-semibold">
+                    External members: choose <strong>Panel Member</strong> as your role.
+                </div>
 
+            </div>
             </div>
         </div>
     );

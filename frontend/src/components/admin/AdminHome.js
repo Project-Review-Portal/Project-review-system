@@ -46,16 +46,16 @@ const AdminHome = () => {
     );
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <div className="max-w-3xl mx-auto py-12 px-6">
+            <div className="admin-home max-w-3xl mx-auto py-2 px-0">
                 <div className="mb-8 flex justify-between items-start">
                     <div>
-                        <h1 className="text-3xl font-extrabold text-gray-800 mb-2">Admin Control Panel</h1>
-                        <p className="text-gray-500">Select a context to manage students, panels, and reviews.</p>
+                        <p className="page-kicker">Academic administration</p>
+                        <h1 className="text-3xl font-extrabold text-gray-800 mb-2">Programme desk</h1>
+                        <p className="text-gray-500">Select a programme record to manage students, panels, and reviews.</p>
                     </div>
                     <button
                         onClick={handleLogout}
-                        className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors shadow"
+                        className="auth-primary text-white px-4 py-2 text-sm font-medium"
                     >
                         Logout
                     </button>
@@ -63,7 +63,7 @@ const AdminHome = () => {
 
                 {/* Global Management */}
                 <div className="mb-8">
-                    <h2 className="text-sm font-semibold uppercase tracking-widest text-indigo-500 mb-3">Global Management</h2>
+                    <h2 className="section-label text-sm font-semibold uppercase tracking-widest mb-3">Global Management</h2>
                     <ListItem
                         title="Global Management"
                         subtitle="Faculty · Designation Limits · PG Programmes"
@@ -75,7 +75,7 @@ const AdminHome = () => {
 
                 {/* Programmes */}
                 <div>
-                    <h2 className="text-sm font-semibold uppercase tracking-widest text-purple-500 mb-3">Programmes</h2>
+                    <h2 className="section-label text-sm font-semibold uppercase tracking-widest mb-3">Programme records</h2>
                     {loading ? (
                         <div className="text-gray-400 text-sm animate-pulse">Loading programmes…</div>
                     ) : (
@@ -107,7 +107,6 @@ const AdminHome = () => {
                     )}
                 </div>
             </div>
-        </div>
     );
 };
 

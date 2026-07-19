@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import ReviewRail from '../ReviewRail';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
@@ -56,7 +57,11 @@ const TeamRules = () => {
 
     return (
         <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-4">Team Formation Rules</h2>
+            <div className="dashboard-title-row">
+                <div><p className="page-kicker">Student record</p><h2 className="text-xl font-semibold mb-1">Team Formation</h2><p className="text-gray-600">Set the foundations before the first formal review.</p></div>
+                <span className={`status-chip ${teamFormationOpen ? 'status-open' : 'status-closed'}`}>{teamFormationOpen ? 'Formation open' : 'Formation closed'}</span>
+            </div>
+            <ReviewRail current={0} label="Your review journey" />
             <div className="space-y-4">
                 <p className="text-gray-700">
                     Welcome to the Team Formation section! Here are the current team formation rules:
@@ -71,11 +76,11 @@ const TeamRules = () => {
                     <li>Team changes are not allowed after final approval.</li>
                     <li>Submit final reports and attend all reviews as required.</li>
                 </ul>
-                <div className="mt-6 p-4 bg-blue-50 rounded-md space-y-2">
-                    <div className="text-blue-700">
+                <div className="institution-note mt-6 p-4 rounded-md space-y-2">
+                    <div>
                         <strong>Team Formation:</strong> {teamFormationOpen ? 'Open' : 'Closed'}
                     </div>
-                    <div className="text-blue-700">
+                    <div>
                         <strong>Guide Selection:</strong> {guideSelectionStart ? (
                             <>
                                 Starts on <span className="font-semibold">{new Date(guideSelectionStart).toLocaleString()}</span>
@@ -85,7 +90,7 @@ const TeamRules = () => {
                             </>
                         ) : 'Dates not set'}
                     </div>
-                    <p className="text-blue-700 mt-2">
+                    <p className="mt-2">
                         Please ensure you have read and understood all the rules before proceeding with team formation and guide selection.
                     </p>
                 </div>

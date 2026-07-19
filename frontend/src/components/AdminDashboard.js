@@ -37,17 +37,14 @@ const AdminDashboard = () => {
     // Determine if we're inside a programme context for the key reset
     const contentKey = location.pathname;
 
-    const isHome = location.pathname === '/admin-dashboard' || location.pathname === '/admin-dashboard/';
-    const showNavbar = !isHome;
-
     const programmeMatch = location.pathname.match(/\/programme\/([^/]+)/);
     const activeProgramme = programmeMatch ? decodeURIComponent(programmeMatch[1]) : null;
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {showNavbar && <Navbar user={user} onLogout={handleLogout} activeProgramme={activeProgramme} />}
-            <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-                <div key={contentKey} className="px-4 py-6 sm:px-0">
+        <div className="app-shell">
+            <Navbar user={user} onLogout={handleLogout} activeProgramme={activeProgramme} />
+            <div className="app-content">
+                <div key={contentKey}>
                     <Routes>
                         {/* Default home — programme selection */}
                         <Route index element={<AdminHome />} />

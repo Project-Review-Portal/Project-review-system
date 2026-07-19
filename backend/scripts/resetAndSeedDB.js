@@ -16,7 +16,7 @@ const generateRandomName = (prefix) => {
 };
 
 const seedDatabase = async () => {
-  const mongoUri = "mongodb+srv://Suchitra:suchi3590@projectreviewcluster.v4ikhob.mongodb.net/test?retryWrites=true&w=majority";
+  const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/project-review-system";
 
   try {
     await mongoose.connect(mongoUri, {
@@ -109,6 +109,7 @@ const seedDatabase = async () => {
         username,
         name,
         password: hashedPassword,
+        role: role,
         roles: [{ role: role, team: null }],
         memberType: memberType || null
       });

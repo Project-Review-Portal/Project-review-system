@@ -45,11 +45,19 @@ const FacultyDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
+    <div className="auth-shell">
+      <aside className="auth-aside">
+        <div className="brand-lockup">
+          <div className="brand-mark">PR</div>
+          <div className="auth-aside-copy"><h1>One system, every review role.</h1><p>Move between your assigned responsibilities while keeping the right programme context in view.</p></div>
+        </div>
+        <div className="auth-aside-meta"><span className="w-2 h-2 rounded-full bg-emerald-300"></span> Faculty workspace</div>
+      </aside>
+      <div className="auth-panel"><div className="selection-card space-y-8">
+        <div className="text-center"><p className="auth-eyebrow">Project review system</p>
         <h2 className="text-center text-3xl font-extrabold text-gray-900 mb-4">
-          Welcome
-        </h2>
+          Welcome, {user?.name || 'Faculty'}
+        </h2></div>
         <p className="text-center text-gray-700 mb-6">
           Please select which dashboard you want to access:
         </p>
@@ -57,7 +65,7 @@ const FacultyDashboard = () => {
           {facultyRoles.map((roleObj, index) => (
             <button
               key={index}
-              className="w-full py-3 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700 focus:outline-none text-lg font-semibold flex justify-between items-center"
+              className="w-full py-3 px-4 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 focus:outline-none text-left text-base font-semibold flex justify-between items-center shadow-sm hover:shadow-md"
               onClick={() => handleSelect(roleObj)}
             >
               <span>{roleLabels[roleObj.role]} ({roleObj.programme})</span>
@@ -67,7 +75,7 @@ const FacultyDashboard = () => {
             </button>
           ))}
         </div>
-      </div>
+      </div></div>
     </div>
   );
 };

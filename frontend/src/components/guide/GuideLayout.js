@@ -19,9 +19,9 @@ const GuideLayout = () => {
     }
 
     return (
-        <div>
+        <div className="app-shell">
             <Navbar user={user} onLogout={handleLogout} />
-            <div className="container mx-auto p-4">
+            <div className="app-content">
                 <Outlet />
             </div>
         </div>

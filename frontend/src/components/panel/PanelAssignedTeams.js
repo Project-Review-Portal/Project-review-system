@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import ReviewRail from '../ReviewRail';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
@@ -95,14 +96,14 @@ const PanelAssignedTeams = () => {
 
     return (
         <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-2xl font-bold mb-6">Your Assigned Teams</h2>
+            <div className="dashboard-title-row"><div><p className="page-kicker">Panel docket</p><h2 className="text-2xl font-bold mb-1">Your assigned teams</h2><p className="text-gray-600">Review each team’s record before entering marks.</p></div><span className="record-count">{assignedTeams.length} TEAMS</span></div>
 
             {assignedTeams.length === 0 ? (
                 <p>No teams have been assigned to your panel yet.</p>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {assignedTeams.map(team => (
-                        <div key={team._id} className="border p-4 rounded-lg shadow-sm">
+                        <div key={team._id} className="border p-4 rounded-lg shadow-sm team-record-card">
                             <div className="flex items-center gap-2 mb-2">
                                 <h3 className="font-semibold text-lg">Team: {team.teamName}</h3>
                                 <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
@@ -113,6 +114,7 @@ const PanelAssignedTeams = () => {
                             <p className="text-gray-700">Review Panel: {team.panel?.name || 'Not Assigned'}</p>
                             <p className="text-gray-700">Viva Panel: {team.vivaPanel?.name || 'Not Assigned'}</p>
                             <p className="text-gray-700">Guide: {team.guidePreference?.name || 'Not Assigned'}</p>
+                            <ReviewRail compact current={1} scores={['—']} label={`${team.teamName} progress`} />
                             <div className="mt-2">
                                 <p className="font-medium">Members:</p>
                                 {team.members && team.members.length > 0 ? (

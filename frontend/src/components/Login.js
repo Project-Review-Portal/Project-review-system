@@ -136,11 +136,26 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
-                <h2 className="text-center text-3xl font-extrabold text-gray-900">
-                    Project Review
+        <div className="auth-shell">
+            <aside className="auth-aside" aria-label="Project Review System">
+                <div className="brand-lockup">
+                    <div className="brand-mark">PR</div>
+                    <div className="auth-aside-copy">
+                        <h1>Every review, clearly in control.</h1>
+                        <p>A focused workspace for project teams, guides, panels, and coordinators to manage the complete review lifecycle.</p>
+                    </div>
+                </div>
+                <div className="auth-aside-meta"><span className="w-2 h-2 rounded-full bg-emerald-300"></span> Secure academic workspace</div>
+            </aside>
+            <div className="auth-panel">
+            <div className="auth-card space-y-6">
+                <p className="auth-eyebrow">Project review system</p>
+                <h2>
+                    {mode === 'login' ? 'Welcome back' : mode === 'forgot-email' ? 'Reset your password' : mode === 'verify-otp' ? 'Verify your identity' : 'Create a new password'}
                 </h2>
+                <p className="auth-description">
+                    {mode === 'login' ? 'Sign in to continue to your review workspace.' : 'Follow the secure steps below to regain access to your workspace.'}
+                </p>
                 {error && (
                     <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
                         <span className="block sm:inline">{error}</span>
@@ -155,15 +170,15 @@ const Login = () => {
                     <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
                         <div className="space-y-4">
                             <div>
-                                <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
+                                <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email or Username</label>
                                 <div className="mt-1">
                                     <input
                                         id="email"
                                         name="email"
-                                        type="email"
+                                        type="text"
                                         required
                                         className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                        placeholder="Enter your email"
+                                        placeholder="Enter your email or username"
                                         value={formData.email}
                                         onChange={handleChange}
                                     />
@@ -191,8 +206,8 @@ const Login = () => {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white ${
-                                    loading ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'
+                                className={`auth-primary group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium text-white ${
+                                    loading ? 'opacity-60' : ''
                                 } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
                             >
                                 {loading ? 'Signing in...' : 'Sign in'}
@@ -200,7 +215,7 @@ const Login = () => {
                             <button
                                 type="button"
                                 onClick={startForgot}
-                                className="w-full text-sm text-indigo-600 hover:text-indigo-800"
+                                className="auth-link w-full text-sm"
                             >
                                 Forgot password?
                             </button>
@@ -211,12 +226,12 @@ const Login = () => {
                 {mode === 'forgot-email' && (
                     <form className="mt-8 space-y-6" onSubmit={submitForgot}>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Email</label>
+                            <label className="block text-sm font-medium text-gray-700">Email or Username</label>
                             <input
-                                type="email"
+                                type="text"
                                 required
                                 className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                placeholder="Enter your registered email"
+                                placeholder="Enter your registered email or username"
                                 value={identifier}
                                 onChange={(e) => setIdentifier(e.target.value)}
                             />
@@ -225,13 +240,13 @@ const Login = () => {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className={`w-full py-2 px-4 text-sm font-medium rounded-md text-white ${
-                                    loading ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'
+                                className={`auth-primary w-full py-2 px-4 text-sm font-medium text-white ${
+                                    loading ? 'opacity-60' : ''
                                 }`}
                             >
                                 {loading ? 'Sending...' : 'Send OTP'}
                             </button>
-                            <button type="button" onClick={() => setMode('login')} className="w-full text-sm text-gray-600 hover:text-gray-800">Back to sign in</button>
+                            <button type="button" onClick={() => setMode('login')} className="auth-link w-full text-sm">Back to sign in</button>
                         </div>
                     </form>
                 )}
@@ -239,9 +254,9 @@ const Login = () => {
                 {mode === 'verify-otp' && (
                     <form className="mt-8 space-y-6" onSubmit={submitVerify}>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Email</label>
+                            <label className="block text-sm font-medium text-gray-700">Email or Username</label>
                             <input
-                                type="email"
+                                type="text"
                                 required
                                 className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                 value={identifier}
@@ -263,13 +278,13 @@ const Login = () => {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className={`w-full py-2 px-4 text-sm font-medium rounded-md text-white ${
-                                    loading ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'
+                                className={`auth-primary w-full py-2 px-4 text-sm font-medium text-white ${
+                                    loading ? 'opacity-60' : ''
                                 }`}
                             >
                                 {loading ? 'Verifying...' : 'Verify OTP'}
                             </button>
-                            <button type="button" onClick={() => setMode('forgot-email')} className="w-full text-sm text-gray-600 hover:text-gray-800">Back</button>
+                            <button type="button" onClick={() => setMode('forgot-email')} className="auth-link w-full text-sm">Back</button>
                         </div>
                     </form>
                 )}
@@ -277,9 +292,9 @@ const Login = () => {
                 {mode === 'reset' && (
                     <form className="mt-8 space-y-6" onSubmit={submitReset}>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Email</label>
+                            <label className="block text-sm font-medium text-gray-700">Email or Username</label>
                             <input
-                                type="email"
+                                type="text"
                                 required
                                 className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                 value={identifier}
@@ -323,18 +338,19 @@ const Login = () => {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className={`w-full py-2 px-4 text-sm font-medium rounded-md text-white ${
-                                    loading ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'
+                                className={`auth-primary w-full py-2 px-4 text-sm font-medium text-white ${
+                                    loading ? 'opacity-60' : ''
                                 }`}
                             >
                                 {loading ? 'Resetting...' : 'Reset Password'}
                             </button>
-                            <button type="button" onClick={() => setMode('login')} className="w-full text-sm text-gray-600 hover:text-gray-800">Back to sign in</button>
+                            <button type="button" onClick={() => setMode('login')} className="auth-link w-full text-sm">Back to sign in</button>
                         </div>
                     </form>
                 )}
                 
                 {/* Login form footer */}
+            </div>
             </div>
         </div>
     );
