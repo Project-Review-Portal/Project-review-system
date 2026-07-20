@@ -39,7 +39,7 @@ const AllocationsDashboard = ({ programme }) => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [programme]);
 
     const fetchData = async () => {
         setLoading(true);

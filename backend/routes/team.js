@@ -38,6 +38,9 @@ router.get('/max-team-size', auth, teamController.getMaxTeamSizePublic);
 // Fetch multiple teams by ids
 router.get('/by-ids', auth, teamController.getTeamsByIds);
 
+// Dynamic Programme Review Cycle endpoint
+router.get('/review-cycle', teamController.getReviewCycle);
+
 // Public route to get config (teamFormationOpen, etc.)
 router.get('/config/public', async (req, res) => {
     try {

@@ -5,6 +5,7 @@ const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3
 const ReviewsVivaSettings = () => {
     const [numReviews, setNumReviews] = useState(3);
     const [vivaRequired, setVivaRequired] = useState(true);
+    const [currentStage, setCurrentStage] = useState(0);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState(null); // { type: 'success'|'error', text: string }
@@ -27,6 +28,7 @@ const ReviewsVivaSettings = () => {
             const data = await res.json();
             setNumReviews(data.numReviews ?? 3);
             setVivaRequired(data.vivaRequired ?? true);
+            setCurrentStage(data.currentStage ?? 0);
         } catch (err) {
             setMessage({ type: 'error', text: err.message || 'Error fetching settings' });
         } finally {
@@ -44,7 +46,7 @@ const ReviewsVivaSettings = () => {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`
                 },
-                body: JSON.stringify({ numReviews, vivaRequired })
+                body: JSON.stringify({ numReviews, vivaRequired, currentStage })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || 'Failed to save settings');
@@ -148,6 +150,28 @@ const ReviewsVivaSettings = () => {
                         }`}
                     />
                 </button>
+            </div>
+
+            {/* Current Active Stage */}
+            <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Current Active Programme Review Stage
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                    Select which review cycle stage is active across the dashboards.
+                </p>
+                <select
+                    value={currentStage}
+                    onChange={e => setCurrentStage(parseInt(e.target.value, 10))}
+                    className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                    <option value={0}>Review 0</option>
+                    {previewSlots.map((slot, idx) => (
+                        <option key={idx + 1} value={idx + 1}>
+                            {slot}
+                        </option>
+                    ))}
+                </select>
             </div>
 
             {/* Preview */}

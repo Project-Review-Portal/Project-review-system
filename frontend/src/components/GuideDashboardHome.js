@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import ReviewRail from './ReviewRail';
+import { useReviewCycle } from '../hooks/useReviewCycle';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const GuideDashboardHome = () => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const { current, scores, stageNames } = useReviewCycle(user?.programme);
     const [teamFormationOpen, setTeamFormationOpen] = useState(true);
     const [guideSelectionStart, setGuideSelectionStart] = useState(null);
     const [guideSelectionEnd, setGuideSelectionEnd] = useState(null);
@@ -38,7 +41,7 @@ const GuideDashboardHome = () => {
     return (
         <div className="bg-white p-6 rounded-lg shadow">
             <div className="dashboard-title-row"><div><p className="page-kicker">Guide desk</p><h2 className="text-2xl font-bold mb-1">Review ledger</h2><p className="text-gray-600">A clear view of the teams and milestones in your care.</p></div><span className="status-chip status-open">Active term</span></div>
-            <ReviewRail current={1} scores={['82']} label="Current review cycle" />
+            <ReviewRail current={current} scores={scores} stages={stageNames} label="Current review cycle" />
             <div className="space-y-4 mb-6">
                 <p className="text-gray-700">
                     Welcome to the Guide Dashboard! Here you can manage your assigned teams, handle guide requests, and oversee review schedules.

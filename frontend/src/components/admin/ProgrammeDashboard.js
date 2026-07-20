@@ -9,11 +9,13 @@ import UserManagement from './UserManagement';
 import GuideUploadAttendance from '../guide/GuideUploadAttendance';
 import GuideMe from '../GuideMe';
 import ReviewRail from '../ReviewRail';
+import { useReviewCycle } from '../../hooks/useReviewCycle';
 
 const ProgrammeDashboard = () => {
     const { programmeName } = useParams();
     const location = useLocation();
     const decodedProgramme = decodeURIComponent(programmeName || 'B.E. CSE');
+    const { current, scores, stageNames } = useReviewCycle(decodedProgramme);
     const pathParts = location.pathname.split('/');
     const progIdx = pathParts.indexOf('programme');
     const section = progIdx >= 0 && pathParts[progIdx + 2] ? pathParts[progIdx + 2] : 'home';
@@ -51,7 +53,7 @@ const ProgrammeDashboard = () => {
                 <div><p className="page-kicker">{details.label}</p><h1>{details.title}</h1><p>{details.description}</p></div>
                 <div className="programme-code"><small>PROGRAMME</small><strong>{decodedProgramme}</strong></div>
             </header>
-            <ReviewRail current={details.step} scores={details.step > 1 ? ['—', '—'] : details.step > 0 ? ['—'] : []} label="Programme review cycle" />
+            <ReviewRail current={current} scores={scores} stages={stageNames} label="Programme review cycle" />
             <section className="programme-session" key={section}>{renderSection()}</section>
         </main>
     );

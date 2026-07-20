@@ -162,7 +162,8 @@ router.post('/check-schedule-exists', auth, attendanceController.checkPreviousSc
 
 router.get('/coordinator/coordinated-teams', auth, authorize(['coordinator', 'assistant coordinator']), panelController.getCoordinatedTeams);
 
-router.get('/coordinator/export-zeroth-attendance', auth, authorize(['coordinator', 'assistant coordinator']), attendanceExportController.exportZerothReviewAttendance);
+router.get('/coordinator/export-zeroth-attendance', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), attendanceExportController.exportZerothReviewAttendance);
+router.get('/coordinator/export-full-attendance', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), attendanceExportController.exportFullAttendance);
 
 router.post('/coordinator/instruction-template',auth,authorize(['coordinator']),templateUpload,panelController.createInstructionTemplate)
 module.exports = router; 

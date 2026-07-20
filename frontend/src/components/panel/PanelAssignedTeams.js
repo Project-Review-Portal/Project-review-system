@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import ReviewRail from '../ReviewRail';
+import { useReviewCycle } from '../../hooks/useReviewCycle';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
 const PanelAssignedTeams = () => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const { current, scores, stageNames } = useReviewCycle(user?.programme);
     const [assignedTeams, setAssignedTeams] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -114,7 +117,7 @@ const PanelAssignedTeams = () => {
                             <p className="text-gray-700">Review Panel: {team.panel?.name || 'Not Assigned'}</p>
                             <p className="text-gray-700">Viva Panel: {team.vivaPanel?.name || 'Not Assigned'}</p>
                             <p className="text-gray-700">Guide: {team.guidePreference?.name || 'Not Assigned'}</p>
-                            <ReviewRail compact current={1} scores={['—']} label={`${team.teamName} progress`} />
+                            <ReviewRail compact current={current} scores={scores} stages={stageNames} label={`${team.teamName} progress`} />
                             <div className="mt-2">
                                 <p className="font-medium">Members:</p>
                                 {team.members && team.members.length > 0 ? (

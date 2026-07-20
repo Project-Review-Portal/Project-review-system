@@ -10,11 +10,17 @@ const InstructionTemplate = require('../models/InstructionTemplate');
 const { getReviewSettings } = require('../utils/reviewSettings');
 const normalizeProgramme = (prog) => {
     if (!prog) return 'B.E. CSE';
-    const clean = String(prog).trim();
-    if (clean.toLowerCase() === 'ug' || clean === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
-        return 'B.E. CSE';
-    }
-    return clean;
+    const cleanStr = Array.isArray(prog) ? prog.join(',') : String(prog);
+    const items = cleanStr.split(',').map(s => s.trim()).filter(Boolean);
+    const normalizedItems = items.map(s => {
+        const clean = s.trim();
+        if (clean.toLowerCase() === 'ug' || clean === 'B.E COMPUTER SCIENCE AND ENGINEERING' || clean.toLowerCase() === 'b.e. cse' || clean.toLowerCase() === 'b.e cse') {
+            return 'B.E. CSE';
+        }
+        return clean;
+    });
+    const unique = [...new Set(normalizedItems)];
+    return unique.join(', ');
 };
 exports.getAllPanels = async (req, res) => {
     try {
@@ -418,8 +424,21 @@ exports.getAssignedTeamsForPanel = async (req, res) => {
             // For coordinators, find teams assigned to their coordinated panel
             console.log('User is a coordinator, finding teams for their panel');
             const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
-            const programme = normalizeProgramme(selectedProgramme);
-            const panel = await Panel.findOne({ coordinator: userId, programme });
+            const normProg = normalizeProgramme(selectedProgramme);
+            const progItems = normProg.split(',').map(p => p.trim()).filter(Boolean);
+            const regexFilters = progItems.map(prog => new RegExp(`^${prog.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i'));
+            if (progItems.some(p => p === 'B.E. CSE' || p.toLowerCase() === 'ug')) {
+                regexFilters.push(new RegExp('^ug$', 'i'), new RegExp('^B\\.E\\. CSE$', 'i'), new RegExp('^B\\.E COMPUTER SCIENCE AND ENGINEERING$', 'i'));
+            }
+            let panel = await Panel.findOne({ 
+                $or: [{ coordinator: userId }, { assistantCoordinators: userId }],
+                programme: { $in: regexFilters }
+            });
+            if (!panel) {
+                panel = await Panel.findOne({
+                    $or: [{ coordinator: userId }, { assistantCoordinators: userId }]
+                });
+            }
             if (!panel) {
                 console.log('No panel found for coordinator');
                 return res.json([]);
@@ -1138,26 +1157,19 @@ exports.getCoordinatedTeams = async (req, res) => {
         
         // 1. Get the raw value from headers or user object
         let rawProgramme = req.headers['x-selected-programme'] || req.user.programme;
-        rawProgramme = normalizeProgramme(rawProgramme);
+        let norm = normalizeProgramme(rawProgramme);
         
-        // 2. If it's a comma-separated string like "UG, UG", clean it up into an array of clean values
-        let programmeArray = [];
-        if (typeof rawProgramme === 'string') {
-            programmeArray = rawProgramme.split(',').map(p => p.trim());
-        } else if (Array.isArray(rawProgramme)) {
-            programmeArray = rawProgramme.map(p => p.toString().trim());
-        } else {
-            programmeArray = [rawProgramme.toString().trim()];
-        }
-
-        // Remove any duplicates (turns ["UG", "UG"] into ["UG"])
+        let programmeArray = norm.split(',').map(p => p.trim()).filter(Boolean);
         programmeArray = [...new Set(programmeArray)];
 
         // 3. Build a regex array for case-insensitive matching
-        const regexFilters = programmeArray.map(prog => new RegExp(`^${prog}$`, 'i'));
+        const regexFilters = programmeArray.map(prog => new RegExp(`^${prog.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i'));
+        if (programmeArray.some(p => p === 'B.E. CSE' || p.toLowerCase() === 'ug')) {
+            regexFilters.push(new RegExp('^ug$', 'i'), new RegExp('^B\\.E\\. CSE$', 'i'), new RegExp('^B\\.E COMPUTER SCIENCE AND ENGINEERING$', 'i'));
+        }
 
         // 4. Find the panel matching the coordinator and ANY of the clean regex options
-        const panel = await Panel.findOne({ 
+        let panel = await Panel.findOne({ 
             $or: [
                 { coordinator: coordinatorId },
                 { assistantCoordinators: coordinatorId }
@@ -1165,9 +1177,19 @@ exports.getCoordinatedTeams = async (req, res) => {
             programme: { $in: regexFilters } 
         });
         
+        // Fallback: If no panel found with specific programme filter, find ANY panel where user is coordinator or assistant coordinator
+        if (!panel) {
+            panel = await Panel.findOne({
+                $or: [
+                    { coordinator: coordinatorId },
+                    { assistantCoordinators: coordinatorId }
+                ]
+            });
+        }
+
         if (!panel) {
             return res.status(404).json({ 
-                message: `No panel found where you are assigned as a coordinator for programme matching "${rawProgramme}".` 
+                message: `No panel found where you are assigned as a coordinator for programme matching "${programmeArray.join(', ')}".` 
             });
         }
 

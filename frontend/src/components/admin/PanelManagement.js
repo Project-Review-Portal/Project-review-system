@@ -20,7 +20,7 @@ const PanelManagement = ({ panelType = 'review', programme }) => {
     useEffect(() => {
         fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [panelType]);
+    }, [panelType, programme]);
 
     // Effect to update available/selected faculty lists when allFaculty or selectedMembersForForm changes
     useEffect(() => {

@@ -89,13 +89,34 @@ const getUserActiveRoles = async (userId) => {
         }
 
         // Fallback: Check static roles in database
-        const staticUser = await User.findById(userId).select('roles');
-        if (staticUser && staticUser.roles) {
-            const hasAsstCoord = staticUser.roles.some(r => r.role === 'assistant coordinator');
+        const staticUser = await User.findById(userId).select('roles role');
+        if (staticUser) {
+            const userStaticRoles = (staticUser.roles || []).map(r => r.role);
+            if (staticUser.role) userStaticRoles.push(staticUser.role);
+
+            const hasCoord = userStaticRoles.includes('coordinator');
+            if (hasCoord) {
+                for (const progName of programmeNames) {
+                    if (!coordinatorProgrammes.has(progName)) {
+                        activeRoles.push({ role: 'coordinator', team: null, programme: progName });
+                    }
+                }
+            }
+
+            const hasAsstCoord = userStaticRoles.includes('assistant coordinator');
             if (hasAsstCoord) {
                 for (const progName of programmeNames) {
                     if (!asstCoordinatorProgrammes.has(progName)) {
                         activeRoles.push({ role: 'assistant coordinator', team: null, programme: progName });
+                    }
+                }
+            }
+
+            const hasPanel = userStaticRoles.includes('panel');
+            if (hasPanel) {
+                for (const progName of programmeNames) {
+                    if (!panelProgrammes.has(progName)) {
+                        activeRoles.push({ role: 'panel', team: null, programme: progName });
                     }
                 }
             }

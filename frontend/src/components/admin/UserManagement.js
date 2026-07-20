@@ -33,7 +33,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
 
-    // Auto-fetch saved designation limits on mount so CSV/manual entries merge against DB state
+    // Auto-fetch saved designation limits and student/faculty lists on mount/programme change
     useEffect(() => {
         const fetchLimitsOnMount = async () => {
             try {
@@ -49,8 +49,17 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
             }
         };
         fetchLimitsOnMount();
+
+        if (!studentsOnly && !globalOnly) {
+            fetchFacultyList(false);
+            fetchStudentList(false);
+        } else if (studentsOnly) {
+            fetchStudentList(false);
+        } else if (globalOnly) {
+            fetchFacultyList(false);
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [programme, studentsOnly, globalOnly]);
 
     // Auto-dismiss general message (only success messages auto-dismiss)
     useEffect(() => {
@@ -123,7 +132,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
                 memberType: 'internal'
             });
 
-            await fetchFacultyList();
+            await fetchFacultyList(true);
         } catch (error) {
             setMessage(error.response?.data?.message || 'Error registering faculty member');
             setMessageType('error');
@@ -413,7 +422,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
             setMessage(`Successfully uploaded ${response.data.count} faculty members`);
             setMessageType('success');
             // Refresh list from server so the page shows the new faculty
-            await fetchFacultyList();
+            await fetchFacultyList(true);
             // Clear local CSV data after successful upload
             setFacultyData([]);
             setFacultyFile(null);
@@ -441,7 +450,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
             setMessage(`Successfully uploaded ${response.data.count} students`);
             setMessageType('success');
             // Refresh list from server so the page shows the new students
-            await fetchStudentList();
+            await fetchStudentList(true);
             // Clear local CSV data after successful upload
             setStudentData([]);
             setStudentFile(null);
@@ -553,7 +562,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
         }
     };
 
-    const fetchFacultyList = async () => {
+    const fetchFacultyList = async (showEmptyMsg = true) => {
         setLoading(true);
         try {
             const response = await axios.get(`${SERVER_API_KEY}/api/admin/faculty-list?includeExternal=true`, { headers });
@@ -565,8 +574,10 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
                 memberType: f.memberType || 'internal'
             })));
             if (!response.data || response.data.length === 0) {
-                setMessage('No faculty registered yet');
-                setMessageType('success');
+                if (showEmptyMsg) {
+                    setMessage('No faculty registered yet');
+                    setMessageType('success');
+                }
             } else {
                 setMessage('');
                 setMessageType('');
@@ -579,7 +590,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
         }
     };
 
-    const fetchStudentList = async () => {
+    const fetchStudentList = async (showEmptyMsg = true) => {
         setLoading(true);
         try {
             const progParam = programme ? `?programme=${encodeURIComponent(programme)}` : '';
@@ -591,8 +602,10 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
                 email_id: s.email || s.email_id || ''
             })));
             if (!response.data || response.data.length === 0) {
-                setMessage('No student registered yet');
-                setMessageType('success');
+                if (showEmptyMsg) {
+                    setMessage('No student registered yet');
+                    setMessageType('success');
+                }
             } else {
                 setMessage('');
                 setMessageType('');

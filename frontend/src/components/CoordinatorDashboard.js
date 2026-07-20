@@ -12,8 +12,11 @@ import GuideUploadAttendance from './guide/GuideUploadAttendance';
 import CoordinatorVivaPanelFormation from './coordinator/CoordinatorVivaPanelFormation';
 import MaterialsTab from './coordinator/materials/MaterialsTab';
 import ReviewRail from './ReviewRail';
+import { useReviewCycle } from '../hooks/useReviewCycle';
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const CoordinatorRulesDashboard = () => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const { current, scores, stageNames } = useReviewCycle(user?.programme);
     const [teamFormationOpen, setTeamFormationOpen] = useState(true);
     const navigate = useNavigate();
     const [guideSelectionStart, setGuideSelectionStart] = useState(null);
@@ -88,7 +91,7 @@ const CoordinatorRulesDashboard = () => {
     return (
         <div className="bg-white p-6 rounded-lg shadow mb-6">
             <div className="dashboard-title-row"><div><p className="page-kicker">Coordinator desk</p><h2 className="text-xl font-semibold mb-1">Review operations</h2><p className="text-gray-600">Keep the programme record moving with a single source of truth.</p></div><span className="status-chip status-open">Cycle in progress</span></div>
-            <ReviewRail current={2} scores={['78', '81']} label="Programme review cycle" />
+            <ReviewRail current={current} scores={scores} stages={stageNames} label="Programme review cycle" />
             {loadingRules ? (
                 <div className="mb-4 text-blue-700">Loading rules...</div>
             ) : rulesError ? (
@@ -203,7 +206,7 @@ const CoordinatorDashboard = () => {
     };
 
     // Guard: Only allow users with coordinator or assistant coordinator role to view this dashboard
-    const hasCoordinatorRole = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
+    const hasCoordinatorRole = (Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role))) || ['coordinator', 'assistant coordinator'].includes(user?.role);
     if (!hasCoordinatorRole) {
         return (
             <div className="p-6">

@@ -24,7 +24,7 @@ const AdminManageReviewSchedules = ({ programme }) => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [programme]);
 
     const fetchData = async () => {
         try {
@@ -43,6 +43,7 @@ const AdminManageReviewSchedules = ({ programme }) => {
 
             setPanels(panelsRes.data);
             setTeams(teamsRes.data);
+            setSchedules(schedulesRes.data);
             setCurrentReviewPeriodStart(reviewPeriodRes.data.startDate || '');
             setCurrentReviewPeriodEnd(reviewPeriodRes.data.endDate || '');
             setSlotTypes(settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva']);

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import UserManagement from './UserManagement';
 import ProgrammeManagement from './ProgrammeManagement';
 import ReviewRail from '../ReviewRail';
+import { useReviewCycle } from '../../hooks/useReviewCycle';
 
 const TABS = [
     { key: 'faculty', label: 'Faculty register', detail: 'Faculty records & designation limits', index: '01' },
@@ -9,6 +10,7 @@ const TABS = [
 ];
 
 const GlobalManagement = () => {
+    const { current, scores, stageNames } = useReviewCycle();
     const [activeTab, setActiveTab] = useState('faculty');
     const active = TABS.find((tab) => tab.key === activeTab);
 
@@ -19,7 +21,7 @@ const GlobalManagement = () => {
                 <div className="global-mark"><small>REVIEW RAIL</small><strong>Central<br />register</strong></div>
             </header>
 
-            <ReviewRail current={0} label="Academic year setup" />
+            <ReviewRail current={current} scores={scores} stages={stageNames} label="Academic year setup" />
 
             <div className="global-tabs" role="tablist" aria-label="Global management sessions">
                 {TABS.map((tab) => (

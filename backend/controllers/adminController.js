@@ -1,4 +1,5 @@
 const Config = require('../models/Config');
+const PgConfig = require('../models/PgConfig');
 const DesignationTeamLimit = require('../models/DesignationTeamLimit');
 const Team = require('../models/Team');
 const User = require('../models/User');
@@ -2034,10 +2035,18 @@ exports.deleteAllDesignationTeamLimits = async (req, res) => {
 // Admin: Get current reviews/viva settings
 exports.getReviewsVivaSettings = async (req, res) => {
     try {
-        const config = await Config.findOne();
+        const { programme } = req.query;
+        let config;
+        if (programme) {
+            config = await PgConfig.findOne({ program: programme });
+        }
+        if (!config) {
+            config = await Config.findOne();
+        }
         res.json({
-            numReviews: config ? config.numReviews : 3,
-            vivaRequired: config ? config.vivaRequired : true
+            numReviews: config ? (config.numReviews ?? 3) : 3,
+            vivaRequired: config ? (config.vivaRequired ?? true) : true,
+            currentStage: config ? (config.currentStage ?? 0) : 0
         });
     } catch (error) {
         console.error('Error fetching reviews/viva settings:', error);
@@ -2048,7 +2057,7 @@ exports.getReviewsVivaSettings = async (req, res) => {
 // Admin: Update reviews/viva settings
 exports.setReviewsVivaSettings = async (req, res) => {
     try {
-        const { numReviews, vivaRequired } = req.body;
+        const { numReviews, vivaRequired, currentStage, programme } = req.body;
 
         if (numReviews === undefined || vivaRequired === undefined) {
             return res.status(400).json({ message: 'numReviews and vivaRequired are required.' });
@@ -2059,16 +2068,37 @@ exports.setReviewsVivaSettings = async (req, res) => {
             return res.status(400).json({ message: 'numReviews must be a number between 1 and 10.' });
         }
 
+        const cStage = currentStage !== undefined ? parseInt(currentStage, 10) : 0;
+
         let config = await Config.findOne();
         if (!config) {
-            config = new Config({ numReviews: n, vivaRequired: !!vivaRequired });
+            config = new Config({ numReviews: n, vivaRequired: !!vivaRequired, currentStage: cStage });
         } else {
             config.numReviews = n;
             config.vivaRequired = !!vivaRequired;
+            config.currentStage = cStage;
         }
 
         await config.save();
-        res.json({ message: 'Reviews/Viva settings updated successfully', numReviews: config.numReviews, vivaRequired: config.vivaRequired });
+
+        if (programme) {
+            let pgConfig = await PgConfig.findOne({ program: programme });
+            if (!pgConfig) {
+                pgConfig = new PgConfig({ program: programme, maxTeamSize: config.maxTeamSize, numReviews: n, vivaRequired: !!vivaRequired, currentStage: cStage });
+            } else {
+                pgConfig.numReviews = n;
+                pgConfig.vivaRequired = !!vivaRequired;
+                pgConfig.currentStage = cStage;
+            }
+            await pgConfig.save();
+        }
+
+        res.json({
+            message: 'Reviews/Viva settings updated successfully',
+            numReviews: config.numReviews,
+            vivaRequired: config.vivaRequired,
+            currentStage: config.currentStage
+        });
     } catch (error) {
         console.error('Error updating reviews/viva settings:', error);
         res.status(500).json({ message: 'Server error' });

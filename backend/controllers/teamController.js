@@ -1,6 +1,8 @@
 const Team = require('../models/Team');
 const User = require('../models/User');
 const Config = require('../models/Config');
+const PgConfig = require('../models/PgConfig');
+const Mark = require('../models/Mark');
 const {
     buildDesignationLimitMap,
     getTeamCountsByGuideIds,
@@ -741,5 +743,83 @@ exports.cancelGuideRequest = async (req, res) => {
     } catch (error) {
         console.error('Error cancelling guide request:', error);
         res.status(500).json({ message: 'Server error' });
+    }
+};
+
+exports.getReviewCycle = async (req, res) => {
+    try {
+        const { programme, teamId } = req.query;
+        let prog = programme;
+        let targetTeamId = teamId;
+
+        if (!prog && targetTeamId) {
+            const team = await Team.findById(targetTeamId).select('programme');
+            if (team && team.programme) prog = team.programme;
+        }
+
+        let config;
+        if (prog) {
+            config = await PgConfig.findOne({ program: prog });
+        }
+        if (!config) {
+            config = await Config.findOne();
+        }
+
+        const numReviews = config ? (config.numReviews ?? 3) : 3;
+        const vivaRequired = config ? (config.vivaRequired ?? true) : true;
+        const currentStage = config ? (config.currentStage ?? 0) : 0;
+
+        const stageKeys = ['review0'];
+        const stageNames = ['Review 0'];
+        for (let i = 1; i <= numReviews; i++) {
+            stageKeys.push(`review${i}`);
+            stageNames.push(`Review ${i}`);
+        }
+        if (vivaRequired) {
+            stageKeys.push('viva');
+            stageNames.push('Viva');
+        }
+
+        let teamFilter = {};
+        if (targetTeamId) {
+            teamFilter._id = targetTeamId;
+        } else if (prog) {
+            teamFilter.programme = prog;
+        }
+
+        const teams = await Team.find(teamFilter).select('_id');
+        const teamIds = teams.map(t => t._id);
+
+        const markMatch = teamIds.length > 0 ? { team: { $in: teamIds } } : {};
+        const marks = await Mark.find(markMatch).select('slotType percentage');
+
+        const scoresMap = {};
+        const countMap = {};
+        for (const m of marks) {
+            if (!m.slotType || m.percentage === undefined || m.percentage === null) continue;
+            const st = m.slotType.toLowerCase();
+            scoresMap[st] = (scoresMap[st] || 0) + m.percentage;
+            countMap[st] = (countMap[st] || 0) + 1;
+        }
+
+        const scores = stageKeys.map(key => {
+            if (countMap[key] && countMap[key] > 0) {
+                const avg = Math.round(scoresMap[key] / countMap[key]);
+                return avg.toString();
+            }
+            return '—';
+        });
+
+        res.json({
+            current: currentStage,
+            scores,
+            stageNames,
+            numReviews,
+            vivaRequired,
+            currentStage
+        });
+    } catch (error) {
+        console.error('Error fetching review cycle:', error);
+        res.status(500).json({ message: 'Error fetching review cycle' });
     }
 };

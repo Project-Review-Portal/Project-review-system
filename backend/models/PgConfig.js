@@ -32,6 +32,22 @@ const PgConfigSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    numReviews: {
+        type: Number,
+        default: 3,
+        min: 1,
+        max: 10
+    },
+    vivaRequired: {
+        type: Boolean,
+        default: true
+    },
+    currentStage: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 10
+    },
     createdAt: {
         type: Date,
         default: Date.now
