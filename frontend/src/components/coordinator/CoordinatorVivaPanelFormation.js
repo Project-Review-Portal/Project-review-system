@@ -89,6 +89,13 @@ const CoordinatorVivaPanelFormation = () => {
     };
 
     const handleSaveVivaPanel = async () => {
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const isReadOnly = storedUser.role === 'assistant coordinator';
+        if (isReadOnly) {
+            setMessage('Action forbidden in Read-Only Mode.');
+            setMessageType('error');
+            return;
+        }
         setLoading(true);
         setMessage('');
         setMessageType('');
@@ -114,6 +121,9 @@ const CoordinatorVivaPanelFormation = () => {
         );
     }
 
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const isReadOnly = storedUser.role === 'assistant coordinator';
+
     // Filter internal members of review panel
     const internalMembers = reviewPanel.members.filter(m => m.memberType === 'internal');
 
@@ -121,6 +131,11 @@ const CoordinatorVivaPanelFormation = () => {
         <div className="max-w-4xl mx-auto space-y-8 p-6 bg-white rounded-xl shadow-lg border border-gray-100 mt-6">
             <div className="border-b pb-4">
                 <h2 className="text-2xl font-bold text-slate-800">Viva Panel Formation</h2>
+                {isReadOnly && (
+                    <div className="mt-4 p-3 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded font-medium text-center">
+                        ℹ️ You are viewing this page in Read-Only Mode as an Assistant Coordinator.
+                    </div>
+                )}
                 <p className="text-sm text-slate-500 mt-1">
                     Form the Viva Examination Panel. Internal review panel members and coordinators are prefilled. Add or remove external examiners as needed.
                 </p>
@@ -184,6 +199,7 @@ const CoordinatorVivaPanelFormation = () => {
                                 value={selectedExternalId}
                                 onChange={(e) => setSelectedExternalId(e.target.value)}
                                 className="flex-1 px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-700"
+                                disabled={isReadOnly}
                             >
                                 <option value="">Select External Examiner</option>
                                 {externalFaculty.map(f => (
@@ -194,7 +210,7 @@ const CoordinatorVivaPanelFormation = () => {
                             </select>
                             <button
                                 onClick={addExternalExaminer}
-                                disabled={!selectedExternalId}
+                                disabled={!selectedExternalId || isReadOnly}
                                 className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 transition-colors"
                             >
                                 Add
@@ -218,7 +234,8 @@ const CoordinatorVivaPanelFormation = () => {
                                             <span className="text-xs text-slate-400 font-semibold">{member.designation || 'Expert'}</span>
                                             <button
                                                 onClick={() => removeExternalExaminer(member._id)}
-                                                className="text-rose-600 hover:text-rose-800 text-lg font-bold px-2"
+                                                className="text-rose-600 hover:text-rose-800 text-lg font-bold px-2 disabled:opacity-50"
+                                                disabled={isReadOnly}
                                             >
                                                 ✕
                                             </button>
@@ -232,7 +249,7 @@ const CoordinatorVivaPanelFormation = () => {
                     <div className="border-t pt-4 mt-6 flex justify-end">
                         <button
                             onClick={handleSaveVivaPanel}
-                            disabled={loading}
+                            disabled={loading || isReadOnly}
                             className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:bg-slate-300 disabled:text-slate-500 transition-colors shadow"
                         >
                             {loading ? 'Saving...' : 'Save Viva Panel'}

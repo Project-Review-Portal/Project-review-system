@@ -6,6 +6,11 @@ const FinalReportSchema = new mongoose.Schema({
     ref: 'Team',
     required: true,
   },
+  materialSetting: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'MaterialSetting',
+    required: true,
+  },
   filePath: {
     type: String,
     required: true,
@@ -21,8 +26,8 @@ const FinalReportSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['uploaded', 'approved', 'rejected'],
-    default: 'uploaded',
+    enum: ['draft', 'pending', 'uploaded', 'approved', 'rejected'],
+    default: 'draft',
   },
   approvedBy: {
     type: mongoose.Schema.Types.ObjectId,

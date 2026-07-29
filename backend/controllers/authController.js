@@ -70,6 +70,37 @@ const getUserActiveRoles = async (userId) => {
             activeRoles.push({ role: 'coordinator', team: null, programme: prog });
         }
 
+        // 4. Assistant Coordinator role: Check if user is assistant coordinator dynamically
+        const asstCoordinatorPanels = await Panel.find({ assistantCoordinators: userId }).select('_id programme');
+        const asstCoordinatorProgrammes = new Set();
+        for (const p of asstCoordinatorPanels) {
+            if (p.programme) asstCoordinatorProgrammes.add(p.programme);
+        }
+
+        if (asstCoordinatorPanels.length > 0) {
+            const panelIds = asstCoordinatorPanels.map(p => p._id);
+            const teamsWithPanel = await Team.find({ panel: { $in: panelIds } }).select('_id programme');
+            for (const t of teamsWithPanel) {
+                if (t.programme) asstCoordinatorProgrammes.add(t.programme);
+            }
+        }
+        for (const prog of asstCoordinatorProgrammes) {
+            activeRoles.push({ role: 'assistant coordinator', team: null, programme: prog });
+        }
+
+        // Fallback: Check static roles in database
+        const staticUser = await User.findById(userId).select('roles');
+        if (staticUser && staticUser.roles) {
+            const hasAsstCoord = staticUser.roles.some(r => r.role === 'assistant coordinator');
+            if (hasAsstCoord) {
+                for (const progName of programmeNames) {
+                    if (!asstCoordinatorProgrammes.has(progName)) {
+                        activeRoles.push({ role: 'assistant coordinator', team: null, programme: progName });
+                    }
+                }
+            }
+        }
+
         return activeRoles;
     } catch (error) {
         console.error('Error getting user active roles:', error);
@@ -147,7 +178,7 @@ exports.login = async (req, res) => {
 
         // For faculty users, include all faculty roles with team mapping (null if none)
         let activeRoles = [];
-        if (['guide', 'panel', 'coordinator'].includes(firstRole.role)) {
+        if (['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(firstRole.role)) {
             activeRoles = await getUserActiveRoles(user._id);
         } else {
             // For non-faculty users, use their roles as is

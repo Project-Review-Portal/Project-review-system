@@ -91,7 +91,7 @@ const App = () => {
                     </ProtectedRoute>
                 } />
                 <Route path="/coordinator-dashboard/*" element={
-                    <ProtectedRoute allowedRoles={['coordinator']}>
+                    <ProtectedRoute allowedRoles={['coordinator', 'assistant coordinator']}>
                         <CoordinatorDashboard />
                     </ProtectedRoute>
                 } />
@@ -99,7 +99,7 @@ const App = () => {
 
                 {/* Coordinator Live Letter Editor (frontend-only) */}
                 <Route path="/coordinator/letters/live" element={
-                    <ProtectedRoute allowedRoles={['coordinator']}>
+                    <ProtectedRoute allowedRoles={['coordinator', 'assistant coordinator']}>
                         <CoordinatorLetterLiveEditorCK />
                     </ProtectedRoute>
                 } />

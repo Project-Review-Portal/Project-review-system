@@ -8,8 +8,8 @@ const controller = new SimpleDocumentController();
 
 // Protect all document routes
 router.use(auth);
-// Authorize coordinator role for all routes in this file
-router.use(authorize(['coordinator']));
+// Authorize coordinator and assistant coordinator roles for all routes in this file
+router.use(authorize(['coordinator', 'assistant coordinator']));
 
 
 // Get list of available templates

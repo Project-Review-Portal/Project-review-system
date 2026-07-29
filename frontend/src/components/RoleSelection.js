@@ -41,9 +41,9 @@ const RoleSelection = () => {
     const seenKeys = new Set();
     const uniqueRoles = [];
     (availableRoles || []).forEach(roleObj => {
-        if (!['guide', 'panel', 'coordinator'].includes(roleObj.role)) return;
+        if (!['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(roleObj.role)) return;
         const role = roleObj.role;
-        const programme = roleObj.programme || 'UG';
+        const programme = roleObj.programme || 'B.E COMPUTER SCIENCE AND ENGINEERING';
         const key = `${role}-${programme}`;
         if (!seenKeys.has(key)) {
             seenKeys.add(key);
@@ -64,7 +64,7 @@ const RoleSelection = () => {
             localStorage.setItem('selectedRole', JSON.stringify({ role: roleObj.role, programme: roleObj.programme }));
 
             // Navigate based on the selected role
-            if (roleObj.role === 'coordinator') {
+            if (roleObj.role === 'coordinator' || roleObj.role === 'assistant coordinator') {
                 navigate('/coordinator-dashboard/review-schedule');
             } else if (roleObj.role === 'guide') {
                 navigate('/guide-dashboard');
@@ -89,6 +89,8 @@ const RoleSelection = () => {
                 return 'Panel Member';
             case 'coordinator':
                 return 'Coordinator';
+            case 'assistant coordinator':
+                return 'Assistant Coordinator';
             default:
                 return role.charAt(0).toUpperCase() + role.slice(1);
         }

@@ -5,6 +5,7 @@ const auth = require('../middleware/auth');
 const { templateUpload } = require('../middleware/upload');
 const authorize = require('../middleware/authorize');
 const attendanceController = require('../controllers/attendanceController');
+const attendanceExportController = require('../controllers/attendanceExportController');
 
 // Admin-only routes for panel management
 router.get('/', auth, authorize(['admin']), panelController.getAllPanels);
@@ -77,44 +78,59 @@ router.get('/marks', auth, authorize(['panel', 'guide', 'admin']), panelControll
 
 // Coordinator scheduling routes (allow both coordinator and admin)
 router.post('/coordinator/generate-slots', auth, authorize(['coordinator', 'admin']), panelController.generateSlotsForCoordinator);
+router.post('/coordinator/save-free-slots', auth, authorize(['coordinator', 'admin']), panelController.saveFreeSlotsForCoordinator);
 router.post('/coordinator/assign-slots', auth, authorize(['coordinator', 'admin']), panelController.assignSlotsForCoordinator);
-router.get('/coordinator/allotted-schedules', auth, authorize(['coordinator', 'admin']), panelController.getAllottedSchedulesForCoordinator);
+router.get('/coordinator/allotted-schedules', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), panelController.getAllottedSchedulesForCoordinator);
 // Allow coordinator (or admin) to delete an allotted schedule they created
 router.delete('/coordinator/allotted-schedules/:scheduleId', auth, authorize(['coordinator', 'admin']), panelController.deleteAllottedSchedule);
 
 // Coordinator Viva Panel endpoints
-router.get('/coordinator/viva-panel', auth, authorize(['coordinator']), panelController.getCoordinatorVivaPanel);
+router.get('/coordinator/viva-panel', auth, authorize(['coordinator', 'assistant coordinator']), panelController.getCoordinatorVivaPanel);
 router.post('/coordinator/viva-panel', auth, authorize(['coordinator']), panelController.saveCoordinatorVivaPanel);
 
 // Debug route for coordinators to check their panel assignment
-router.get('/coordinator/panel-status', auth, authorize(['coordinator', 'admin']), async (req, res) => {
+router.get('/coordinator/panel-status', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), async (req, res) => {
     try {
         const coordinatorId = req.user.id;
+        
+        // 1. Extract the program context from the headers (default to 'UG' if missing)
+        const userProgramme = req.headers['x-selected-programme'] || 'UG';
+        // console.log(req.headers['x-selected-programme'] , 'UG')
         const Panel = require('../models/Panel');
         const Team = require('../models/Team');
         
-        const panel = await Panel.findOne({ coordinator: coordinatorId })
-            .populate('members', 'username name')
-            .populate('coordinator', 'username name');
+        const panels = await Panel.find({ 
+                    programme: userProgramme, // Assumes your Panel model maps a 'programme' string field
+                    $or: [
+                        { coordinator: coordinatorId },
+                        { assistantCoordinators: coordinatorId }
+                    ]
+                })
+                .populate('members', 'username name')
+                .populate('coordinator', 'username name');
         
-        if (!panel) {
+        if (!panels || panels.length === 0) {
             return res.json({
                 hasPanel: false,
-                message: 'No panel assigned to this coordinator',
-                coordinatorId: coordinatorId
+                message: `No panels assigned to this coordinator for the ${userProgramme} program context`,
+                coordinatorId: coordinatorId,
+                programme: userProgramme
             });
         }
         
-        const teams = await Team.find({ panel: panel._id })
+        // 3. Find only teams belonging to this filtered slice of panels
+        const teams = await Team.find({ panel: { $in: panels.map(p => p._id) } })
             .populate('teamLeader', 'username name')
             .populate('members', 'username name')
             .populate('guidePreference', 'username name');
         
         res.json({
             hasPanel: true,
-            panel: panel,
+            panel: panels[0],
+            panels: panels,
             teams: teams,
-            coordinatorId: coordinatorId
+            coordinatorId: coordinatorId,
+            programme: userProgramme
         });
     } catch (error) {
         console.error('Error checking coordinator panel status:', error);
@@ -143,5 +159,10 @@ router.post('/attendance/check', auth, attendanceController.checkAttendanceForTe
 
 // New route for checking schedule existence
 router.post('/check-schedule-exists', auth, attendanceController.checkPreviousScheduleExists);
+
+router.get('/coordinator/coordinated-teams', auth, authorize(['coordinator', 'assistant coordinator']), panelController.getCoordinatedTeams);
+
+router.get('/coordinator/export-zeroth-attendance', auth, authorize(['coordinator', 'assistant coordinator']), attendanceExportController.exportZerothReviewAttendance);
+
 router.post('/coordinator/instruction-template',auth,authorize(['coordinator']),templateUpload,panelController.createInstructionTemplate)
 module.exports = router; 

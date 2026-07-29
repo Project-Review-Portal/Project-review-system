@@ -73,7 +73,7 @@ const teamSchema = new mongoose.Schema({
     },
     programme: {
         type: String,
-        default: 'UG'   // 'UG', 'M.E. Big Data', etc.
+        default: 'B.E. CSE'   // 'B.E. CSE', 'M.E. Big Data', etc.
     }
 });
 

@@ -9,7 +9,7 @@ const timeTableSchema = new mongoose.Schema({
     team: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Team',
-        required: true
+        required: false
     },
     date: {
         type: Date,

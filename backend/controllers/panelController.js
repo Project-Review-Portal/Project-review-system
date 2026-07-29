@@ -8,7 +8,14 @@ const Config = require('../models/Config');
 const Mark = require('../models/Mark');
 const InstructionTemplate = require('../models/InstructionTemplate'); 
 const { getReviewSettings } = require('../utils/reviewSettings');
-// Get all panels
+const normalizeProgramme = (prog) => {
+    if (!prog) return 'B.E. CSE';
+    const clean = String(prog).trim();
+    if (clean.toLowerCase() === 'ug' || clean === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
+        return 'B.E. CSE';
+    }
+    return clean;
+};
 exports.getAllPanels = async (req, res) => {
     try {
         // Support filtering by panelType query param
@@ -78,7 +85,7 @@ exports.createPanel = async (req, res) => {
     try {
         const { members, coordinator, assistantCoordinators, panelType, programme } = req.body;
         const resolvedPanelType = panelType === 'viva' ? 'viva' : 'review';
-        const targetProgramme = programme || 'UG';
+        const targetProgramme = normalizeProgramme(programme);
         console.log('Received members for createPanel:', members);
         console.log('Received coordinator for createPanel:', coordinator);
         console.log('Received assistantCoordinators for createPanel:', assistantCoordinators);
@@ -410,8 +417,8 @@ exports.getAssignedTeamsForPanel = async (req, res) => {
         } else if (userRole === 'coordinator' || rolesArray.includes('coordinator')) {
             // For coordinators, find teams assigned to their coordinated panel
             console.log('User is a coordinator, finding teams for their panel');
-            const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
-            const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
+            const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+            const programme = normalizeProgramme(selectedProgramme);
             const panel = await Panel.findOne({ coordinator: userId, programme });
             if (!panel) {
                 console.log('No panel found for coordinator');
@@ -651,6 +658,7 @@ exports.generateSlotsForCoordinator = async (req, res) => {
         if (!endTime) errors.push('End time is required.');
         const durationNum = Number(duration);
         if (!durationNum || durationNum <= 0) errors.push('Duration must be a positive number.');
+        let totalMin = 0;
         if (startTime && endTime) {
             try {
                 const [sh, sm] = startTime.split(':').map(Number);
@@ -658,8 +666,8 @@ exports.generateSlotsForCoordinator = async (req, res) => {
                 const startMin = sh * 60 + sm;
                 const endMin = eh * 60 + em;
                 if (endMin <= startMin) errors.push('End time must be after start time.');
-                const windowMinutes = endMin - startMin;
-                if (durationNum > windowMinutes) errors.push('Duration cannot exceed the time window between start and end.');
+                totalMin = endMin - startMin;
+                if (durationNum > totalMin) errors.push('Duration cannot exceed the time window between start and end.');
             } catch (e) {
                 errors.push('Invalid time format.');
             }
@@ -670,8 +678,8 @@ exports.generateSlotsForCoordinator = async (req, res) => {
 
         // Find the coordinator's panel
         const coordinatorId = req.user.id;
-        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
-        const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+        const programme = normalizeProgramme(selectedProgramme);
         const panel = await Panel.findOne({ coordinator: coordinatorId, programme });
         if (!panel) {
             console.log('❌ No panel found for coordinator:', coordinatorId, 'programme:', programme);
@@ -679,16 +687,6 @@ exports.generateSlotsForCoordinator = async (req, res) => {
         }
         
         console.log('✅ Found panel for coordinator:', panel._id, panel.name);
-        
-        // Get all teams for this panel
-        const teams = await Team.find({ panel: panel._id })
-            .populate('teamLeader', 'username name')
-            .populate('members', 'username name')
-            .populate('guidePreference', 'username name');
-        
-        console.log('✅ Found teams for panel:', teams.length);
-
-        // No review sequence validation: coordinators can generate slots regardless of prior reviews
 
         // Generate slots
         const slots = [];
@@ -709,12 +707,94 @@ exports.generateSlotsForCoordinator = async (req, res) => {
             });
             current = slotEnd;
         }
+
+        // Calculate if there are extra minutes left over
+        const extraMin = totalMin % durationNum;
+        let extraMinutesMessage = '';
+        if (extraMin > 0) {
+            extraMinutesMessage = `There are extra ${extraMin} minutes left over at the end of the specified time range.`;
+        }
         
-        console.log('✅ Generated slots:', slots.length);
-        res.json({ slots, teams });
+        console.log('✅ Generated slots:', slots.length, '| Extra mins message:', extraMinutesMessage);
+        res.json({ slots, extraMinutesMessage });
     } catch (error) {
         console.error('Error generating slots:', error);
         res.status(500).json({ message: 'Server error generating slots' });
+    }
+};
+
+// Coordinator: Save generated free slots
+exports.saveFreeSlotsForCoordinator = async (req, res) => {
+    try {
+        const { slotType, slots, date: providedDate } = req.body;
+        // slots: [{ start, end }]
+        const coordinatorId = req.user.id;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+        const programme = normalizeProgramme(selectedProgramme);
+        const panel = await Panel.findOne({ coordinator: coordinatorId, programme });
+        if (!panel) {
+            return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
+        }
+
+        if (!slots || !Array.isArray(slots) || slots.length === 0) {
+            return res.status(400).json({ message: 'No slots provided to save.' });
+        }
+
+        // Create free schedules
+        for (const slot of slots) {
+            let scheduleDate = null;
+            if (providedDate) {
+                scheduleDate = new Date(providedDate);
+            } else if (slot.start) {
+                scheduleDate = new Date(slot.start);
+            }
+            if (!scheduleDate || isNaN(scheduleDate.getTime())) {
+                return res.status(400).json({ message: `Invalid or missing date.` });
+            }
+
+            // Normalize date field to midnight (date-only)
+            const dateOnly = new Date(scheduleDate);
+            dateOnly.setHours(0, 0, 0, 0);
+
+            // Validate slot times
+            if (!slot.start || !slot.end) {
+                return res.status(400).json({ message: `Missing slot start/end times.` });
+            }
+            const startD = new Date(slot.start);
+            const endD = new Date(slot.end);
+            if (isNaN(startD.getTime()) || isNaN(endD.getTime())) {
+                return res.status(400).json({ message: `Invalid slot time.` });
+            }
+            if (endD <= startD) {
+                return res.status(400).json({ message: `End time must be after start time.` });
+            }
+            
+            // Compose period as HH:mm-HH:mm
+            const pad = (n) => String(n).padStart(2, '0');
+            const period = `${pad(startD.getHours())}:${pad(startD.getMinutes())}-${pad(endD.getHours())}:${pad(endD.getMinutes())}`;
+
+            // Create free schedule slot (team is null)
+            await TimeTable.create({
+                name: `${slotType} (Free)`,
+                description: `${slotType} free slot created by coordinator`,
+                panel: panel._id,
+                team: null,
+                date: dateOnly,
+                period,
+                startTime: slot.start,
+                endTime: slot.end,
+                duration: (endD - startD) / 60000,
+                slotType,
+                slotAssignedBy: coordinatorId,
+                type: 'Team Review',
+                status: 'scheduled',
+                isNotified: true
+            });
+        }
+        res.json({ message: 'Free slots saved successfully!' });
+    } catch (error) {
+        console.error('Error saving free slots:', error);
+        res.status(500).json({ message: 'Server error saving free slots' });
     }
 };
 
@@ -724,8 +804,8 @@ exports.assignSlotsForCoordinator = async (req, res) => {
         const { slotType, assignments, date: providedDate } = req.body;
         // assignments: [{ teamId, slot: { start, end } }]
         const coordinatorId = req.user.id;
-        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
-        const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+        const programme = normalizeProgramme(selectedProgramme);
         const panel = await Panel.findOne({ coordinator: coordinatorId, programme });
         if (!panel) {
             return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
@@ -920,11 +1000,18 @@ exports.createInstructionTemplate = async (req, res) => {
 exports.getCoordinatorVivaPanel = async (req, res) => {
     try {
         const coordinatorId = req.user.id;
-        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
-        const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+        const programme = normalizeProgramme(selectedProgramme);
         
         // Find the review panel where the user is coordinator
-        const reviewPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'review', programme })
+        const reviewPanel = await Panel.findOne({ 
+            $or: [
+                { coordinator: coordinatorId },
+                { assistantCoordinators: coordinatorId }
+            ],
+            panelType: 'review', 
+            programme 
+        })
             .populate('members', 'username name memberType designation')
             .populate('coordinator', 'username name memberType designation')
             .populate('assistantCoordinators', 'username name memberType designation');
@@ -934,7 +1021,14 @@ exports.getCoordinatorVivaPanel = async (req, res) => {
         }
 
         // Find the viva panel if it exists
-        const vivaPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'viva', programme })
+        const vivaPanel = await Panel.findOne({ 
+            $or: [
+                { coordinator: coordinatorId },
+                { assistantCoordinators: coordinatorId }
+            ],
+            panelType: 'viva', 
+            programme 
+        })
             .populate('members', 'username name memberType designation')
             .populate('coordinator', 'username name memberType designation')
             .populate('assistantCoordinators', 'username name memberType designation');
@@ -952,8 +1046,8 @@ exports.getCoordinatorVivaPanel = async (req, res) => {
 exports.saveCoordinatorVivaPanel = async (req, res) => {
     try {
         const coordinatorId = req.user.id;
-        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme || 'UG';
-        const programme = selectedProgramme.toLowerCase() === 'ug' ? 'UG' : selectedProgramme;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+        const programme = normalizeProgramme(selectedProgramme);
         const { externalMemberIds } = req.body; // Array of external examiner IDs
 
         if (!Array.isArray(externalMemberIds)) {
@@ -1035,5 +1129,66 @@ exports.saveCoordinatorVivaPanel = async (req, res) => {
     } catch (error) {
         console.error('Error saving coordinator viva panel:', error);
         res.status(500).json({ message: 'Server error' });
+    }
+};
+// Get all teams coordinated by the logged-in coordinator 
+exports.getCoordinatedTeams = async (req, res) => {
+    try {
+        const coordinatorId = req.user.id;
+        
+        // 1. Get the raw value from headers or user object
+        let rawProgramme = req.headers['x-selected-programme'] || req.user.programme;
+        rawProgramme = normalizeProgramme(rawProgramme);
+        
+        // 2. If it's a comma-separated string like "UG, UG", clean it up into an array of clean values
+        let programmeArray = [];
+        if (typeof rawProgramme === 'string') {
+            programmeArray = rawProgramme.split(',').map(p => p.trim());
+        } else if (Array.isArray(rawProgramme)) {
+            programmeArray = rawProgramme.map(p => p.toString().trim());
+        } else {
+            programmeArray = [rawProgramme.toString().trim()];
+        }
+
+        // Remove any duplicates (turns ["UG", "UG"] into ["UG"])
+        programmeArray = [...new Set(programmeArray)];
+
+        // 3. Build a regex array for case-insensitive matching
+        const regexFilters = programmeArray.map(prog => new RegExp(`^${prog}$`, 'i'));
+
+        // 4. Find the panel matching the coordinator and ANY of the clean regex options
+        const panel = await Panel.findOne({ 
+            $or: [
+                { coordinator: coordinatorId },
+                { assistantCoordinators: coordinatorId }
+            ],
+            programme: { $in: regexFilters } 
+        });
+        
+        if (!panel) {
+            return res.status(404).json({ 
+                message: `No panel found where you are assigned as a coordinator for programme matching "${rawProgramme}".` 
+            });
+        }
+
+        // 5. Find all teams assigned to this specific panel ID
+        const coordinatedTeams = await Team.find({ panel: panel._id })
+            .populate('teamLeader', 'username name')
+            .populate('members', 'username name')
+            .populate('guidePreference', 'username name')
+            .populate('vivaPanel', 'name');
+
+        // 6. Inject the panel name context for frontend convenience
+        const formattedTeams = coordinatedTeams.map(team => ({
+            ...team.toObject(),
+            panelName: panel.name
+        }));
+
+        console.log(`Found ${formattedTeams.length} coordinated teams for Panel: ${panel.name}`);
+        res.json(formattedTeams);
+
+    } catch (error) {
+        console.error('Error fetching coordinated teams:', error);
+        res.status(500).json({ message: 'Server error while fetching coordinated teams', error: error.message });
     }
 };

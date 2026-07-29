@@ -31,7 +31,7 @@ const panelSchema = new mongoose.Schema({
     },
     programme: {
         type: String,
-        default: 'UG'
+        default: 'B.E. CSE'
     }
 });
 

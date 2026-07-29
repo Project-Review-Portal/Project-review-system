@@ -10,6 +10,7 @@ import GuideMe from './GuideMe';
 import CoordinatorLetterLiveEditorCK from './CoordinatorLetterLiveEditorCK';
 import GuideUploadAttendance from './guide/GuideUploadAttendance';
 import CoordinatorVivaPanelFormation from './coordinator/CoordinatorVivaPanelFormation';
+import MaterialsTab from './coordinator/materials/MaterialsTab';
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const CoordinatorRulesDashboard = () => {
     const [teamFormationOpen, setTeamFormationOpen] = useState(true);
@@ -199,8 +200,8 @@ const CoordinatorDashboard = () => {
         window.location.href = '/';
     };
 
-    // Guard: Only allow users with coordinator role to view this dashboard
-    const hasCoordinatorRole = Array.isArray(user?.roles) && user.roles.some(r => r.role === 'coordinator');
+    // Guard: Only allow users with coordinator or assistant coordinator role to view this dashboard
+    const hasCoordinatorRole = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
     if (!hasCoordinatorRole) {
         return (
             <div className="p-6">
@@ -221,9 +222,11 @@ const CoordinatorDashboard = () => {
         );
     }
 
+    const currentRole = user?.role === 'assistant coordinator' ? 'assistant coordinator' : 'coordinator';
+
     return (
         <div>
-            <Navbar user={{ ...user, role: 'coordinator' }} onLogout={handleLogout} />
+            <Navbar user={{ ...user, role: currentRole }} onLogout={handleLogout} />
             
          
             
@@ -238,6 +241,8 @@ const CoordinatorDashboard = () => {
                     <Route path="upload-attendance" element={<GuideUploadAttendance />} />
                     <Route path="review-schedule" element={<CoordinatorReviewSchedule />} />
                     <Route path="viva-schedule" element={<CoordinatorVivaSchedule />} />
+                    <Route path="materials" element={<MaterialsTab />} />
+                    <Route path="materials/*" element={<MaterialsTab />} />
                     <Route path="instruction-template" element={<CoordinatorInstructionTemplate />} />
                     <Route path="*" element={<Navigate to="dashboard" replace />} />
                 </Routes>

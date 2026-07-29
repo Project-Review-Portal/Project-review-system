@@ -173,7 +173,7 @@ exports.setMaxTeamSize = async (req, res) => {
                     const team = new Team({
                         teamName: student.username,
                         teamLeader: student._id,
-                        programme: student.programme || 'UG',
+                        programme: student.programme || 'B.E COMPUTER SCIENCE AND ENGINEERING',
                         members: [],
                         memberStatus: [],
                         isTeamComplete: true,
@@ -301,7 +301,9 @@ exports.getUnassignedTeams = async (req, res) => {
 // Get guides with the count of teams assigned to them, sorted by count
 exports.getGuidesWithTeamCounts = async (req, res) => {
     try {
-        const programmeType = req.query.programmeType || 'UG';
+        const progType = req.query.programmeType || 'B.E COMPUTER SCIENCE AND ENGINEERING';
+        const isBE = progType === 'UG' || progType === 'B.E COMPUTER SCIENCE AND ENGINEERING';
+        const programmeType = isBE ? 'UG' : 'PG';
         const guides = await User.find({
             'roles.role': 'guide',
             memberType: 'internal'
@@ -309,9 +311,9 @@ exports.getGuidesWithTeamCounts = async (req, res) => {
         const { buildDesignationLimitMap, resolveGuideLimitStatus } = require('../utils/guideTeamLimit');
         const limitMap = await buildDesignationLimitMap(programmeType);
 
-        const programmeQuery = programmeType === 'UG'
-            ? { programme: 'UG' }
-            : { programme: { $ne: 'UG' } };
+        const programmeQuery = isBE
+            ? { programme: 'B.E COMPUTER SCIENCE AND ENGINEERING' }
+            : { programme: { $ne: 'B.E COMPUTER SCIENCE AND ENGINEERING' } };
 
         const guidesWithCounts = await Promise.all(guides.map(async (guide) => {
             const teamsAssigned = await Team.find({
@@ -457,7 +459,7 @@ exports.assignAllUnassignedGuides = async (req, res) => {
         for (const team of unassignedTeams) {
             const currentTeam = await Team.findById(team._id).select('rejectedGuides programme');
             const teamRejectedGuides = currentTeam ? currentTeam.rejectedGuides.map(id => id.toString()) : [];
-            const isPg = currentTeam && currentTeam.programme && currentTeam.programme !== 'UG';
+            const isPg = currentTeam && currentTeam.programme && currentTeam.programme !== 'UG' && currentTeam.programme !== 'B.E COMPUTER SCIENCE AND ENGINEERING';
             const programmeType = isPg ? 'PG' : 'UG';
 
             // Sort guides to balance workload
@@ -2246,14 +2248,16 @@ exports.autoAssignPanels = async (req, res) => {
         }
 
         for (const team of teams) {
-            const teamProgramme = (team.programme || 'UG').trim().toLowerCase();
+            let teamProgramme = (team.programme || 'B.E COMPUTER SCIENCE AND ENGINEERING').trim().toLowerCase();
+            if (teamProgramme === 'ug') teamProgramme = 'b.e computer science and engineering';
             const guideId = team.guidePreference ? team.guidePreference._id.toString() : null;
 
             // Check if the currently assigned panel (if any) is valid and programme matches
             const currentPanel = team[teamField];
             let isUnassigned = !currentPanel;
             if (currentPanel) {
-                const currentPanelProg = (currentPanel.programme || 'UG').trim().toLowerCase();
+                let currentPanelProg = (currentPanel.programme || 'B.E COMPUTER SCIENCE AND ENGINEERING').trim().toLowerCase();
+                if (currentPanelProg === 'ug') currentPanelProg = 'b.e computer science and engineering';
                 if (currentPanelProg !== teamProgramme) {
                     isUnassigned = true; // mismatch => treat as unassigned
                 }
@@ -2261,12 +2265,14 @@ exports.autoAssignPanels = async (req, res) => {
 
             if (isUnassigned) {
                 // Filter panels by the team's programme (same logic as the frontend dropdown)
-                const programmePanels = panels.filter(p =>
-                    (p.programme || 'UG').trim().toLowerCase() === teamProgramme
-                );
+                const programmePanels = panels.filter(p => {
+                    let pProg = (p.programme || 'B.E COMPUTER SCIENCE AND ENGINEERING').trim().toLowerCase();
+                    if (pProg === 'ug') pProg = 'b.e computer science and engineering';
+                    return pProg === teamProgramme;
+                });
 
                 if (programmePanels.length === 0) {
-                    warnings.push(`Warning: No ${typeLabel} found for programme "${team.programme || 'UG'}" — Team ${team.teamName} was skipped.`);
+                    warnings.push(`Warning: No ${typeLabel} found for programme "${team.programme || 'B.E COMPUTER SCIENCE AND ENGINEERING'}" — Team ${team.teamName} was skipped.`);
                     continue;
                 }
 

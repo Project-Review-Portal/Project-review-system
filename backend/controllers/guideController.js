@@ -72,7 +72,7 @@ exports.acceptRequest = async (req, res) => {
             resolveGuideLimitStatus
         } = require('../utils/guideTeamLimit');
 
-        const isPg = team.programme && team.programme !== 'UG';
+        const isPg = team.programme && team.programme !== 'UG' && team.programme !== 'B.E COMPUTER SCIENCE AND ENGINEERING' && team.programme !== 'B.E. CSE';
         const programmeType = isPg ? 'PG' : 'UG';
 
         const guide = await User.findById(guideId);
@@ -831,5 +831,121 @@ exports.getGuideCapacity = async (req, res) => {
     } catch (err) {
         console.error('Error in getGuideCapacity:', err);
         return res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// Get all panels that have allocations for this guide's teams
+exports.getGuideAssignedPanels = async (req, res) => {
+    try {
+        const guideId = req.user.id;
+        const teams = await Team.find({ guidePreference: guideId }).select('panel vivaPanel');
+        
+        const panelIds = new Set();
+        teams.forEach(t => {
+            if (t.panel) panelIds.add(t.panel.toString());
+            if (t.vivaPanel) panelIds.add(t.vivaPanel.toString());
+        });
+        
+        const panels = await Panel.find({ _id: { $in: Array.from(panelIds) } })
+            .select('name panelType coordinator members programme')
+            .populate('coordinator', 'name username')
+            .populate('members', 'name username');
+            
+        res.json(panels);
+    } catch (error) {
+        console.error('Error fetching guide assigned panels:', error);
+        res.status(500).json({ message: 'Server error fetching panels' });
+    }
+};
+
+// Get all slots for a panel and all teams for this guide on this panel
+exports.getPanelSlotsForGuide = async (req, res) => {
+    try {
+        const { panelId } = req.params;
+        const guideId = req.user.id;
+        
+        const slots = await TimeTable.find({ panel: panelId })
+            .populate({
+                path: 'team',
+                select: 'teamName guidePreference',
+                populate: {
+                    path: 'guidePreference',
+                    select: 'name'
+                }
+            })
+            .sort({ date: 1, startTime: 1 });
+            
+        const myTeams = await Team.find({ 
+            guidePreference: guideId,
+            $or: [{ panel: panelId }, { vivaPanel: panelId }]
+        }).select('teamName programme');
+        
+        res.json({ slots, myTeams });
+    } catch (error) {
+        console.error('Error fetching panel slots for guide:', error);
+        res.status(500).json({ message: 'Server error fetching panel slots' });
+    }
+};
+
+// Save guide's assignments/unassignments for a panel
+exports.savePanelSlotAssignments = async (req, res) => {
+    try {
+        const { panelId, assignments } = req.body;
+        const guideId = req.user.id;
+        
+        if (!panelId || !Array.isArray(assignments)) {
+            return res.status(400).json({ message: 'Invalid request data' });
+        }
+        
+        const panel = await Panel.findById(panelId);
+        if (!panel) {
+            return res.status(404).json({ message: 'Panel not found' });
+        }
+        
+        for (const assign of assignments) {
+            const { slotId, teamId } = assign;
+            
+            const slot = await TimeTable.findById(slotId);
+            if (!slot || slot.panel.toString() !== panelId) {
+                return res.status(400).json({ message: `Slot ${slotId} not found or does not belong to the selected panel.` });
+            }
+            
+            if (teamId) {
+                const team = await Team.findById(teamId);
+                if (!team) {
+                    return res.status(404).json({ message: `Team ${teamId} not found.` });
+                }
+                
+                if (team.guidePreference.toString() !== guideId) {
+                    return res.status(403).json({ message: `You are not authorized to assign team ${team.teamName}.` });
+                }
+                
+                slot.team = teamId;
+                slot.name = `${slot.slotType} for ${team.teamName}`;
+                slot.description = `${slot.slotType} scheduled by guide`;
+            } else {
+                if (slot.team) {
+                    const currentTeam = await Team.findById(slot.team);
+                    if (currentTeam && currentTeam.guidePreference.toString() !== guideId) {
+                        return res.status(403).json({ message: `You are not authorized to remove assignment for team ${currentTeam.teamName}.` });
+                    }
+                }
+                await TimeTable.findByIdAndUpdate(slotId, {
+                    $unset: { team: '' },
+                    $set: {
+                        name: `${slot.slotType} (Free)`,
+                        description: `${slot.slotType} free slot created by coordinator`
+                    }
+                });
+                continue;
+            }
+            
+            await slot.save();
+        }
+        
+        res.json({ message: 'Assignments saved successfully!' });
+    } catch (error) {
+        console.error('Error saving slot assignments for guide:', error);
+        res.status(500).json({ message: 'Server error saving assignments' });
     }
 };

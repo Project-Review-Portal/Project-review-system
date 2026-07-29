@@ -40,6 +40,23 @@ const uploadTemplate = multer({
   }
 }).single('reviewTemplate');
 
+const storageMaterial = multer.diskStorage({
+  destination: './uploads/materials',
+  filename: function(req, file, cb){
+    cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
+  }
+});
+
+const uploadMaterial = multer({
+  storage: storageMaterial,
+  limits: {fileSize: 10000000}, // 10MB limit for materials
+  fileFilter: function(req, file, cb){
+    // Validation happens at controller level based on MaterialSetting
+    cb(null, true);
+  }
+}).single('material');
+
+
 // Init upload for general files (templates and signatures)
 const uploadGeneral = multer({
   storage: storage,
@@ -85,6 +102,7 @@ function checkGeneralFileType(file, cb){
 module.exports=uploadReport;// Default export for backward compatibility
 module.exports.reportUpload = uploadReport; 
 module.exports.templateUpload=uploadTemplate;
+module.exports.materialUpload=uploadMaterial;
 module.exports.single = uploadGeneral.single.bind(uploadGeneral);
 module.exports.array = uploadGeneral.array.bind(uploadGeneral);
 module.exports.fields = uploadGeneral.fields.bind(uploadGeneral); 

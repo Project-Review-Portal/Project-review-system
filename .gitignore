@@ -20,6 +20,7 @@ dist/
 test-outputs/
 uploads/generated/
 backend/uploads/generated/
+backend/uploads/materials/
 
 backend/uploads/report/
 backend/uploads/review-templates/

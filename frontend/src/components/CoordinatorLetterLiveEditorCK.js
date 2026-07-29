@@ -13,6 +13,9 @@ const CoordinatorLetterLiveEditorCK = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  //const isReadOnly = storedUser.role === 'assistant coordinator';
+
   // Load templates manifest
   useEffect(() => {
     fetch('/templates/templates.json')
@@ -31,8 +34,8 @@ const CoordinatorLetterLiveEditorCK = () => {
         styleMap: [
           // Add any custom style mappings if needed
         ],
-        convertImage: mammoth.images.inline(function(element) {
-          return element.read('base64').then(function(imageBuffer) {
+        convertImage: mammoth.images.inline(function (element) {
+          return element.read('base64').then(function (imageBuffer) {
             return { src: 'data:' + element.contentType + ';base64,' + imageBuffer };
           });
         })
@@ -103,6 +106,11 @@ const CoordinatorLetterLiveEditorCK = () => {
     <div className="max-w-6xl mx-auto p-6">
       <div className="bg-white rounded-lg shadow p-4 mb-4">
         <h1 className="text-2xl font-bold mb-4">Letter Generation (CKEditor, No Docker)</h1>
+        {/* {isReadOnly && (
+          <div className="mb-4 p-3 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded font-medium text-center">
+            ℹ️ You are viewing this page in Read-Only Mode as an Assistant Coordinator.
+          </div>
+        )} */}
         {error && <div className="mb-3 p-2 bg-red-100 text-red-700 rounded">{error}</div>}
         <div className="flex flex-wrap items-center gap-3">
           <label className="font-medium">Select Template</label>
@@ -130,16 +138,17 @@ const CoordinatorLetterLiveEditorCK = () => {
             editor={ClassicEditor}
             data={editorData}
             onChange={(evt, editor) => setEditorData(editor.getData())}
+            //disabled={isReadOnly}
             config={{
               toolbar: [
-                'undo','redo','|','heading','|','bold','italic','underline','strikethrough','|',
-                'bulletedList','numberedList','|','link','blockQuote','insertTable','imageUpload','|','alignment:left','alignment:center','alignment:right','alignment:justify'
+                'undo', 'redo', '|', 'heading', '|', 'bold', 'italic', 'underline', 'strikethrough', '|',
+                'bulletedList', 'numberedList', '|', 'link', 'blockQuote', 'insertTable', 'imageUpload', '|', 'alignment:left', 'alignment:center', 'alignment:right', 'alignment:justify'
               ],
               table: {
-                contentToolbar: [ 'tableColumn', 'tableRow', 'mergeTableCells', 'tableProperties', 'tableCellProperties' ]
+                contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells', 'tableProperties', 'tableCellProperties']
               },
               image: {
-                toolbar: [ 'imageTextAlternative', 'imageStyle:full', 'imageStyle:side' ]
+                toolbar: ['imageTextAlternative', 'imageStyle:full', 'imageStyle:side']
               }
             }}
           />

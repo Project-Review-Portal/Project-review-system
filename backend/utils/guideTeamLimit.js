@@ -2,11 +2,12 @@ const Team = require('../models/Team');
 const DesignationTeamLimit = require('../models/DesignationTeamLimit');
 
 async function buildDesignationLimitMap(programmeType) {
-    const progType = programmeType || 'UG';
+    const progType = programmeType || 'B.E. CSE';
     const limits = await DesignationTeamLimit.find({});
     const map = new Map();
     for (const entry of limits) {
-        const limitVal = progType === 'PG' ? entry.pgLimit : entry.ugLimit;
+        const isBE = progType === 'UG' || progType === 'B.E COMPUTER SCIENCE AND ENGINEERING' || progType === 'B.E. CSE';
+        const limitVal = isBE ? entry.ugLimit : entry.pgLimit;
         map.set(entry.designation.trim().toLowerCase(), limitVal);
     }
     return map;
@@ -17,10 +18,11 @@ async function getTeamCountsByGuideIds(guideIds, programmeType) {
         return new Map();
     }
 
-    const progType = programmeType || 'UG';
-    const programmeQuery = progType === 'UG' 
-        ? { programme: 'UG' } 
-        : { programme: { $ne: 'UG' } };
+    const progType = programmeType || 'B.E. CSE';
+    const isBE = progType === 'UG' || progType === 'B.E COMPUTER SCIENCE AND ENGINEERING' || progType === 'B.E. CSE';
+    const programmeQuery = isBE 
+        ? { programme: 'B.E. CSE' } 
+        : { programme: { $ne: 'B.E. CSE' } };
 
     const counts = await Team.aggregate([
         {

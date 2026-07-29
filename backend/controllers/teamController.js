@@ -26,7 +26,7 @@ exports.getAvailableStudents = async (req, res) => {
         
         // Fetch current user to get their programme
         const currentUser = await User.findById(currentUserId);
-        const userProgramme = currentUser ? (currentUser.programme || 'UG') : 'UG';
+        const userProgramme = currentUser ? (currentUser.programme || 'B.E. CSE') : 'B.E. CSE';
 
         // Find students who are not in any team (neither as leader nor member) and not the current user, and are in the SAME programme
         const availableStudents = await User.find({
@@ -65,7 +65,7 @@ exports.getGuides = async (req, res) => {
             _id: { $nin: rejectedGuideIds }
         }).select('username name designation');
 
-        const isPg = team && team.programme && team.programme !== 'UG';
+        const isPg = team && team.programme && team.programme !== 'UG' && team.programme !== 'B.E COMPUTER SCIENCE AND ENGINEERING' && team.programme !== 'B.E. CSE';
         const programmeType = isPg ? 'PG' : 'UG';
         const limitMap = await buildDesignationLimitMap(programmeType);
         const guideIds = guides.map((guide) => guide._id);
@@ -135,7 +135,7 @@ exports.createTeam = async (req, res) => {
         // const maxTeamNumber = await Team.find({}, {teamName : 1});
 
         const leader = await User.findById(teamLeaderId);
-        const leaderProgramme = leader.programme || 'UG';
+        const leaderProgramme = leader ? (leader.programme || 'B.E. CSE') : 'B.E. CSE';
 
         // Retrieve all existing teams for this programme to generate the next sequential team name
         const existingTeams = await Team.find({ programme: leaderProgramme }, { teamName: 1 });
@@ -254,7 +254,7 @@ exports.requestGuide = async (req, res) => {
             return res.status(400).json({ message: 'Invalid guide selected.' });
         }
 
-        const isPg = team && team.programme && team.programme !== 'UG';
+        const isPg = team && team.programme && team.programme !== 'UG' && team.programme !== 'B.E COMPUTER SCIENCE AND ENGINEERING' && team.programme !== 'B.E. CSE';
         const programmeType = isPg ? 'PG' : 'UG';
         const limitMap = await buildDesignationLimitMap(programmeType);
         const countMap = await getTeamCountsByGuideIds([guide._id], programmeType);

@@ -23,7 +23,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     { label: 'Guide Requests', path: '/student-dashboard/guide-requests' },
                     { label: 'My Panel', path: '/student-dashboard/my-panel' },
                     { label: 'Review Schedules', path: '/student-dashboard/review-schedules' },
-                    { label: 'Final Report', path: '/student-dashboard/final-report' },
+                    { label: 'Uploads', path: '/student-dashboard/final-report' },
                     { label: 'Announcements', path: '/student-dashboard/coordinator-instructions' },
                     { label: 'Guide Me', path: '/student-dashboard/guide-me' }
                 ];
@@ -34,7 +34,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     { label: 'My Teams', path: '/guide-dashboard/my-teams' },
                     { label: 'Review Schedules', path: '/guide-dashboard/review-schedules' },
                     { label: 'Mark Teams', path: '/guide-dashboard/mark-teams' },
-                    { label: 'Final Reports', path: '/guide-dashboard/final-reports' },
+                    { label: 'Uploads', path: '/guide-dashboard/final-reports' },
                     { label: 'Guide Me', path: '/guide-dashboard/guide-me' }
                 ];
             case 'panel':
@@ -65,6 +65,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     { label: 'Schedules', path: `${prefix}/manage-review-schedules` },
                     { label: 'Guide Me', path: `${prefix}/guide-me` }
                 ];
+            case 'assistant coordinator':
             case 'coordinator':
                 return [
                     { label: 'Dashboard', path: '/coordinator-dashboard/dashboard' },
@@ -73,6 +74,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     { label: 'Upload Attendance', path: '/coordinator-dashboard/upload-attendance' },
                     { label: 'Review Schedule', path: '/coordinator-dashboard/review-schedule' },
                     { label: 'Viva Schedule', path: '/coordinator-dashboard/viva-schedule' },
+                    { label: 'Materials', path: '/coordinator-dashboard/materials' },
                     { label: 'Letter Generation', path: '/coordinator-dashboard/letter-generation' },
                     { label: 'Broadcasts', path: '/coordinator-dashboard/instruction-template' },
                     { label: 'Guide Me', path: '/coordinator-dashboard/guide-me' }
@@ -93,9 +95,13 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                             let text = '';
                             if (user.role === 'admin') {
                                 text = `Admin${activeProgramme ? ` (${activeProgramme})` : ''}`;
-                            } else if (['guide', 'panel', 'coordinator'].includes(user.role)) {
-                                const displayProg = user.programme || 'UG';
-                                const roleLabel = user.role === 'panel' ? 'Panel Member' : user.role.charAt(0).toUpperCase() + user.role.slice(1);
+                            } else if (['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(user.role)) {
+                                const displayProg = user.programme || 'B.E COMPUTER SCIENCE AND ENGINEERING';
+                                const roleLabel = user.role === 'panel' 
+                                    ? 'Panel Member' 
+                                    : user.role === 'assistant coordinator'
+                                        ? 'Assistant Coordinator'
+                                        : user.role.charAt(0).toUpperCase() + user.role.slice(1);
                                 text = `${roleLabel} (${displayProg})`;
                             } else if (user.role === 'student') {
                                 text = `${user.username} - ${user.name}`;
@@ -144,7 +150,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                         {/* <span className="text-white text-xs lg:text-sm hidden sm:block truncate max-w-32">Welcome!</span> */}
                         
                         {/* Switch Role button for faculty users with multiple roles */}
-                        {['guide', 'panel', 'coordinator'].includes(user.role) && user.roles && user.roles.length > 1 && (
+                        {['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(user.role) && user.roles && user.roles.length > 1 && (
                             <button
                                 onClick={() => navigate('/role-selection')}
                                 className="bg-indigo-500 text-white px-2 py-2 rounded-md text-xs sm:text-sm font-medium hover:bg-indigo-600 whitespace-nowrap"
