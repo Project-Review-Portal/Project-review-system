@@ -880,11 +880,27 @@ exports.assignSlotsForCoordinator = async (req, res) => {
 exports.getAllottedSchedulesForCoordinator = async (req, res) => {
     try {
         const coordinatorId = req.user.id;
-        const schedules = await TimeTable.find({ slotAssignedBy: coordinatorId })
-            .populate('team', 'teamName')
+        // Find panels where this user is coordinator or assistant coordinator
+        const panels = await Panel.find({
+            $or: [
+                { coordinator: coordinatorId },
+                { assistantCoordinators: coordinatorId }
+            ]
+        });
+        const panelIds = panels.map(p => p._id);
+
+        const schedules = await TimeTable.find({ panel: { $in: panelIds } })
+            .populate({
+                path: 'team',
+                select: 'teamName guidePreference programme',
+                populate: {
+                    path: 'guidePreference',
+                    select: 'name'
+                }
+            })
             .populate({
                 path: 'panel',
-                select: 'name members',
+                select: 'name members programme',
                 populate: {
                     path: 'members',
                     select: 'username name memberType'
@@ -903,13 +919,16 @@ exports.deleteAllottedSchedule = async (req, res) => {
         const coordinatorId = req.user.id;
         const { scheduleId } = req.params;
 
-        const schedule = await TimeTable.findById(scheduleId);
+        const schedule = await TimeTable.findById(scheduleId).populate('panel');
         if (!schedule) {
             return res.status(404).json({ message: 'Review schedule not found.' });
         }
 
-        // Only allow the coordinator who created the schedule or an admin to delete it
-        if (schedule.slotAssignedBy && schedule.slotAssignedBy.toString() === coordinatorId) {
+        // Allow deletion if requester is the coordinator of the panel the schedule belongs to, or was slotAssignedBy, or is Admin
+        const isPanelCoordinator = schedule.panel && schedule.panel.coordinator && schedule.panel.coordinator.toString() === coordinatorId;
+        const isCreator = schedule.slotAssignedBy && schedule.slotAssignedBy.toString() === coordinatorId;
+
+        if (isPanelCoordinator || isCreator) {
             await TimeTable.findByIdAndDelete(scheduleId);
             return res.json({ message: 'Review schedule deleted successfully!' });
         }

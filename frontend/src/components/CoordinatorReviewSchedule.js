@@ -26,8 +26,7 @@ const CoordinatorReviewSchedule = () => {
   const [step, setStep] = useState(1); // 1: form, 2: preview
   const [allottedSchedules, setAllottedSchedules] = useState([]);
   const [loadingSchedules, setLoadingSchedules] = useState(false);
-  const [filterTeam, setFilterTeam] = useState('');
-  const [filterType, setFilterType] = useState('all');
+  const [selectedSlotType, setSelectedSlotType] = useState('review1');
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -174,7 +173,10 @@ const CoordinatorReviewSchedule = () => {
       const selectedProgramme = storedUser.programme;
       let fetchedSchedules = fetchRes.data || [];
       if (selectedProgramme) {
-          fetchedSchedules = fetchedSchedules.filter(sch => sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+          fetchedSchedules = fetchedSchedules.filter(sch => 
+              (sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase()) ||
+              (sch.panel?.programme?.toLowerCase() === selectedProgramme?.toLowerCase())
+          );
       }
       setAllottedSchedules(fetchedSchedules);
     } catch (err) {
@@ -196,7 +198,10 @@ const CoordinatorReviewSchedule = () => {
         const selectedProgramme = storedUser.programme;
         let fetchedSchedules = res.data || [];
         if (selectedProgramme) {
-            fetchedSchedules = fetchedSchedules.filter(sch => sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+            fetchedSchedules = fetchedSchedules.filter(sch => 
+                (sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase()) ||
+                (sch.panel?.programme?.toLowerCase() === selectedProgramme?.toLowerCase())
+            );
         }
         setAllottedSchedules(fetchedSchedules);
       } catch (err) {
@@ -211,14 +216,23 @@ const CoordinatorReviewSchedule = () => {
     }
   }, [user]);
 
-  const handleDeleteSchedule = async (scheduleId) => {
+  const handleDeleteSchedule = async (scheduleId, hasAssignedTeam, teamName) => {
     const isReadOnly = user?.role === 'assistant coordinator';
     if (isReadOnly) {
       setError('Action forbidden in Read-Only Mode.');
       return;
     }
-    if (!window.confirm('Are you sure you want to delete this schedule? This will remove it everywhere.')) return;
+    
+    let confirmMsg = 'Are you sure you want to delete this slot?';
+    if (hasAssignedTeam) {
+      confirmMsg = `Warning: Team "${teamName}" is already assigned to this slot. Are you sure you want to delete the slot? This will cancel the schedule for this team and keep data consistent across guide logins.`;
+    }
+    
+    if (!window.confirm(confirmMsg)) return;
+    
     setLoadingSchedules(true);
+    setError('');
+    setMessage('');
     try {
       const token = localStorage.getItem('token');
       await axios.delete(`${SERVER_API_KEY}/api/panels/coordinator/allotted-schedules/${scheduleId}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -228,12 +242,15 @@ const CoordinatorReviewSchedule = () => {
       const selectedProgramme = storedUser.programme;
       let fetchedSchedules = res.data || [];
       if (selectedProgramme) {
-          fetchedSchedules = fetchedSchedules.filter(sch => sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+          fetchedSchedules = fetchedSchedules.filter(sch => 
+              (sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase()) ||
+              (sch.panel?.programme?.toLowerCase() === selectedProgramme?.toLowerCase())
+          );
       }
       setAllottedSchedules(fetchedSchedules);
-      setMessage('Schedule deleted successfully');
+      setMessage('Slot deleted successfully');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to delete schedule');
+      setError(err.response?.data?.message || 'Failed to delete slot');
     } finally {
       setLoadingSchedules(false);
     }
@@ -252,8 +269,89 @@ const CoordinatorReviewSchedule = () => {
 
   const isReadOnly = user?.role === 'assistant coordinator';
 
+  // Format start/end times into e.g. "09.30 am to 09.50 am"
+  const formatPeriodLabel = (startStr, endStr) => {
+    const s = new Date(startStr);
+    const e = new Date(endStr);
+    const pad = (n) => String(n).padStart(2, '0');
+    
+    const formatTime = (dateObj) => {
+      let hours = dateObj.getHours();
+      const minutes = pad(dateObj.getMinutes());
+      const ampm = hours >= 12 ? 'pm' : 'am';
+      hours = hours % 12;
+      hours = hours ? hours : 12; // '0' becomes '12'
+      return `${pad(hours)}.${minutes} ${ampm}`;
+    };
+    
+    return `${formatTime(s)} to ${formatTime(e)}`;
+  };
+
+  // Filter slots by selected slotType (review1, review2, review3, viva)
+  const filteredSlots = allottedSchedules.filter(s => s.slotType === selectedSlotType);
+
+  // Compute unique date/session rows
+  const rowMap = new Map();
+  filteredSlots.forEach(s => {
+    const dateObj = new Date(s.date);
+    const startObj = new Date(s.startTime);
+    const isFN = startObj.getHours() < 12;
+    const session = isFN ? 'FN' : 'AN';
+    
+    const dateString = dateObj.toISOString().split('T')[0];
+    const key = `${dateString}_${session}`;
+    
+    if (!rowMap.has(key)) {
+      const dateStrLabel = dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+      const dayStrLabel = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+      rowMap.set(key, {
+        key,
+        dateString,
+        session,
+        label: `${dateStrLabel} (${dayStrLabel})`,
+        day: dayStrLabel,
+        dateVal: dateObj
+      });
+    }
+  });
+
+  const sortedRows = Array.from(rowMap.values()).sort((a, b) => {
+    const diff = a.dateVal - b.dateVal;
+    if (diff !== 0) return diff;
+    return a.session === 'FN' ? -1 : 1;
+  });
+
+  // Compute unique periods (columns)
+  const periodMap = new Map();
+  filteredSlots.forEach(s => {
+    const label = formatPeriodLabel(s.startTime, s.endTime);
+    const startD = new Date(s.startTime);
+    const minutes = startD.getHours() * 60 + startD.getMinutes();
+    if (!periodMap.has(label)) {
+      periodMap.set(label, minutes);
+    }
+  });
+
+  const sortedPeriods = Array.from(periodMap.keys()).sort((a, b) => periodMap.get(a) - periodMap.get(b));
+
+  // Find slot for a row and period
+  const findSlot = (row, period) => {
+    return filteredSlots.find(s => {
+      const dObj = new Date(s.date);
+      const sObj = new Date(s.startTime);
+      const dateString = dObj.toISOString().split('T')[0];
+      const isFN = sObj.getHours() < 12;
+      const session = isFN ? 'FN' : 'AN';
+      
+      const slotRowKey = `${dateString}_${session}`;
+      const slotPeriod = formatPeriodLabel(s.startTime, s.endTime);
+      
+      return slotRowKey === row.key && slotPeriod === period;
+    });
+  };
+
   return (
-    <div className="bg-white p-6 rounded-lg shadow max-w-3xl mx-auto">
+    <div className="bg-white p-6 rounded-lg shadow-md max-w-7xl mx-auto w-full">
       <h2 className="text-2xl font-bold mb-4">Review Schedule</h2>
       {isReadOnly && (
         <div className="mb-4 p-3 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded font-medium text-center">
@@ -264,7 +362,7 @@ const CoordinatorReviewSchedule = () => {
       {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
       
       {step === 1 && (
-        <form onSubmit={handleGenerateSlots} className="space-y-4">
+        <form onSubmit={handleGenerateSlots} className="space-y-4 max-w-3xl">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Review Type</label>
@@ -307,7 +405,7 @@ const CoordinatorReviewSchedule = () => {
       )}
       
       {step === 2 && (
-        <div className="space-y-4">
+        <div className="space-y-4 max-w-3xl">
           <h3 className="text-lg font-semibold text-gray-800">Review Generated Slots</h3>
           {extraMinutesMessage && (
             <div className="p-3 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded text-sm">
@@ -346,95 +444,114 @@ const CoordinatorReviewSchedule = () => {
         </div>
       )}
 
-      {/* Allotted Schedules Section */}
-      <div className="bg-gray-50 mt-8 p-4 rounded-lg shadow-inner">
-        <h3 className="text-xl font-semibold mb-4">Allotted Review Schedules</h3>
-        <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
-          <input
-            type="text"
-            value={filterTeam}
-            onChange={(e) => setFilterTeam(e.target.value)}
-            placeholder="Filter by team"
-            className="border rounded px-2 py-1 w-full md:w-1/2"
-          />
-          <select
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className="border rounded px-2 py-1 w-full md:w-1/3"
-          >
-            <option value="all">All Types</option>
-            {slotTypes.map(st => (
-              <option key={st} value={st}>{st === 'viva' ? 'VIVA' : `Review ${st.replace('review', '')}`}</option>
+      {/* Slots Timetable Section */}
+      <div className="bg-gray-50 mt-8 p-6 rounded-lg shadow-inner w-full">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-4 mb-4">
+          <div>
+            <h3 className="text-xl font-semibold text-gray-800">Allotted Slots Timetable</h3>
+            <p className="text-xs text-gray-500 mt-1">Review the free and assigned slots for your coordinated panels.</p>
+          </div>
+          
+          {/* Slot Type Selector */}
+          <div className="flex bg-white p-1 rounded-md border shadow-sm">
+            {['review1', 'review2', 'review3', 'viva'].map(type => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => { setSelectedSlotType(type); setError(''); setMessage(''); }}
+                className={`px-3 py-1.5 rounded text-xs font-bold uppercase transition tracking-wider ${selectedSlotType === type ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                {type === 'viva' ? 'Viva' : `Review ${type.replace('review', '')}`}
+              </button>
             ))}
-          </select>
+          </div>
         </div>
+
         {loadingSchedules ? (
-          <div>Loading schedules...</div>
-        ) : allottedSchedules.length === 0 ? (
-          <div className="text-gray-500">No review schedules allotted yet.</div>
+          <div className="text-center py-8 font-bold text-gray-500">Loading timetable slots...</div>
+        ) : filteredSlots.length === 0 ? (
+          <div className="text-center py-8 bg-white border rounded-lg text-gray-500 font-semibold shadow-sm">
+            No slots have been set for this review type yet.
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full border border-gray-200 bg-white">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="px-3 py-2 border text-left text-sm font-semibold text-gray-700">Review</th>
-                  <th className="px-3 py-2 border text-left text-sm font-semibold text-gray-700">Type</th>
-                  <th className="px-3 py-2 border text-left text-sm font-semibold text-gray-700">Team</th>
-                  <th className="px-3 py-2 border text-left text-sm font-semibold text-gray-700">Panel</th>
-                  <th className="px-3 py-2 border text-left text-sm font-semibold text-gray-700">Start</th>
-                  <th className="px-3 py-2 border text-left text-sm font-semibold text-gray-700">End</th>
-                  <th className="px-3 py-2 border text-left text-sm font-semibold text-gray-700">Duration</th>
-                  <th className="px-3 py-2 border text-left text-sm font-semibold text-gray-700">Action</th>
+          <div className="overflow-x-auto border rounded-lg shadow-sm bg-white">
+            <table className="w-full border-collapse text-left text-sm bg-white">
+              <thead>
+                <tr className="bg-indigo-600 text-white">
+                  <th className="border p-3 text-sm font-bold w-48 tracking-wider uppercase">Date & Session</th>
+                  {sortedPeriods.map((period, pIdx) => (
+                    <th key={pIdx} className="border p-3 text-center text-sm font-bold min-w-[200px] tracking-wider">
+                      {period}
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody>
-                {allottedSchedules
-                  .filter((s) => {
-                    const teamName = (s.team?.teamName || 'Free Slot').toString().toLowerCase();
-                    const teamOk = !filterTeam || teamName.includes(filterTeam.toLowerCase());
-                    const rawType = (s.slotType || s.type || '').toString().toLowerCase();
-                    const typeOk = filterType === 'all' || rawType === filterType;
-                    return teamOk && typeOk;
-                  })
-                  .map((schedule) => {
-                    const displayName = schedule.name || (schedule.slotType ? `${schedule.slotType}` : 'Review');
-                    const rawType = (schedule.slotType || schedule.type || '').toString().toLowerCase();
-                    const typeLabel = rawType === 'viva' ? 'VIVA' : `Review ${rawType.replace('review', '')}`;
-                    let duration = schedule.duration;
-                    try {
-                      if ((!duration || duration === 0) && schedule.startTime && schedule.endTime) {
-                        duration = Math.round((new Date(schedule.endTime) - new Date(schedule.startTime)) / 60000);
+              <tbody className="divide-y divide-gray-200">
+                {sortedRows.map((row, rIdx) => (
+                  <tr key={rIdx} className="hover:bg-gray-50/50 transition-colors">
+                    {/* Left Date column */}
+                    <td className="border p-3 bg-gray-50 align-top">
+                      <div className="font-bold text-gray-800">{row.label}</div>
+                      <span className="inline-block mt-2 text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">{row.session}</span>
+                    </td>
+
+                    {/* Slots columns */}
+                    {sortedPeriods.map((period, pIdx) => {
+                      const slot = findSlot(row, period);
+                      if (!slot) {
+                        return (
+                          <td key={pIdx} className="border p-3 bg-gray-50/40 text-center text-gray-400 select-none align-middle font-medium italic text-xs">
+                            Not Available
+                          </td>
+                        );
                       }
-                    } catch (e) {
-                      duration = schedule.duration || 0;
-                    }
-                    return (
-                      <tr key={schedule._id} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 border text-sm">{displayName}</td>
-                        <td className="px-3 py-2 border text-sm">{typeLabel}</td>
-                        <td className="px-3 py-2 border text-sm font-semibold text-gray-600">{schedule.team?.teamName || 'Free Slot'}</td>
-                        <td className="px-3 py-2 border text-sm">{schedule.panel?.name || 'N/A'}</td>
-                        <td className="px-3 py-2 border text-sm">{schedule.startTime ? new Date(schedule.startTime).toLocaleString() : 'N/A'}</td>
-                        <td className="px-3 py-2 border text-sm">{schedule.endTime ? new Date(schedule.endTime).toLocaleString() : 'N/A'}</td>
-                        <td className="px-3 py-2 border text-sm">{duration ? `${duration} min` : 'N/A'}</td>
-                        <td className="px-3 py-2 border text-sm">
-                          <button
-                            className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={() => handleDeleteSchedule(schedule._id)}
-                            disabled={loadingSchedules || isReadOnly}
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+
+                      const hasTeam = !!slot.team;
+                      const teamName = slot.team?.teamName || 'Free Slot';
+                      const supervisorName = slot.team?.guidePreference?.name || '—';
+
+                      if (!hasTeam) {
+                        // FREE SLOT (Green theme)
+                        return (
+                          <td key={pIdx} className="border p-3 bg-green-50/30 border-green-200 text-center align-top transition-colors hover:bg-green-50/50">
+                            <div className="text-[10px] uppercase font-extrabold text-green-700 tracking-wider mb-2">Free Slot</div>
+                            <div className="text-[11px] text-gray-400 mb-3">Supervisor: —</div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSchedule(slot._id, false)}
+                              className="px-3 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 hover:border-red-300 rounded text-[10px] font-bold uppercase transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={isReadOnly}
+                            >
+                              Delete Slot
+                            </button>
+                          </td>
+                        );
+                      } else {
+                        // ASSIGNED/OCCUPIED SLOT (Blue/Indigo theme)
+                        return (
+                          <td key={pIdx} className="border p-3 bg-indigo-50 border-indigo-200 text-center align-top transition-colors hover:bg-indigo-100/30">
+                            <div className="text-[10px] uppercase font-extrabold text-indigo-700 tracking-wider mb-1">Assigned Team</div>
+                            <div className="font-bold text-gray-800 text-sm">{teamName}</div>
+                            <div className="text-[11px] text-indigo-600 mt-1 font-semibold mb-3">Supervisor: {supervisorName}</div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSchedule(slot._id, true, teamName)}
+                              className="px-3 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 hover:border-red-300 rounded text-[10px] font-bold uppercase transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={isReadOnly}
+                            >
+                              Delete Slot
+                            </button>
+                          </td>
+                        );
+                      }
+                    })}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
       </div>
-
     </div>
   );
 };
