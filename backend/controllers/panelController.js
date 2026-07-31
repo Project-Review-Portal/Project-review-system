@@ -688,6 +688,11 @@ exports.generateSlotsForCoordinator = async (req, res) => {
         
         console.log('✅ Found panel for coordinator:', panel._id, panel.name);
 
+        // Find existing schedules for this panel on the specified date (to check for conflicts)
+        const dateOnly = new Date(date);
+        dateOnly.setHours(0, 0, 0, 0);
+        const existingSchedules = await TimeTable.find({ panel: panel._id, date: dateOnly });
+
         // Generate slots
         const slots = [];
         const baseDate = new Date(date);
@@ -701,9 +706,18 @@ exports.generateSlotsForCoordinator = async (req, res) => {
             const slotStart = new Date(current);
             const slotEnd = new Date(current.getTime() + duration * 60000);
             if (slotEnd > end) break;
+
+            // Check if this slot overlaps with any existing schedule for this panel
+            const conflict = existingSchedules.some(exist => {
+                const existStart = new Date(exist.startTime);
+                const existEnd = new Date(exist.endTime);
+                return (slotStart < existEnd && slotEnd > existStart);
+            });
+
             slots.push({
                 start: slotStart,
-                end: slotEnd
+                end: slotEnd,
+                hasConflict: conflict
             });
             current = slotEnd;
         }
@@ -738,6 +752,33 @@ exports.saveFreeSlotsForCoordinator = async (req, res) => {
 
         if (!slots || !Array.isArray(slots) || slots.length === 0) {
             return res.status(400).json({ message: 'No slots provided to save.' });
+        }
+
+        // Fetch existing schedules for conflict validation
+        let targetDate = null;
+        if (providedDate) {
+            targetDate = new Date(providedDate);
+        } else if (slots[0] && slots[0].start) {
+            targetDate = new Date(slots[0].start);
+        }
+        
+        if (targetDate && !isNaN(targetDate.getTime())) {
+            const dateOnly = new Date(targetDate);
+            dateOnly.setHours(0, 0, 0, 0);
+            const existingSchedules = await TimeTable.find({ panel: panel._id, date: dateOnly });
+
+            for (const slot of slots) {
+                const startD = new Date(slot.start);
+                const endD = new Date(slot.end);
+                const hasConflict = existingSchedules.some(exist => {
+                    const existStart = new Date(exist.startTime);
+                    const existEnd = new Date(exist.endTime);
+                    return (startD < existEnd && endD > existStart);
+                });
+                if (hasConflict) {
+                    return res.status(409).json({ message: 'Error: One or more slots overlap with already existing slots.' });
+                }
+            }
         }
 
         // Create free schedules

@@ -6,13 +6,14 @@ const DURATION_OPTIONS = [10, 15, 20, 25, 30];
 const CoordinatorReviewSchedule = () => {
   const [user, setUser] = useState(null);
   const [reviewTypes, setReviewTypes] = useState([
+    { value: 'review0', label: 'Review 0' },
     { value: 'review1', label: 'Review 1' },
     { value: 'review2', label: 'Review 2' },
     { value: 'review3', label: 'Review 3' },
   ]);
-  const [slotTypes, setSlotTypes] = useState(['review1', 'review2', 'review3', 'viva']);
+  const [slotTypes, setSlotTypes] = useState(['review0', 'review1', 'review2', 'review3', 'viva']);
   const [form, setForm] = useState({
-    reviewType: 'review1',
+    reviewType: 'review0',
     date: '',
     startTime: '',
     endTime: '',
@@ -26,7 +27,7 @@ const CoordinatorReviewSchedule = () => {
   const [step, setStep] = useState(1); // 1: form, 2: preview
   const [allottedSchedules, setAllottedSchedules] = useState([]);
   const [loadingSchedules, setLoadingSchedules] = useState(false);
-  const [selectedSlotType, setSelectedSlotType] = useState('review1');
+  const [selectedSlotType, setSelectedSlotType] = useState('review0');
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -42,7 +43,7 @@ const CoordinatorReviewSchedule = () => {
       const settingsRes = await axios.get(`${SERVER_API_KEY}/api/auth/review-settings`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const validSlots = settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva'];
+      const validSlots = settingsRes.data.validSlotTypes || ['review0', 'review1', 'review2', 'review3', 'viva'];
       setSlotTypes(validSlots);
       
       const generatedTypes = validSlots.map(slot => ({
@@ -290,65 +291,24 @@ const CoordinatorReviewSchedule = () => {
   // Filter slots by selected slotType (review1, review2, review3, viva)
   const filteredSlots = allottedSchedules.filter(s => s.slotType === selectedSlotType);
 
-  // Compute unique date/session rows
-  const rowMap = new Map();
+  // Group slots by Date only (normalized string)
+  const dateGroupsMap = new Map();
   filteredSlots.forEach(s => {
-    const dateObj = new Date(s.date);
-    const startObj = new Date(s.startTime);
-    const isFN = startObj.getHours() < 12;
-    const session = isFN ? 'FN' : 'AN';
+    const d = new Date(s.date);
+    const dateKey = d.toISOString().split('T')[0]; // YYYY-MM-DD
     
-    const dateString = dateObj.toISOString().split('T')[0];
-    const key = `${dateString}_${session}`;
-    
-    if (!rowMap.has(key)) {
-      const dateStrLabel = dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-      const dayStrLabel = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
-      rowMap.set(key, {
-        key,
-        dateString,
-        session,
-        label: `${dateStrLabel} (${dayStrLabel})`,
-        day: dayStrLabel,
-        dateVal: dateObj
+    if (!dateGroupsMap.has(dateKey)) {
+      dateGroupsMap.set(dateKey, {
+        dateKey,
+        dateVal: d,
+        slots: []
       });
     }
+    dateGroupsMap.get(dateKey).slots.push(s);
   });
 
-  const sortedRows = Array.from(rowMap.values()).sort((a, b) => {
-    const diff = a.dateVal - b.dateVal;
-    if (diff !== 0) return diff;
-    return a.session === 'FN' ? -1 : 1;
-  });
-
-  // Compute unique periods (columns)
-  const periodMap = new Map();
-  filteredSlots.forEach(s => {
-    const label = formatPeriodLabel(s.startTime, s.endTime);
-    const startD = new Date(s.startTime);
-    const minutes = startD.getHours() * 60 + startD.getMinutes();
-    if (!periodMap.has(label)) {
-      periodMap.set(label, minutes);
-    }
-  });
-
-  const sortedPeriods = Array.from(periodMap.keys()).sort((a, b) => periodMap.get(a) - periodMap.get(b));
-
-  // Find slot for a row and period
-  const findSlot = (row, period) => {
-    return filteredSlots.find(s => {
-      const dObj = new Date(s.date);
-      const sObj = new Date(s.startTime);
-      const dateString = dObj.toISOString().split('T')[0];
-      const isFN = sObj.getHours() < 12;
-      const session = isFN ? 'FN' : 'AN';
-      
-      const slotRowKey = `${dateString}_${session}`;
-      const slotPeriod = formatPeriodLabel(s.startTime, s.endTime);
-      
-      return slotRowKey === row.key && slotPeriod === period;
-    });
-  };
+  // Sort dates chronologically
+  const sortedDates = Array.from(dateGroupsMap.values()).sort((a, b) => a.dateVal - b.dateVal);
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md max-w-7xl mx-auto w-full">
@@ -412,24 +372,48 @@ const CoordinatorReviewSchedule = () => {
               ⚠️ {extraMinutesMessage}
             </div>
           )}
-          <div className="border rounded divide-y max-h-60 overflow-y-auto">
+          
+          {/* Conflict warning */}
+          {slots.some(s => s.hasConflict) && (
+            <div className="p-3 bg-red-50 text-red-800 border border-red-200 rounded text-sm font-semibold">
+              ⚠️ already slots are present in that time duration
+            </div>
+          )}
+
+          <div className="border rounded divide-y max-h-60 overflow-y-auto bg-white">
             {slots.map((slot, sidx) => {
               const start = new Date(slot.start);
               const end = new Date(slot.end);
               const slotStr = `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
               return (
-                <div key={sidx} className="p-3 flex justify-between items-center bg-gray-50">
-                  <span className="font-medium text-sm text-gray-700">Slot {sidx + 1}</span>
-                  <span className="text-sm text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded font-semibold">{slotStr}</span>
+                <div key={sidx} className={`p-3 flex justify-between items-center ${slot.hasConflict ? 'bg-red-50/50 border-l-4 border-red-500' : 'bg-gray-50'}`}>
+                  <div className="flex flex-col">
+                    <span className="font-medium text-sm text-gray-700">Slot {sidx + 1}</span>
+                    {slot.hasConflict && (
+                      <span className="text-[10px] text-red-600 font-bold uppercase mt-0.5">Time Conflict</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded font-semibold">{slotStr}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSlots(prev => prev.filter((_, i) => i !== sidx))}
+                      className="text-red-500 hover:text-red-700 font-bold px-1.5 py-0.5 border border-transparent hover:border-red-200 rounded transition"
+                      title="Remove Slot from generation"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
               );
             })}
           </div>
           <div className="flex gap-3">
             <button
-              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 font-semibold disabled:bg-indigo-300"
+              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 font-semibold disabled:bg-indigo-300 disabled:cursor-not-allowed"
               onClick={handleSaveFreeSlots}
-              disabled={loading || slots.length === 0}
+              disabled={loading || slots.length === 0 || slots.some(s => s.hasConflict)}
+              title={slots.some(s => s.hasConflict) ? 'remove slots that has conflicts with exisiting ones' : 'Save generated slots'}
             >
               {loading ? 'Saving...' : 'Save Slots'}
             </button>
@@ -454,14 +438,14 @@ const CoordinatorReviewSchedule = () => {
           
           {/* Slot Type Selector */}
           <div className="flex bg-white p-1 rounded-md border shadow-sm">
-            {['review1', 'review2', 'review3', 'viva'].map(type => (
+            {['review0', 'review1', 'review2', 'review3', 'viva'].map(type => (
               <button
                 key={type}
                 type="button"
                 onClick={() => { setSelectedSlotType(type); setError(''); setMessage(''); }}
                 className={`px-3 py-1.5 rounded text-xs font-bold uppercase transition tracking-wider ${selectedSlotType === type ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
               >
-                {type === 'viva' ? 'Viva' : `Review ${type.replace('review', '')}`}
+                {type === 'viva' ? 'Viva' : type === 'review0' ? 'Review 0' : `Review ${type.replace('review', '')}`}
               </button>
             ))}
           </div>
@@ -474,81 +458,113 @@ const CoordinatorReviewSchedule = () => {
             No slots have been set for this review type yet.
           </div>
         ) : (
-          <div className="overflow-x-auto border rounded-lg shadow-sm bg-white">
-            <table className="w-full border-collapse text-left text-sm bg-white">
-              <thead>
-                <tr className="bg-indigo-600 text-white">
-                  <th className="border p-3 text-sm font-bold w-48 tracking-wider uppercase">Date & Session</th>
-                  {sortedPeriods.map((period, pIdx) => (
-                    <th key={pIdx} className="border p-3 text-center text-sm font-bold min-w-[200px] tracking-wider">
-                      {period}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {sortedRows.map((row, rIdx) => (
-                  <tr key={rIdx} className="hover:bg-gray-50/50 transition-colors">
-                    {/* Left Date column */}
-                    <td className="border p-3 bg-gray-50 align-top">
-                      <div className="font-bold text-gray-800">{row.label}</div>
-                      <span className="inline-block mt-2 text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">{row.session}</span>
-                    </td>
+          <div className="space-y-5">
+            {sortedDates.map(group => {
+              const slotsForDate = [...group.slots].sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+              const hasFN = slotsForDate.some(s => new Date(s.startTime).getHours() < 12);
+              const hasAN = slotsForDate.some(s => new Date(s.startTime).getHours() >= 12);
 
-                    {/* Slots columns */}
-                    {sortedPeriods.map((period, pIdx) => {
-                      const slot = findSlot(row, period);
-                      if (!slot) {
-                        return (
-                          <td key={pIdx} className="border p-3 bg-gray-50/40 text-center text-gray-400 select-none align-middle font-medium italic text-xs">
-                            Not Available
-                          </td>
-                        );
-                      }
+              const chunkArray = (arr, size) => {
+                const chunks = [];
+                for (let i = 0; i < arr.length; i += size) {
+                  chunks.push(arr.slice(i, i + size));
+                }
+                return chunks;
+              };
+              const chunks = chunkArray(slotsForDate, 5);
 
-                      const hasTeam = !!slot.team;
-                      const teamName = slot.team?.teamName || 'Free Slot';
-                      const supervisorName = slot.team?.guidePreference?.name || '—';
+              const dateObj = group.dateVal;
+              const formattedDateLabel = dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+              const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
 
-                      if (!hasTeam) {
-                        // FREE SLOT (Green theme)
-                        return (
-                          <td key={pIdx} className="border p-3 bg-green-50/30 border-green-200 text-center align-top transition-colors hover:bg-green-50/50">
-                            <div className="text-[10px] uppercase font-extrabold text-green-700 tracking-wider mb-2">Free Slot</div>
-                            <div className="text-[11px] text-gray-400 mb-3">Supervisor: —</div>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteSchedule(slot._id, false)}
-                              className="px-3 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 hover:border-red-300 rounded text-[10px] font-bold uppercase transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                              disabled={isReadOnly}
-                            >
-                              Delete Slot
-                            </button>
-                          </td>
-                        );
-                      } else {
-                        // ASSIGNED/OCCUPIED SLOT (Blue/Indigo theme)
-                        return (
-                          <td key={pIdx} className="border p-3 bg-indigo-50 border-indigo-200 text-center align-top transition-colors hover:bg-indigo-100/30">
-                            <div className="text-[10px] uppercase font-extrabold text-indigo-700 tracking-wider mb-1">Assigned Team</div>
-                            <div className="font-bold text-gray-800 text-sm">{teamName}</div>
-                            <div className="text-[11px] text-indigo-600 mt-1 font-semibold mb-3">Supervisor: {supervisorName}</div>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteSchedule(slot._id, true, teamName)}
-                              className="px-3 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 hover:border-red-300 rounded text-[10px] font-bold uppercase transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                              disabled={isReadOnly}
-                            >
-                              Delete Slot
-                            </button>
-                          </td>
-                        );
-                      }
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              return (
+                <div key={group.dateKey} className="flex flex-col md:flex-row gap-4 bg-white p-5 border rounded-lg shadow-sm">
+                  {/* Left Column: Date Box */}
+                  <div className="md:w-48 flex-shrink-0 bg-gray-50 p-4 border rounded-md flex flex-col justify-center items-center text-center">
+                    <div className="font-bold text-gray-800 text-sm">{formattedDateLabel}</div>
+                    <div className="text-xs text-gray-500 font-semibold mt-1">{dayName}</div>
+                    
+                    {/* Session Badges */}
+                    <div className="mt-3 flex gap-1.5 justify-center">
+                      {hasFN && (
+                        <span className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700" title="Forenoon">FN</span>
+                      )}
+                      {hasAN && (
+                        <span className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700" title="Afternoon">AN</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Chunks of Slots */}
+                  <div className="flex-1 space-y-4">
+                    {chunks.map((chunk, chunkIdx) => (
+                      <div key={chunkIdx} className="space-y-1">
+                        {/* Header Row (Periods) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                          {chunk.map((slot, sIdx) => (
+                            <div key={sIdx} className="bg-indigo-600 text-white font-bold text-[10px] text-center py-1.5 px-2 rounded-t uppercase tracking-wider animate-pulse-subtle">
+                              {formatPeriodLabel(slot.startTime, slot.endTime)}
+                            </div>
+                          ))}
+                          {/* Fill remaining empty columns */}
+                          {chunk.length < 5 && Array.from({ length: 5 - chunk.length }).map((_, i) => (
+                            <div key={`empty-hdr-${i}`} className="hidden sm:block"></div>
+                          ))}
+                        </div>
+
+                        {/* Slots Row (Cards) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                          {chunk.map((slot, sIdx) => {
+                            const hasTeam = !!slot.team;
+                            const teamName = slot.team?.teamName || 'Free Slot';
+                            const supervisorName = slot.team?.guidePreference?.name || '—';
+
+                            if (!hasTeam) {
+                              return (
+                                <div key={sIdx} className="border p-3 bg-green-50/30 border-green-200 rounded-b text-center flex flex-col justify-between items-center transition-colors hover:bg-green-50/50 min-h-[105px]">
+                                  <div className="text-[9px] uppercase font-extrabold text-green-700 tracking-wider">Free Slot</div>
+                                  <div className="text-[10px] text-gray-400 my-1">Supervisor: —</div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSchedule(slot._id, false)}
+                                    className="px-2.5 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 hover:border-red-300 rounded text-[9px] font-bold uppercase transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed w-full"
+                                    disabled={isReadOnly}
+                                  >
+                                    Delete Slot
+                                  </button>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div key={sIdx} className="border p-3 bg-indigo-50 border-indigo-200 rounded-b text-center flex flex-col justify-between items-center transition-colors hover:bg-indigo-100/30 min-h-[105px]">
+                                  <div>
+                                    <div className="text-[9px] uppercase font-extrabold text-indigo-700 tracking-wider">Assigned Team</div>
+                                    <div className="font-bold text-gray-800 text-xs mt-0.5 truncate max-w-full" title={teamName}>{teamName}</div>
+                                    <div className="text-[9px] text-indigo-600 font-semibold truncate max-w-full" title={`Supervisor: ${supervisorName}`}>Supervisor: {supervisorName}</div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSchedule(slot._id, true, teamName)}
+                                    className="mt-2 px-2.5 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 hover:border-red-300 rounded text-[9px] font-bold uppercase transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed w-full"
+                                    disabled={isReadOnly}
+                                  >
+                                    Delete Slot
+                                  </button>
+                                </div>
+                              );
+                            }
+                          })}
+                          {/* Fill remaining empty columns */}
+                          {chunk.length < 5 && Array.from({ length: 5 - chunk.length }).map((_, i) => (
+                            <div key={`empty-card-${i}`} className="hidden sm:block"></div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

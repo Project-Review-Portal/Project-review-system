@@ -8,7 +8,7 @@ const GuideReview = () => {
     const [selectedPanel, setSelectedPanel] = useState(null);
     const [slots, setSlots] = useState([]);
     const [myTeams, setMyTeams] = useState([]);
-    const [selectedSlotType, setSelectedSlotType] = useState('review1');
+    const [selectedSlotType, setSelectedSlotType] = useState('review0');
     const [modifiedAssignments, setModifiedAssignments] = useState({});
     const [loading, setLoading] = useState(true);
     const [loadingSlots, setLoadingSlots] = useState(false);
@@ -125,68 +125,27 @@ const GuideReview = () => {
         return `${formatTime(s)} to ${formatTime(e)}`;
     };
 
-    // Filter slots by selected slotType (review1, review2, viva)
+    // Filter slots by selected slotType (review1, review2, review3, viva)
     const filteredSlots = slots.filter(s => s.slotType === selectedSlotType);
 
-    // Compute unique date/session rows
-    const rowMap = new Map();
+    // Group slots by Date only (normalized string)
+    const dateGroupsMap = new Map();
     filteredSlots.forEach(s => {
-        const dateObj = new Date(s.date);
-        const startObj = new Date(s.startTime);
-        const isFN = startObj.getHours() < 12;
-        const session = isFN ? 'FN' : 'AN';
+        const d = new Date(s.date);
+        const dateKey = d.toISOString().split('T')[0]; // YYYY-MM-DD
         
-        const dateString = dateObj.toISOString().split('T')[0];
-        const key = `${dateString}_${session}`;
-        
-        if (!rowMap.has(key)) {
-            const dateStrLabel = dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-            const dayStrLabel = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
-            rowMap.set(key, {
-                key,
-                dateString,
-                session,
-                label: `${dateStrLabel} (${dayStrLabel})`,
-                day: dayStrLabel,
-                dateVal: dateObj
+        if (!dateGroupsMap.has(dateKey)) {
+            dateGroupsMap.set(dateKey, {
+                dateKey,
+                dateVal: d,
+                slots: []
             });
         }
+        dateGroupsMap.get(dateKey).slots.push(s);
     });
 
-    const sortedRows = Array.from(rowMap.values()).sort((a, b) => {
-        const diff = a.dateVal - b.dateVal;
-        if (diff !== 0) return diff;
-        return a.session === 'FN' ? -1 : 1;
-    });
-
-    // Compute unique periods (columns)
-    const periodMap = new Map();
-    filteredSlots.forEach(s => {
-        const label = formatPeriodLabel(s.startTime, s.endTime);
-        const startD = new Date(s.startTime);
-        const minutes = startD.getHours() * 60 + startD.getMinutes();
-        if (!periodMap.has(label)) {
-            periodMap.set(label, minutes);
-        }
-    });
-
-    const sortedPeriods = Array.from(periodMap.keys()).sort((a, b) => periodMap.get(a) - periodMap.get(b));
-
-    // Find slot for a row and period
-    const findSlot = (row, period) => {
-        return filteredSlots.find(s => {
-            const dObj = new Date(s.date);
-            const sObj = new Date(s.startTime);
-            const dateString = dObj.toISOString().split('T')[0];
-            const isFN = sObj.getHours() < 12;
-            const session = isFN ? 'FN' : 'AN';
-            
-            const slotRowKey = `${dateString}_${session}`;
-            const slotPeriod = formatPeriodLabel(s.startTime, s.endTime);
-            
-            return slotRowKey === row.key && slotPeriod === period;
-        });
-    };
+    // Sort dates chronologically
+    const sortedDates = Array.from(dateGroupsMap.values()).sort((a, b) => a.dateVal - b.dateVal);
 
     // Calculate currently assigned team IDs across all slots of this type
     const assignedTeamIds = new Set();
@@ -260,13 +219,13 @@ const GuideReview = () => {
                         
                         {/* Slot Type Selector */}
                         <div className="flex bg-gray-100 p-1 rounded-md">
-                            {['review1', 'review2', 'review3', 'viva'].map(type => (
+                            {['review0', 'review1', 'review2', 'review3', 'viva'].map(type => (
                                 <button
                                     key={type}
                                     onClick={() => { setSelectedSlotType(type); setModifiedAssignments({}); setError(null); setSuccessMessage(''); }}
                                     className={`px-3 py-1.5 rounded text-xs font-bold uppercase transition tracking-wider ${selectedSlotType === type ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}
                                 >
-                                    {type === 'viva' ? 'Viva' : `Review ${type.replace('review', '')}`}
+                                    {type === 'viva' ? 'Viva' : type === 'review0' ? 'Review 0' : `Review ${type.replace('review', '')}`}
                                 </button>
                             ))}
                         </div>
@@ -283,112 +242,143 @@ const GuideReview = () => {
                         </div>
                     ) : (
                         <div>
-                            <div className="overflow-x-auto border rounded-lg shadow-sm">
-                                <table className="w-full border-collapse text-left text-sm bg-white">
-                                    <thead>
-                                        <tr className="bg-indigo-600 text-white">
-                                            <th className="border p-3 text-sm font-bold w-48 tracking-wider uppercase">Date & Session</th>
-                                            {sortedPeriods.map((period, pIdx) => (
-                                                <th key={pIdx} className="border p-3 text-center text-sm font-bold min-w-[200px] tracking-wider">
-                                                    {period}
-                                                </th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200">
-                                        {sortedRows.map((row, rIdx) => (
-                                            <tr key={rIdx} className="hover:bg-gray-50/50 transition-colors">
-                                                {/* Left Date column */}
-                                                <td className="border p-3 bg-gray-50 align-top">
-                                                    <div className="font-bold text-gray-800">{row.label}</div>
-                                                    <span className="inline-block mt-2 text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">{row.session}</span>
-                                                </td>
+                            <div className="space-y-5">
+                                {sortedDates.map(group => {
+                                    const slotsForDate = [...group.slots].sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+                                    const hasFN = slotsForDate.some(s => new Date(s.startTime).getHours() < 12);
+                                    const hasAN = slotsForDate.some(s => new Date(s.startTime).getHours() >= 12);
 
-                                                {/* Slots columns */}
-                                                {sortedPeriods.map((period, pIdx) => {
-                                                    const slot = findSlot(row, period);
-                                                    if (!slot) {
-                                                        return (
-                                                            <td key={pIdx} className="border p-3 bg-gray-50/40 text-center text-gray-400 select-none align-middle font-medium italic text-xs">
-                                                                Not Available
-                                                            </td>
-                                                        );
-                                                    }
+                                    const chunkArray = (arr, size) => {
+                                        const chunks = [];
+                                        for (let i = 0; i < arr.length; i += size) {
+                                            chunks.push(arr.slice(i, i + size));
+                                        }
+                                        return chunks;
+                                    };
+                                    const chunks = chunkArray(slotsForDate, 5);
 
-                                                    const currentTeamId = modifiedAssignments[slot._id] !== undefined ? modifiedAssignments[slot._id] : (slot.team?._id?.toString() || null);
-                                                    const isAssigned = !!currentTeamId;
-                                                    const isMyTeam = isAssigned && (
-                                                        myTeams.some(t => t._id?.toString() === currentTeamId?.toString()) ||
-                                                        (slot.team?.guidePreference?._id?.toString() === guideUser?._id?.toString())
-                                                    );
+                                    const dateObj = group.dateVal;
+                                    const formattedDateLabel = dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+                                    const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
 
-                                                    if (!isAssigned) {
-                                                        // FREE SLOT (Green border, selection dropdown)
-                                                        return (
-                                                            <td key={pIdx} className="border p-3 bg-green-50/30 border-green-200 text-center align-top transition-colors hover:bg-green-50/50">
-                                                                <div className="text-[10px] uppercase font-extrabold text-green-700 tracking-wider mb-2">Free Slot</div>
-                                                                <select
-                                                                    value=""
-                                                                    onChange={(e) => {
-                                                                        const val = e.target.value;
-                                                                        if (val) {
-                                                                            setModifiedAssignments(prev => ({
-                                                                                ...prev,
-                                                                                [slot._id]: val
-                                                                            }));
-                                                                        }
-                                                                    }}
-                                                                    className="w-full border border-green-300 rounded px-2 py-1 text-xs bg-white text-gray-800 font-medium cursor-pointer shadow-sm hover:border-green-400 focus:outline-none"
-                                                                >
-                                                                    <option value="">-- Assign Team --</option>
-                                                                    {myTeams
-                                                                        .filter(t => !assignedTeamIds.has(t._id?.toString()))
-                                                                        .map(t => (
-                                                                            <option key={t._id} value={t._id}>{t.teamName}</option>
-                                                                        ))
-                                                                    }
-                                                                </select>
-                                                                <div className="text-[11px] text-gray-400 mt-2">Supervisor: —</div>
-                                                            </td>
-                                                        );
-                                                    } else if (isMyTeam) {
-                                                        // MY TEAM ASSIGNED (Indigo / Blue border, show team and unassign)
-                                                        const teamObj = myTeams.find(t => t._id === currentTeamId) || slot.team;
-                                                        return (
-                                                            <td key={pIdx} className="border p-3 bg-indigo-50 border-indigo-200 text-center align-top transition-colors hover:bg-indigo-100/30">
-                                                                <div className="text-[10px] uppercase font-extrabold text-indigo-700 tracking-wider mb-1">My Team Assigned</div>
-                                                                <div className="font-bold text-gray-800 text-sm">{teamObj?.teamName}</div>
-                                                                <div className="text-[11px] text-indigo-600 mt-1 font-semibold">Supervisor: {guideUser?.name || 'You'}</div>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setModifiedAssignments(prev => ({
-                                                                            ...prev,
-                                                                            [slot._id]: null // mark as cleared
-                                                                        }));
-                                                                    }}
-                                                                    className="mt-3 px-2 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 hover:border-red-300 rounded text-[10px] font-bold uppercase transition shadow-sm"
-                                                                >
-                                                                    Unassign
-                                                                </button>
-                                                            </td>
-                                                        );
-                                                    } else {
-                                                        // OCCUPIED BY ANOTHER GUIDE (Red border, read-only)
-                                                        const teamName = slot.team?.teamName || 'N/A';
-                                                        const otherGuideName = slot.team?.guidePreference?.name || 'N/A';
-                                                        return (
-                                                            <td key={pIdx} className="border p-3 bg-red-50/20 border-red-100 text-center text-red-800 select-none align-top">
-                                                                <div className="text-[10px] uppercase font-extrabold text-red-500 tracking-wider mb-1">Occupied</div>
-                                                                <div className="font-bold text-gray-700 text-sm">{teamName}</div>
-                                                                <div className="text-[11px] text-gray-500 mt-1">Supervisor: {otherGuideName}</div>
-                                                            </td>
-                                                        );
-                                                    }
-                                                })}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                    return (
+                                        <div key={group.dateKey} className="flex flex-col md:flex-row gap-4 bg-white p-5 border rounded-lg shadow-sm">
+                                            {/* Left Column: Date Box */}
+                                            <div className="md:w-48 flex-shrink-0 bg-gray-50 p-4 border rounded-md flex flex-col justify-center items-center text-center">
+                                                <div className="font-bold text-gray-800 text-sm">{formattedDateLabel}</div>
+                                                <div className="text-xs text-gray-500 font-semibold mt-1">{dayName}</div>
+                                                
+                                                {/* Session Badges */}
+                                                <div className="mt-3 flex gap-1.5 justify-center">
+                                                    {hasFN && (
+                                                        <span className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700" title="Forenoon">FN</span>
+                                                    )}
+                                                    {hasAN && (
+                                                        <span className="text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700" title="Afternoon">AN</span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Right Column: Chunks of Slots */}
+                                            <div className="flex-1 space-y-4">
+                                                {chunks.map((chunk, chunkIdx) => (
+                                                    <div key={chunkIdx} className="space-y-1">
+                                                        {/* Header Row (Periods) */}
+                                                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                                                            {chunk.map((slot, sIdx) => (
+                                                                <div key={sIdx} className="bg-indigo-600 text-white font-bold text-[10px] text-center py-1.5 px-2 rounded-t uppercase tracking-wider">
+                                                                    {formatPeriodLabel(slot.startTime, slot.endTime)}
+                                                                </div>
+                                                            ))}
+                                                            {/* Fill remaining empty columns */}
+                                                            {chunk.length < 5 && Array.from({ length: 5 - chunk.length }).map((_, i) => (
+                                                                <div key={`empty-hdr-${i}`} className="hidden sm:block"></div>
+                                                            ))}
+                                                        </div>
+
+                                                        {/* Slots Row (Cards) */}
+                                                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                                                            {chunk.map((slot, sIdx) => {
+                                                                const currentTeamId = modifiedAssignments[slot._id] !== undefined ? modifiedAssignments[slot._id] : (slot.team?._id?.toString() || null);
+                                                                const isAssigned = !!currentTeamId;
+                                                                const isMyTeam = isAssigned && (
+                                                                    myTeams.some(t => t._id?.toString() === currentTeamId?.toString()) ||
+                                                                    (slot.team?.guidePreference?._id?.toString() === guideUser?._id?.toString())
+                                                                );
+
+                                                                if (!isAssigned) {
+                                                                    return (
+                                                                        <div key={sIdx} className="border p-3 bg-green-50/30 border-green-200 rounded-b text-center flex flex-col justify-between items-center transition-colors hover:bg-green-50/50 min-h-[105px]">
+                                                                            <div className="text-[9px] uppercase font-extrabold text-green-700 tracking-wider mb-2">Free Slot</div>
+                                                                            <select
+                                                                                value=""
+                                                                                onChange={(e) => {
+                                                                                    const val = e.target.value;
+                                                                                    if (val) {
+                                                                                        setModifiedAssignments(prev => ({
+                                                                                            ...prev,
+                                                                                            [slot._id]: val
+                                                                                        }));
+                                                                                    }
+                                                                                }}
+                                                                                className="w-full border border-green-300 rounded px-2 py-1 text-xs bg-white text-gray-800 font-medium cursor-pointer shadow-sm hover:border-green-400 focus:outline-none"
+                                                                            >
+                                                                                <option value="">-- Assign Team --</option>
+                                                                                {myTeams
+                                                                                    .filter(t => !assignedTeamIds.has(t._id?.toString()))
+                                                                                    .map(t => (
+                                                                                        <option key={t._id} value={t._id}>{t.teamName}</option>
+                                                                                    ))
+                                                                                }
+                                                                            </select>
+                                                                            <div className="text-[10px] text-gray-400 mt-2">Supervisor: —</div>
+                                                                        </div>
+                                                                    );
+                                                                } else if (isMyTeam) {
+                                                                    const teamObj = myTeams.find(t => t._id === currentTeamId) || slot.team;
+                                                                    return (
+                                                                        <div key={sIdx} className="border p-3 bg-indigo-50 border-indigo-200 rounded-b text-center flex flex-col justify-between items-center transition-colors hover:bg-indigo-100/30 min-h-[105px]">
+                                                                            <div>
+                                                                                <div className="text-[9px] uppercase font-extrabold text-indigo-700 tracking-wider">My Team Assigned</div>
+                                                                                <div className="font-bold text-gray-800 text-xs truncate max-w-full" title={teamObj?.teamName}>{teamObj?.teamName}</div>
+                                                                                <div className="text-[9px] text-indigo-600 font-semibold truncate max-w-full" title={`Supervisor: ${guideUser?.name || 'You'}`}>Supervisor: {guideUser?.name || 'You'}</div>
+                                                                            </div>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setModifiedAssignments(prev => ({
+                                                                                        ...prev,
+                                                                                        [slot._id]: null // mark as cleared
+                                                                                    }));
+                                                                                }}
+                                                                                className="mt-2 px-2.5 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 hover:border-red-300 rounded text-[9px] font-bold uppercase transition shadow-sm w-full"
+                                                                            >
+                                                                                Unassign
+                                                                            </button>
+                                                                        </div>
+                                                                    );
+                                                                } else {
+                                                                    const teamName = slot.team?.teamName || 'N/A';
+                                                                    const otherGuideName = slot.team?.guidePreference?.name || 'N/A';
+                                                                    return (
+                                                                        <div key={sIdx} className="border p-3 bg-red-50/20 border-red-100 rounded-b text-center flex flex-col justify-center items-center text-red-800 min-h-[105px]">
+                                                                            <div className="text-[9px] uppercase font-extrabold text-red-500 tracking-wider mb-1">Occupied</div>
+                                                                            <div className="font-bold text-gray-700 text-xs truncate max-w-full" title={teamName}>{teamName}</div>
+                                                                            <div className="text-[9px] text-gray-500 mt-1 truncate max-w-full" title={`Supervisor: ${otherGuideName}`}>Supervisor: {otherGuideName}</div>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                            })}
+                                                            {/* Fill remaining empty columns */}
+                                                            {chunk.length < 5 && Array.from({ length: 5 - chunk.length }).map((_, i) => (
+                                                                <div key={`empty-card-${i}`} className="hidden sm:block"></div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
 
                             {/* Batch Action Buttons */}
