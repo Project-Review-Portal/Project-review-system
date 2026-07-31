@@ -16,6 +16,16 @@ const normalizeProgramme = (prog) => {
     }
     return clean;
 };
+
+const programmeQueryFilter = (prog) => {
+    if (!prog) return undefined;
+    const clean = String(prog).trim();
+    if (clean.toLowerCase() === 'ug' || clean === 'B.E COMPUTER SCIENCE AND ENGINEERING' || clean === 'B.E. CSE') {
+        return { $in: ['B.E. CSE', 'UG', 'B.E COMPUTER SCIENCE AND ENGINEERING'] };
+    }
+    return clean;
+};
+
 exports.getAllPanels = async (req, res) => {
     try {
         // Support filtering by panelType query param
@@ -24,7 +34,10 @@ exports.getAllPanels = async (req, res) => {
             filter.panelType = req.query.panelType;
         }
         if (req.query.programme) {
-            filter.programme = req.query.programme;
+            const progFilter = programmeQueryFilter(req.query.programme);
+            if (progFilter) {
+                filter.programme = progFilter;
+            }
         }
 
         // 1. Fetch panels and fully populate relational documents
@@ -159,7 +172,7 @@ exports.createPanel = async (req, res) => {
 exports.updatePanel = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, members, coordinator, assistantCoordinators } = req.body;
+        const { name, members, coordinator, assistantCoordinators, programme } = req.body;
         console.log('Received members for updatePanel:', members);
         console.log('Received coordinator for updatePanel:', coordinator);
         console.log('Received assistantCoordinators for updatePanel:', assistantCoordinators);
@@ -184,6 +197,9 @@ exports.updatePanel = async (req, res) => {
         }
         if (assistantCoordinators !== undefined) {
             panel.assistantCoordinators = assistantCoordinators;
+        }
+        if (programme !== undefined) {
+            panel.programme = normalizeProgramme(programme);
         }
         await panel.save();
 
