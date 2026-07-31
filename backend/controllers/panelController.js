@@ -694,29 +694,12 @@ exports.generateSlotsForCoordinator = async (req, res) => {
 
         // Find the coordinator's panel
         const coordinatorId = req.user.id;
-        const selectedProgramme = req.headers['x-selected-programme'] || req.headers['programme'] || req.user.programme;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
         const programme = normalizeProgramme(selectedProgramme);
-        
-        let panel = await Panel.findOne({
-            $or: [
-                { coordinator: coordinatorId },
-                { assistantCoordinators: coordinatorId }
-            ],
-            programme
-        });
-
-        if (!panel) {
-            panel = await Panel.findOne({
-                $or: [
-                    { coordinator: coordinatorId },
-                    { assistantCoordinators: coordinatorId }
-                ]
-            });
-        }
-
+        const panel = await Panel.findOne({ coordinator: coordinatorId, programme });
         if (!panel) {
             console.log('❌ No panel found for coordinator:', coordinatorId, 'programme:', programme);
-            return res.status(404).json({ message: `No panel found assigned to your account as coordinator.` });
+            return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
         }
         
         console.log('✅ Found panel for coordinator:', panel._id, panel.name);
@@ -762,28 +745,11 @@ exports.saveFreeSlotsForCoordinator = async (req, res) => {
         const { slotType, slots, date: providedDate } = req.body;
         // slots: [{ start, end }]
         const coordinatorId = req.user.id;
-        const selectedProgramme = req.headers['x-selected-programme'] || req.headers['programme'] || req.user.programme;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
         const programme = normalizeProgramme(selectedProgramme);
-        
-        let panel = await Panel.findOne({
-            $or: [
-                { coordinator: coordinatorId },
-                { assistantCoordinators: coordinatorId }
-            ],
-            programme
-        });
-
+        const panel = await Panel.findOne({ coordinator: coordinatorId, programme });
         if (!panel) {
-            panel = await Panel.findOne({
-                $or: [
-                    { coordinator: coordinatorId },
-                    { assistantCoordinators: coordinatorId }
-                ]
-            });
-        }
-
-        if (!panel) {
-            return res.status(404).json({ message: `No panel found assigned to your account as coordinator.` });
+            return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
         }
 
         if (!slots || !Array.isArray(slots) || slots.length === 0) {
@@ -854,28 +820,11 @@ exports.assignSlotsForCoordinator = async (req, res) => {
         const { slotType, assignments, date: providedDate } = req.body;
         // assignments: [{ teamId, slot: { start, end } }]
         const coordinatorId = req.user.id;
-        const selectedProgramme = req.headers['x-selected-programme'] || req.headers['programme'] || req.user.programme;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
         const programme = normalizeProgramme(selectedProgramme);
-        
-        let panel = await Panel.findOne({
-            $or: [
-                { coordinator: coordinatorId },
-                { assistantCoordinators: coordinatorId }
-            ],
-            programme
-        });
-
+        const panel = await Panel.findOne({ coordinator: coordinatorId, programme });
         if (!panel) {
-            panel = await Panel.findOne({
-                $or: [
-                    { coordinator: coordinatorId },
-                    { assistantCoordinators: coordinatorId }
-                ]
-            });
-        }
-
-        if (!panel) {
-            return res.status(404).json({ message: `No panel found assigned to your account as coordinator.` });
+            return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
         }
         
         const teamIds = assignments.map(a => a.teamId);
