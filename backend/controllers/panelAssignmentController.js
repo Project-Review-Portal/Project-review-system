@@ -211,19 +211,18 @@ exports.getAvailablePanelsForTeam = async (req, res) => {
             .populate('members', 'username name _id')
             .populate('coordinator', 'username name _id');
         
-        // Filter panels to exclude those with conflicts and filter out viva panels
+        // Filter panels to exclude those with conflicts
         const availablePanels = allPanels.filter(panel => {
-            if (panel.panelType === 'viva') return false;
-            if (!team.guidePreference || !team.guidePreference._id) return true;
-            
-            const guideIdStr = team.guidePreference._id.toString();
-            const guideInPanel = Array.isArray(panel.members) && panel.members.some(member => 
-                member && member._id && member._id.toString() === guideIdStr
+            // Check if team's guide is in the panel
+            const guideInPanel = panel.members.some(member => 
+                member._id.toString() === team.guidePreference._id.toString()
             );
             
-            const guideIsCoordinator = panel.coordinator && panel.coordinator._id && 
-                panel.coordinator._id.toString() === guideIdStr;
+            // Check if team's guide is the panel coordinator
+            const guideIsCoordinator = panel.coordinator && 
+                panel.coordinator._id.toString() === team.guidePreference._id.toString();
             
+            // Panel is available if guide is not in panel and not coordinator
             return !guideInPanel && !guideIsCoordinator;
         });
         
@@ -255,6 +254,7 @@ exports.assignPanelToTeam = async (req, res) => {
         if(isSamePanel){
             return res.status(404).json({ message: 'Assingning the same panel '})
         }
+        // console.log({teampanel : team.panel, type : typeof(team.panel), panelId, isSamePanel})
 
         // Validate panel exists
         const panel = await Panel.findById(panelId)
@@ -266,15 +266,12 @@ exports.assignPanelToTeam = async (req, res) => {
         }
         
         // Check for conflicts
-        const hasGuide = team.guidePreference && team.guidePreference._id;
-        const guideIdStr = hasGuide ? team.guidePreference._id.toString() : null;
-
-        const guideInPanel = hasGuide && Array.isArray(panel.members) && panel.members.some(member => 
-            member && member._id && member._id.toString() === guideIdStr
+        const guideInPanel = panel.members.some(member => 
+            member._id.toString() === team.guidePreference._id.toString()
         );
         
-        const guideIsCoordinator = hasGuide && panel.coordinator && panel.coordinator._id && 
-            panel.coordinator._id.toString() === guideIdStr;
+        const guideIsCoordinator = panel.coordinator && 
+            panel.coordinator._id.toString() === team.guidePreference._id.toString();
         
         if (guideInPanel || guideIsCoordinator) {
             return res.status(400).json({ 

@@ -2256,21 +2256,17 @@ exports.autoAssignPanels = async (req, res) => {
             panelCounts[p._id.toString()] = count;
         }
 
-        const normProg = (p) => {
-            let prog = (p || 'B.E. CSE').trim().toLowerCase();
-            if (prog === 'ug' || prog === 'b.e computer science and engineering' || prog === 'b.e. cse') return 'b.e. cse';
-            return prog;
-        };
-
         for (const team of teams) {
-            let teamProgramme = normProg(team.programme);
+            let teamProgramme = (team.programme || 'B.E COMPUTER SCIENCE AND ENGINEERING').trim().toLowerCase();
+            if (teamProgramme === 'ug') teamProgramme = 'b.e computer science and engineering';
             const guideId = team.guidePreference ? team.guidePreference._id.toString() : null;
 
             // Check if the currently assigned panel (if any) is valid and programme matches
             const currentPanel = team[teamField];
             let isUnassigned = !currentPanel;
             if (currentPanel) {
-                let currentPanelProg = normProg(currentPanel.programme);
+                let currentPanelProg = (currentPanel.programme || 'B.E COMPUTER SCIENCE AND ENGINEERING').trim().toLowerCase();
+                if (currentPanelProg === 'ug') currentPanelProg = 'b.e computer science and engineering';
                 if (currentPanelProg !== teamProgramme) {
                     isUnassigned = true; // mismatch => treat as unassigned
                 }
@@ -2278,14 +2274,14 @@ exports.autoAssignPanels = async (req, res) => {
 
             if (isUnassigned) {
                 // Filter panels by the team's programme (same logic as the frontend dropdown)
-                let programmePanels = panels.filter(p => normProg(p.programme) === teamProgramme);
+                const programmePanels = panels.filter(p => {
+                    let pProg = (p.programme || 'B.E COMPUTER SCIENCE AND ENGINEERING').trim().toLowerCase();
+                    if (pProg === 'ug') pProg = 'b.e computer science and engineering';
+                    return pProg === teamProgramme;
+                });
 
                 if (programmePanels.length === 0) {
-                    programmePanels = panels; // fallback to all panels if no exact programme match
-                }
-
-                if (programmePanels.length === 0) {
-                    warnings.push(`Warning: No ${typeLabel} found for programme "${team.programme || 'B.E. CSE'}" — Team ${team.teamName} was skipped.`);
+                    warnings.push(`Warning: No ${typeLabel} found for programme "${team.programme || 'B.E COMPUTER SCIENCE AND ENGINEERING'}" — Team ${team.teamName} was skipped.`);
                     continue;
                 }
 
