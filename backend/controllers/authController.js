@@ -8,12 +8,12 @@ const nodemailer = require('nodemailer');
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here-change-in-production';
 
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '465', 10),
+    secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465' || true,
     auth: {
-        user: 'cseceg24@gmail.com',
-        pass: 'gvuvoumzoufcimcp',
+        user: process.env.SMTP_USER || 'cseceg24@gmail.com',
+        pass: process.env.SMTP_PASS || 'gvuvoumzoufcimcp',
     },
 });
 

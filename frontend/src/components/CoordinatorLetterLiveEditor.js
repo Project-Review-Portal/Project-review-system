@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { DocumentEditor } from '@onlyoffice/document-editor-react';
 
 // Update this if you run OnlyOffice Document Server elsewhere
-const DOC_SERVER_URL = 'http://localhost:8080';
+const DOC_SERVER_URL = process.env.REACT_APP_DOC_SERVER_URL || 'http://localhost:8080';
 
 const CoordinatorLetterLiveEditor = () => {
   const [templates, setTemplates] = useState([]);
