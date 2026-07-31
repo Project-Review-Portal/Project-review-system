@@ -36,12 +36,10 @@ const PanelManagement = ({ panelType = 'review', programme }) => {
         setAvailableFacultyForSelection(newAvailable);
     }, [allFaculty, selectedMembersForForm]);
 
-    const fetchData = async (keepMessages = false) => {
+    const fetchData = async () => {
         setLoading(true);
-        if (!keepMessages) {
-            setError('');
-            setMessage('');
-        }
+        setError('');
+        setMessage('');
         try {
             const token = localStorage.getItem('token');
             if (!token) {
@@ -121,17 +119,15 @@ const PanelManagement = ({ panelType = 'review', programme }) => {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
 
-            let successMsg = '';
             if (editingPanelId) {
                 await axios.put(`${SERVER_API_KEY}/api/panels/${editingPanelId}`, panelData, { headers });
-                successMsg = 'Panel updated successfully!';
+                setMessage('Panel updated successfully!');
             } else {
                 await axios.post(`${SERVER_API_KEY}/api/panels`, panelData, { headers });
-                successMsg = 'Panel created successfully!';
+                setMessage('Panel created successfully!');
             }
-            handleClearForm(true);
-            setMessage(successMsg);
-            await fetchData(true);
+            handleClearForm();
+            fetchData();
         } catch (err) {
             console.error('Error saving panel:', err);
             setError(err.response?.data?.message || 'Failed to save panel.');
@@ -161,7 +157,7 @@ const PanelManagement = ({ panelType = 'review', programme }) => {
                 const headers = { Authorization: `Bearer ${token}` };
                 await axios.delete(`${SERVER_API_KEY}/api/panels/${panelId}`, { headers });
                 setMessage('Panel deleted successfully!');
-                fetchData(true);
+                fetchData();
             } catch (err) {
                 console.error('Error deleting panel:', err);
                 setError(err.response?.data?.message || 'Failed to delete panel.');
@@ -169,16 +165,14 @@ const PanelManagement = ({ panelType = 'review', programme }) => {
         }
     };
 
-    const handleClearForm = (keepMessages = false) => {
+    const handleClearForm = () => {
         setEditingPanelId(null);
         setSelectedMembersForForm([]);
         setSelectedCoordinator(null);
         setSelectedAssistantCoordinators([]);
         setShowPanelForm(false);
-        if (!keepMessages) {
-            setError('');
-            setMessage('');
-        }
+        setError('');
+        setMessage('');
     };
 
     if (loading) {

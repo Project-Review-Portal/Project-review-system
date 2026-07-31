@@ -539,16 +539,7 @@ exports.removeGuideFromTeam = async (req, res) => {
 // Get all panels
 exports.getAllPanels = async (req, res) => {
     try {
-        const filter = {};
-        if (req.query.programme) {
-            const clean = String(req.query.programme).trim();
-            if (clean.toLowerCase() === 'ug' || clean === 'B.E COMPUTER SCIENCE AND ENGINEERING' || clean === 'B.E. CSE') {
-                filter.programme = { $in: ['B.E. CSE', 'UG', 'B.E COMPUTER SCIENCE AND ENGINEERING'] };
-            } else {
-                filter.programme = clean;
-            }
-        }
-        const panels = await Panel.find(filter)
+        const panels = await Panel.find()
             .populate('members', 'username name memberType')
             .populate('coordinator', 'username name');
         res.json(panels);
