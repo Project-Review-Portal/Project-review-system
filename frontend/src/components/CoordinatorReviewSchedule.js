@@ -1,26 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-const getApiUrl = () => {
-  if (process.env.REACT_APP_SERVER_API_KEY) return process.env.REACT_APP_SERVER_API_KEY;
-  if (typeof window !== 'undefined' && window.location && window.location.hostname) {
-    return `${window.location.protocol}//${window.location.hostname}:3626`;
-  }
-  return "http://localhost:3626";
-};
-const SERVER_API_KEY = getApiUrl();
-
-const checkIsCoordinator = (u) => {
-  if (!u) return false;
-  if (['coordinator', 'assistant coordinator'].includes(u.role)) return true;
-  if (Array.isArray(u.roles)) {
-    return u.roles.some(r => {
-      const rName = typeof r === 'string' ? r : r?.role;
-      return ['coordinator', 'assistant coordinator'].includes(rName);
-    });
-  }
-  return false;
-};
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const DURATION_OPTIONS = [10, 15, 20, 25, 30];
 
 const CoordinatorReviewSchedule = () => {
@@ -111,7 +91,7 @@ const CoordinatorReviewSchedule = () => {
     setLoading(true);
     
     // Check if user is coordinator before making API call
-    const isCoordinator = checkIsCoordinator(user);
+    const isCoordinator = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
     if (!isCoordinator) {
       setError('You are not a coordinator for any team.');
       setLoading(false);
@@ -141,12 +121,11 @@ const CoordinatorReviewSchedule = () => {
       setExtraMinutesMessage(res.data.extraMinutesMessage || '');
       setStep(2);
     } catch (err) {
-      console.error('Error generating slots:', err);
       if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
         const errorMessages = err.response.data.errors.join('\n');
         setError(`Validation failed:\n${errorMessages}`);
       } else {
-        setError(err.response?.data?.message || err.message || 'Failed to generate slots.');
+        setError(err.response?.data?.message || 'Failed to generate slots.');
       }
     } finally {
       setLoading(false);
@@ -158,7 +137,7 @@ const CoordinatorReviewSchedule = () => {
     setMessage('');
     setLoading(true);
     
-    const isCoordinator = checkIsCoordinator(user);
+    const isCoordinator = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
     if (!isCoordinator) {
       setError('You are not a coordinator for any team.');
       setLoading(false);
@@ -226,7 +205,7 @@ const CoordinatorReviewSchedule = () => {
         setLoadingSchedules(false);
       }
     };
-    const hasCoordinatorRole = checkIsCoordinator(user);
+    const hasCoordinatorRole = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
     if (hasCoordinatorRole) {
       fetchAllottedSchedules();
     }
@@ -261,7 +240,7 @@ const CoordinatorReviewSchedule = () => {
   };
 
   // Check if user has coordinator role in roles array
-  const isCoordinator = checkIsCoordinator(user);
+  const isCoordinator = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
   if (user && !isCoordinator) {
     return (
       <div className="bg-white p-6 rounded-lg shadow text-center">

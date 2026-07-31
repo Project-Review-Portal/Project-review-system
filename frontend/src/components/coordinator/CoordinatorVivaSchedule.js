@@ -1,26 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-const getApiUrl = () => {
-  if (process.env.REACT_APP_SERVER_API_KEY) return process.env.REACT_APP_SERVER_API_KEY;
-  if (typeof window !== 'undefined' && window.location && window.location.hostname) {
-    return `${window.location.protocol}//${window.location.hostname}:3626`;
-  }
-  return "http://localhost:3626";
-};
-const SERVER_API_KEY = getApiUrl();
-
-const checkIsCoordinator = (u) => {
-  if (!u) return false;
-  if (['coordinator', 'assistant coordinator'].includes(u.role)) return true;
-  if (Array.isArray(u.roles)) {
-    return u.roles.some(r => {
-      const rName = typeof r === 'string' ? r : r?.role;
-      return ['coordinator', 'assistant coordinator'].includes(rName);
-    });
-  }
-  return false;
-};
-
+const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626"; 
 const DURATION_OPTIONS = [15, 20, 30, 45, 60];
 
 const CoordinatorVivaSchedule = () => {
@@ -99,7 +79,7 @@ const CoordinatorVivaSchedule = () => {
     setLoading(true);
     
     // Check if user is coordinator before making API call
-    const isCoordinator = checkIsCoordinator(user);
+    const isCoordinator = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
     if (!isCoordinator) {
       setError('You are not a coordinator for any team.');
       setLoading(false);
@@ -155,8 +135,7 @@ const CoordinatorVivaSchedule = () => {
       setScheduleStatus({});
       setStep(2);
     } catch (err) {
-      console.error('Error generating slots:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to generate slots.');
+      setError(err.response?.data?.message || 'Failed to generate slots.');
     } finally {
       setLoading(false);
     }
@@ -176,7 +155,7 @@ const CoordinatorVivaSchedule = () => {
     setLoading(true);
     
     // Check if user is coordinator before making API call
-    const isCoordinator = checkIsCoordinator(user);
+    const isCoordinator = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
     if (!isCoordinator) {
       setError('You are not a coordinator for any team.');
       setLoading(false);
@@ -241,14 +220,14 @@ const CoordinatorVivaSchedule = () => {
         setLoadingSchedules(false);
       }
     };
-    const hasCoordinatorRole = checkIsCoordinator(user);
+    const hasCoordinatorRole = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
     if (hasCoordinatorRole) {
       fetchAllottedSchedules();
     }
   }, [user]);
 
   // Check if user has coordinator role in roles array
-  const isCoordinator = checkIsCoordinator(user);
+  const isCoordinator = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
   if (user && !isCoordinator) {
     return (
       <div className="bg-white p-6 rounded-lg shadow text-center">
