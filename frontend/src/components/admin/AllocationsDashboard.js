@@ -3,6 +3,16 @@ import axios from 'axios';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
+const normalizeProg = (prog) => {
+    if (!prog) return 'B.E. CSE';
+    const clean = String(prog).trim();
+    const lower = clean.toLowerCase();
+    if (lower === 'ug' || lower === 'b.e computer science and engineering' || lower === 'b.e. cse' || lower === 'b.e. computer science and engineering') {
+        return 'B.E. CSE';
+    }
+    return clean;
+};
+
 const AllocationsDashboard = ({ programme }) => {
     const [teams, setTeams] = useState([]);
     const [guides, setGuides] = useState([]);
@@ -49,7 +59,7 @@ const AllocationsDashboard = ({ programme }) => {
             const [teamsRes, facultyRes, panelsRes] = await Promise.all([
                 axios.get(`${SERVER_API_KEY}/api/admin/teams${progParam}`, { headers }),
                 axios.get(`${SERVER_API_KEY}/api/auth/faculty`, { headers }),
-                axios.get(`${SERVER_API_KEY}/api/panels`, { headers })
+                axios.get(`${SERVER_API_KEY}/api/panels${progParam}`, { headers })
             ]);
 
             const allTeams = teamsRes.data || [];
@@ -67,7 +77,7 @@ const AllocationsDashboard = ({ programme }) => {
             // Initialize allocations state - validate references against available dropdown options
             const initAllocations = {};
             allTeams.forEach(team => {
-                const teamProg = (team.programme || 'UG').trim().toLowerCase();
+                const teamProg = normalizeProg(team.programme || programme);
                 
                 // 1. Validate Guide: must exist in internalGuides
                 const guideVal = team.guidePreference ? team.guidePreference._id || team.guidePreference : '';
@@ -75,13 +85,11 @@ const AllocationsDashboard = ({ programme }) => {
 
                 // 2. Validate Review Panel: must exist in filtered reviewPanels for this programme
                 const panelVal = team.panel ? team.panel._id || team.panel : '';
-                const progReviewPanels = allPanels.filter(p => p.panelType !== 'viva' && (p.programme || 'UG').trim().toLowerCase() === teamProg);
-                const hasValidReviewPanel = panelVal && progReviewPanels.some(p => String(p._id) === String(panelVal));
+                const hasValidReviewPanel = panelVal && allPanels.some(p => p.panelType !== 'viva' && String(p._id) === String(panelVal));
 
                 // 3. Validate Viva Panel: must exist in filtered vivaPanels for this programme
                 const vivaVal = team.vivaPanel ? team.vivaPanel._id || team.vivaPanel : '';
-                const progVivaPanels = allPanels.filter(p => p.panelType === 'viva' && (p.programme || 'UG').trim().toLowerCase() === teamProg);
-                const hasValidVivaPanel = vivaVal && progVivaPanels.some(p => String(p._id) === String(vivaVal));
+                const hasValidVivaPanel = vivaVal && allPanels.some(p => p.panelType === 'viva' && String(p._id) === String(vivaVal));
 
                 initAllocations[team._id] = {
                     guideId: hasValidGuide ? String(guideVal) : '',
@@ -513,23 +521,30 @@ const AllocationsDashboard = ({ programme }) => {
                                             }}
                                         >
                                             <option value="">No Panel</option>
-                                            {reviewPanels.filter(p => (p.programme || 'UG').trim().toLowerCase() === (team.programme || 'UG').trim().toLowerCase()).map(p => {
-                                                const coordName = p.coordinator ? p.coordinator.name : 'None';
-                                                const membersList = p.members && p.members.length > 0 
-                                                    ? p.members.map(m => m.name).join(', ') 
-                                                    : 'None';
-                                                const nativeTooltip = `Coordinator: ${coordName}\nMembers: ${membersList}`;
+                                            {(() => {
+                                                const tProg = normalizeProg(team.programme || programme);
+                                                let matchedPanels = reviewPanels.filter(p => normalizeProg(p.programme) === tProg);
+                                                if (matchedPanels.length === 0) {
+                                                    matchedPanels = reviewPanels;
+                                                }
+                                                return matchedPanels.map(p => {
+                                                    const coordName = p.coordinator ? p.coordinator.name : 'None';
+                                                    const membersList = p.members && p.members.length > 0 
+                                                        ? p.members.map(m => m.name).join(', ') 
+                                                        : 'None';
+                                                    const nativeTooltip = `Coordinator: ${coordName}\nMembers: ${membersList}`;
 
-                                                return (
-                                                    <option 
-                                                        key={p._id} 
-                                                        value={p._id}
-                                                        title={nativeTooltip}
-                                                    >
-                                                        {p.name}
-                                                    </option>
-                                                );
-                                            })}
+                                                    return (
+                                                        <option 
+                                                            key={p._id} 
+                                                            value={p._id}
+                                                            title={nativeTooltip}
+                                                        >
+                                                            {p.name}
+                                                        </option>
+                                                    );
+                                                });
+                                            })()}
                                         </select>
                                     </td>
                                     
