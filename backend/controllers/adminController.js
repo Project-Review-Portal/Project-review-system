@@ -1658,23 +1658,30 @@ exports.deleteFaculty = async (req, res) => {
 
         const facultyObjectId = user._id;
 
-        // 1) Delete ALL teams where this faculty is the assigned guide
-        const teamsGuided = await Team.find({ guidePreference: facultyObjectId }).select('_id');
-        const teamIdsGuided = teamsGuided.map(t => t._id);
+        // 1) All teams that have this faculty as guide will now have no guide
+        await Team.updateMany({ guidePreference: facultyObjectId }, { $set: { guidePreference: null } });
 
-        if (teamIdsGuided.length > 0) {
-            // Cascade delete related data for these teams
-            try { await TimeTable.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) {}
-            try { await Mark.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) {}
-            try { await Attendance.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) {}
-            try { const FinalReport = require('../models/FinalReport'); await FinalReport.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) {}
-            try { const TeamPanelAssignment = require('../models/TeamPanelAssignment'); await TeamPanelAssignment.updateMany({}, { $pull: { teams: { $in: teamIdsGuided } } }); } catch (e) {}
-            await Team.deleteMany({ _id: { $in: teamIdsGuided } });
+        // 2) If the faculty is in a panel and is coordinator, remove the panel completely.
+        const coordinatedPanels = await Panel.find({ coordinator: facultyObjectId });
+        if (coordinatedPanels.length > 0) {
+            const coordinatedPanelIds = coordinatedPanels.map(p => p._id);
+            // Delete these panels completely (triggers Panel schema hooks)
+            await Panel.deleteMany({ _id: { $in: coordinatedPanelIds } });
+            
+            // Delete associated TimeTable schedules
+            await TimeTable.deleteMany({ panel: { $in: coordinatedPanelIds } });
         }
 
-        // 2) Remove this faculty from any panel memberships and coordinator positions
-        try { await Panel.updateMany({ members: facultyObjectId }, { $pull: { members: facultyObjectId } }); } catch (e) {}
-        try { await Panel.updateMany({ coordinator: facultyObjectId }, { $set: { coordinator: null } }); } catch (e) {}
+        // Pull from members list or assistantCoordinators list in other panels
+        await Panel.updateMany(
+            { $or: [{ members: facultyObjectId }, { assistantCoordinators: facultyObjectId }] },
+            { 
+                $pull: { 
+                    members: facultyObjectId,
+                    assistantCoordinators: facultyObjectId
+                }
+            }
+        );
 
         // Finally delete the faculty user
         await User.deleteOne({ _id: facultyObjectId });
@@ -1703,20 +1710,38 @@ exports.deleteStudent = async (req, res) => {
 
         const studentId = user._id;
 
-        // Remove this student from all teams (members and leader)
-        await Team.updateMany({ members: studentId }, { $pull: { members: studentId } });
-        await Team.updateMany({ teamLeader: studentId }, { $set: { teamLeader: null } });
-
-        // Find teams that are now empty (no leader and no members) and delete them with cascade
-        const orphanTeams = await Team.find({ $or: [ { members: { $size: 0 } }, { members: { $exists: false } } ], teamLeader: null }).select('_id');
-        const orphanIds = orphanTeams.map(t => t._id);
-        if (orphanIds.length > 0) {
-            try { await TimeTable.deleteMany({ team: { $in: orphanIds } }); } catch (e) {}
-            try { await Mark.deleteMany({ team: { $in: orphanIds } }); } catch (e) {}
-            try { await Attendance.deleteMany({ team: { $in: orphanIds } }); } catch (e) {}
-            try { const FinalReport = require('../models/FinalReport'); await FinalReport.deleteMany({ team: { $in: orphanIds } }); } catch (e) {}
-            try { const TeamPanelAssignment = require('../models/TeamPanelAssignment'); await TeamPanelAssignment.updateMany({}, { $pull: { teams: { $in: orphanIds } } }); } catch (e) {}
-            await Team.deleteMany({ _id: { $in: orphanIds } });
+        // Check if the student is in any team
+        const team = await Team.findOne({ $or: [{ teamLeader: studentId }, { members: studentId }] });
+        if (team) {
+            const isLeader = team.teamLeader && team.teamLeader.toString() === studentId.toString();
+            if (isLeader) {
+                // Disband the team! (triggers Team schema pre hooks which clean schedules, marks, assignments, etc.)
+                await Team.findOneAndDelete({ _id: team._id });
+                // Also update the users who were in that team to clear their team reference in roles array
+                await User.updateMany(
+                    { 'roles.team': team._id.toString() },
+                    { $set: { 'roles.$.team': null } }
+                );
+            } else {
+                // Remove student from members list & memberStatus, unlock team if it is locked
+                await Team.updateOne(
+                    { _id: team._id },
+                    { 
+                        $pull: { 
+                            members: studentId,
+                            memberStatus: { user: studentId }
+                        },
+                        $set: {
+                            isLocked: false
+                        }
+                    }
+                );
+                // Reset lockApproved to false for all remaining members so they must re-approve locking
+                await Team.updateOne(
+                    { _id: team._id },
+                    { $set: { 'memberStatus.$[].lockApproved': false } }
+                );
+            }
         }
 
         // Clean student-specific data
@@ -1729,6 +1754,81 @@ exports.deleteStudent = async (req, res) => {
     } catch (error) {
         console.error('Error deleting student:', error);
         res.status(500).json({ message: 'Error deleting student' });
+    }
+};
+
+// Check student deletion metadata before executing
+exports.checkStudentDeletion = async (req, res) => {
+    try {
+        const { regno } = req.params;
+        const user = await User.findOne({ username: regno });
+        if (!user) {
+            return res.status(404).json({ message: 'Student not found' });
+        }
+
+        const studentId = user._id;
+        const team = await Team.findOne({ $or: [{ teamLeader: studentId }, { members: studentId }] });
+
+        if (team) {
+            const isLeader = team.teamLeader && team.teamLeader.toString() === studentId.toString();
+            return res.json({
+                inTeam: true,
+                isLeader,
+                teamName: team.teamName,
+                studentName: user.name
+            });
+        }
+
+        return res.json({
+            inTeam: false,
+            isLeader: false,
+            teamName: null,
+            studentName: user.name
+        });
+    } catch (error) {
+        console.error('Error checking student deletion:', error);
+        res.status(500).json({ message: 'Server error checking student deletion' });
+    }
+};
+
+// Check faculty deletion metadata before executing
+exports.checkFacultyDeletion = async (req, res) => {
+    try {
+        const { facultyId } = req.params;
+        const user = await User.findOne({ $or: [{ username: facultyId }, { email: facultyId }] });
+        if (!user) {
+            return res.status(404).json({ message: 'Faculty member not found' });
+        }
+
+        const facultyObjectId = user._id;
+
+        // Count teams guided
+        const guidedTeamsCount = await Team.countDocuments({ guidePreference: facultyObjectId });
+
+        // Find coordinated panels
+        const coordinatedPanels = await Panel.find({ coordinator: facultyObjectId }).select('name');
+        const coordinatedPanelNames = coordinatedPanels.map(p => p.name);
+
+        // Find other panel memberships
+        const memberOrAssistPanels = await Panel.find({
+            $and: [
+                { coordinator: { $ne: facultyObjectId } },
+                { $or: [{ members: facultyObjectId }, { assistantCoordinators: facultyObjectId }] }
+            ]
+        }).select('name');
+        const memberOrAssistPanelNames = memberOrAssistPanels.map(p => p.name);
+
+        return res.json({
+            facultyName: user.name,
+            guidedTeamsCount,
+            isCoordinator: coordinatedPanelNames.length > 0,
+            coordinatedPanels: coordinatedPanelNames,
+            isMemberOrAssist: memberOrAssistPanelNames.length > 0,
+            memberOrAssistPanels: memberOrAssistPanelNames
+        });
+    } catch (error) {
+        console.error('Error checking faculty deletion:', error);
+        res.status(500).json({ message: 'Server error checking faculty deletion' });
     }
 }; 
 

@@ -33,10 +33,6 @@ const teamSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
-    lockRequested: {
-        type: Boolean,
-        default: false
-    },
     isLocked: {
         type: Boolean,
         default: false

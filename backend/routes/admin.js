@@ -65,6 +65,8 @@ router.put('/update-faculty/:facultyId', auth, authorize(['admin']), adminContro
 router.put('/update-student/:regno', auth, authorize(['admin']), adminController.updateStudent);
 router.delete('/delete-faculty/:facultyId', auth, authorize(['admin']), adminController.deleteFaculty);
 router.delete('/delete-student/:regno', auth, authorize(['admin']), adminController.deleteStudent);
+router.get('/check-student-deletion/:regno', auth, authorize(['admin']), adminController.checkStudentDeletion);
+router.get('/check-faculty-deletion/:facultyId', auth, authorize(['admin']), adminController.checkFacultyDeletion);
 router.delete('/delete-user/:userId', auth, authorize(['admin']), adminController.deleteUser);
 router.get('/faculty-list', auth, authorize(['admin']), adminController.getAllFaculty);
 router.get('/student-list', auth, authorize(['admin']), adminController.getAllStudents);

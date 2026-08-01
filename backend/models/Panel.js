@@ -41,16 +41,21 @@ panelSchema.index({ name: 1, panelType: 1, programme: 1 }, { unique: true });
 // Cascade deletion logic for Panel
 panelSchema.pre('findOneAndDelete', async function(next) {
     const panelId = this.getQuery()._id;
-    await mongoose.model('Team').updateMany({ panel: panelId }, { $set: { panel: null, coordinator: null } });
-    await mongoose.model('Team').updateMany({ vivaPanel: panelId }, { $set: { vivaPanel: null } });
-    await mongoose.model('TeamPanelAssignment').deleteMany({ panel: panelId });
+    if (panelId) {
+        await mongoose.model('Team').updateMany({ panel: panelId }, { $set: { panel: null, coordinator: null } });
+        await mongoose.model('Team').updateMany({ vivaPanel: panelId }, { $set: { vivaPanel: null } });
+        await mongoose.model('TeamPanelAssignment').deleteMany({ panel: panelId });
+        try { await mongoose.model('TimeTable').deleteMany({ panel: panelId }); } catch(e) {}
+    }
     next();
 });
 
 panelSchema.pre('deleteOne', { document: true, query: false }, async function(next) {
-    await mongoose.model('Team').updateMany({ panel: this._id }, { $set: { panel: null, coordinator: null } });
-    await mongoose.model('Team').updateMany({ vivaPanel: this._id }, { $set: { vivaPanel: null } });
-    await mongoose.model('TeamPanelAssignment').deleteMany({ panel: this._id });
+    const panelId = this._id;
+    await mongoose.model('Team').updateMany({ panel: panelId }, { $set: { panel: null, coordinator: null } });
+    await mongoose.model('Team').updateMany({ vivaPanel: panelId }, { $set: { vivaPanel: null } });
+    await mongoose.model('TeamPanelAssignment').deleteMany({ panel: panelId });
+    try { await mongoose.model('TimeTable').deleteMany({ panel: panelId }); } catch(e) {}
     next();
 });
 
@@ -60,6 +65,19 @@ panelSchema.pre('deleteOne', { document: false, query: true }, async function(ne
         await mongoose.model('Team').updateMany({ panel: panelId }, { $set: { panel: null, coordinator: null } });
         await mongoose.model('Team').updateMany({ vivaPanel: panelId }, { $set: { vivaPanel: null } });
         await mongoose.model('TeamPanelAssignment').deleteMany({ panel: panelId });
+        try { await mongoose.model('TimeTable').deleteMany({ panel: panelId }); } catch(e) {}
+    }
+    next();
+});
+
+panelSchema.pre('deleteMany', async function(next) {
+    const conditions = this.getQuery();
+    if (conditions._id && conditions._id.$in) {
+        const panelIds = conditions._id.$in;
+        await mongoose.model('Team').updateMany({ panel: { $in: panelIds } }, { $set: { panel: null, coordinator: null } });
+        await mongoose.model('Team').updateMany({ vivaPanel: { $in: panelIds } }, { $set: { vivaPanel: null } });
+        await mongoose.model('TeamPanelAssignment').deleteMany({ panel: { $in: panelIds } });
+        try { await mongoose.model('TimeTable').deleteMany({ panel: { $in: panelIds } }); } catch(e) {}
     }
     next();
 });

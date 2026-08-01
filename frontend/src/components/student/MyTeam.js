@@ -270,7 +270,7 @@ const MyTeam = () => {
                 </div>
             )}
 
-            {!team.isLocked && !team.lockRequested && isLeader && !canLockTeam && (
+            {!team.isLocked && isLeader && !canLockTeam && (
                 <div className="p-4 bg-yellow-50 text-yellow-800 border-l-4 border-yellow-400 rounded text-sm space-y-1">
                     <strong>⚠️ Lock Blocked:</strong> You have <b>{pendingMembersOnly.length} pending invitation(s)</b> out to other students.
                     <p className="text-xs text-gray-600">You must wait for them to Accept/Decline, or click "Revoke Invite" below to clear the request before you can lock this team configuration.</p>
@@ -294,14 +294,6 @@ const MyTeam = () => {
                                 }`}>
                                     {m.status === 'pending' ? '⏳ Pending Response' : 'Accepted'}
                                 </span>
-                                
-                                {team.lockRequested && m.status === 'accepted' && (
-                                    <span className={`text-xs px-2 py-1 rounded font-semibold ${
-                                        m.lockApproved ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                                    }`}>
-                                        {m.lockApproved ? '✓ Lock Approved' : '⏳ Lock Pending'}
-                                    </span>
-                                )}
 
                                 {isLeader && !team.isLocked && (
                                     <button

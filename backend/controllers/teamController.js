@@ -682,7 +682,6 @@ exports.requestLock = async (req, res) => {
         team.members = acceptedMembers.map(m => m.user);
         team.isTeamComplete = true; 
         team.isLocked = true;
-        team.lockRequested = false;
         
         // Reset lock approval consensus flags
         team.memberStatus.forEach(m => {

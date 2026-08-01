@@ -29,6 +29,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
     const [limitMessage, setLimitMessage] = useState('');
     const [limitMessageType, setLimitMessageType] = useState('');
     const [limitCsvFileName, setLimitCsvFileName] = useState('');
+    const [deleteConfirmModal, setDeleteConfirmModal] = useState({ show: false, type: '', id: '', data: null });
 
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
@@ -485,17 +486,60 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
         }
     };
 
-    const deleteFaculty = async (emailId) => {
-        if (!window.confirm('Are you sure you want to delete this faculty member?')) return;
-
+    const handleRequestDeleteFaculty = async (emailId) => {
         setLoading(true);
         try {
-            await axios.delete(`${SERVER_API_KEY}/api/admin/delete-faculty/${emailId}`, { headers });
-            setFacultyData(facultyData.filter(f => f.email_id !== emailId));
-            setMessage('Faculty member deleted successfully');
-            setMessageType('success');
+            const res = await axios.get(`${SERVER_API_KEY}/api/admin/check-faculty-deletion/${emailId}`, { headers });
+            setDeleteConfirmModal({
+                show: true,
+                type: 'faculty',
+                id: emailId,
+                data: res.data
+            });
         } catch (error) {
-            setMessage(error.response?.data?.message || 'Error deleting faculty member');
+            setMessage(error.response?.data?.message || 'Error checking faculty member status');
+            setMessageType('error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRequestDeleteStudent = async (regno) => {
+        setLoading(true);
+        try {
+            const res = await axios.get(`${SERVER_API_KEY}/api/admin/check-student-deletion/${regno}`, { headers });
+            setDeleteConfirmModal({
+                show: true,
+                type: 'student',
+                id: regno,
+                data: res.data
+            });
+        } catch (error) {
+            setMessage(error.response?.data?.message || 'Error checking student status');
+            setMessageType('error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const executeDeleteUser = async () => {
+        const { type, id } = deleteConfirmModal;
+        setDeleteConfirmModal({ show: false, type: '', id: '', data: null });
+        setLoading(true);
+        try {
+            if (type === 'student') {
+                await axios.delete(`${SERVER_API_KEY}/api/admin/delete-student/${id}`, { headers });
+                setStudentData(studentData.filter(s => s.regno !== id));
+                setMessage('Student deleted successfully');
+                setMessageType('success');
+            } else {
+                await axios.delete(`${SERVER_API_KEY}/api/admin/delete-faculty/${id}`, { headers });
+                setFacultyData(facultyData.filter(f => f.email_id !== id));
+                setMessage('Faculty member deleted successfully');
+                setMessageType('success');
+            }
+        } catch (error) {
+            setMessage(error.response?.data?.message || `Error deleting ${type}`);
             setMessageType('error');
         } finally {
             setLoading(false);
@@ -513,23 +557,6 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
             setMessageType('success');
         } catch (error) {
             setMessage(error.response?.data?.message || 'Error deleting all faculty');
-            setMessageType('error');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const deleteStudent = async (regno) => {
-        if (!window.confirm('Are you sure you want to delete this student?')) return;
-
-        setLoading(true);
-        try {
-            await axios.delete(`${SERVER_API_KEY}/api/admin/delete-student/${regno}`, { headers });
-            setStudentData(studentData.filter(s => s.regno !== regno));
-            setMessage('Student deleted successfully');
-            setMessageType('success');
-        } catch (error) {
-            setMessage(error.response?.data?.message || 'Error deleting student');
             setMessageType('error');
         } finally {
             setLoading(false);
@@ -852,7 +879,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
                                                         Edit
                                                     </button>
                                                     <button
-                                                        onClick={() => deleteFaculty(faculty.email_id)}
+                                                        onClick={() => handleRequestDeleteFaculty(faculty.email_id)}
                                                         className="bg-red-500 text-white px-2 py-1 rounded text-xs font-semibold"
                                                     >
                                                         Delete
@@ -1222,7 +1249,7 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
                                                         Edit
                                                     </button>
                                                     <button
-                                                        onClick={() => deleteStudent(student.regno)}
+                                                        onClick={() => handleRequestDeleteStudent(student.regno)}
                                                         className="bg-red-500 text-white px-2 py-1 rounded"
                                                     >
                                                         Delete
@@ -1285,6 +1312,89 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
                     </div>
                 )}
             </div>
+
+            {/* Custom Professional Confirmation Modal */}
+            {deleteConfirmModal.show && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all duration-300 animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden transform transition-all duration-300 scale-100 p-6 space-y-4">
+                        {/* Modal Header */}
+                        <div className="flex items-center gap-3 text-amber-600">
+                            <div className="p-2 bg-amber-50 rounded-full">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                            </div>
+                            <h3 className="text-lg font-bold text-slate-800">Confirm Deletion</h3>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="text-sm text-slate-600 space-y-2">
+                            {deleteConfirmModal.type === 'student' ? (
+                                <>
+                                    <p>
+                                        Are you sure you want to delete student <strong>{deleteConfirmModal.data?.studentName}</strong> ({deleteConfirmModal.id})?
+                                    </p>
+                                    {deleteConfirmModal.data?.inTeam && (
+                                        <div className="p-3 bg-rose-50 border border-rose-100 rounded-lg text-rose-800 text-xs">
+                                            {deleteConfirmModal.data.isLeader ? (
+                                                <p>
+                                                    ⚠️ <strong>Warning:</strong> This student is the <strong>Leader</strong> of team <strong>"{deleteConfirmModal.data.teamName}"</strong>. Deleting them will <strong>disband the team</strong> and cascade delete all associated schedules, marks, and final reports!
+                                                </p>
+                                            ) : (
+                                                <p>
+                                                    ℹ️ <strong>Notice:</strong> This student is a member of team <strong>"{deleteConfirmModal.data.teamName}"</strong>. Deleting them will remove them from the team and <strong>unlock the team</strong> automatically.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <>
+                                    <p>
+                                        Are you sure you want to delete faculty member <strong>{deleteConfirmModal.data?.facultyName}</strong> ({deleteConfirmModal.id})?
+                                    </p>
+                                    {(deleteConfirmModal.data?.guidedTeamsCount > 0 || deleteConfirmModal.data?.isCoordinator || deleteConfirmModal.data?.isMemberOrAssist) && (
+                                        <div className="p-3 bg-rose-50 border border-rose-100 rounded-lg text-rose-800 text-xs space-y-1.5">
+                                            {deleteConfirmModal.data.guidedTeamsCount > 0 && (
+                                                <p>
+                                                    ⚠️ <strong>Warning:</strong> They guide <strong>{deleteConfirmModal.data.guidedTeamsCount} team(s)</strong>. These teams will be left with <strong>no guide</strong> and must request a new guide.
+                                                </p>
+                                            )}
+                                            {deleteConfirmModal.data.isCoordinator && (
+                                                <p>
+                                                    ⚠️ <strong>Warning:</strong> They are the coordinator of panel(s): <strong>{deleteConfirmModal.data.coordinatedPanels.join(', ')}</strong>. Deleting this faculty will <strong>permanently delete these panels</strong> and their schedules!
+                                                </p>
+                                            )}
+                                            {deleteConfirmModal.data.isMemberOrAssist && (
+                                                <p>
+                                                    ℹ️ <strong>Notice:</strong> They will be removed from assistant coordinator or member positions in panel(s): <strong>{deleteConfirmModal.data.memberOrAssistPanels.join(', ')}</strong>.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            <p className="text-xs text-slate-400 mt-2">This action cannot be undone.</p>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                            <button
+                                onClick={() => setDeleteConfirmModal({ show: false, type: '', id: '', data: null })}
+                                className="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={executeDeleteUser}
+                                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm hover:shadow-md transition-all"
+                            >
+                                Confirm Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
