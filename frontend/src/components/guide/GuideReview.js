@@ -28,10 +28,19 @@ const GuideReview = () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const selectedProgramme = storedUser.programme;
+
             const res = await axios.get(`${SERVER_API_KEY}/api/guide/assigned-panels`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setPanels(res.data || []);
+            
+            let fetchedPanels = res.data || [];
+            if (selectedProgramme) {
+                fetchedPanels = fetchedPanels.filter(p => p.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+            }
+
+            setPanels(fetchedPanels);
             setLoading(false);
         } catch (err) {
             console.error('Error fetching assigned panels:', err);
