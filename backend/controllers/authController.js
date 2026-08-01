@@ -25,8 +25,8 @@ const getUserActiveRoles = async (userId) => {
         const Programme = require('../models/Programme');
         const allProgrammes = await Programme.find().sort({ name: 1 });
         const programmeNames = allProgrammes.map(p => p.name);
-        if (!programmeNames.some(name => name.toLowerCase() === 'ug')) {
-            programmeNames.unshift('ug');
+        if (!programmeNames.some(name => name.toLowerCase() === 'b.e. cse')) {
+            programmeNames.unshift('B.E. CSE');
         }
 
         // 1. Guide role: Every faculty member can defaultly be a guide for all programs

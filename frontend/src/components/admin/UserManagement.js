@@ -584,13 +584,21 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
         setLoading(true);
         try {
             const response = await axios.get(`${SERVER_API_KEY}/api/admin/faculty-list?includeExternal=true`, { headers });
-            setFacultyData(response.data.map(f => ({
+            const mapped = response.data.map(f => ({
                 seniority: f.seniority || '',
                 email_id: f.email || f.username || '',
                 name: f.name,
                 designation: f.designation || '',
                 memberType: f.memberType || 'internal'
-            })));
+            }));
+            
+            mapped.sort((a, b) => {
+                const sA = a.seniority === '' ? Infinity : Number(a.seniority);
+                const sB = b.seniority === '' ? Infinity : Number(b.seniority);
+                return sA - sB;
+            });
+            
+            setFacultyData(mapped);
             if (!response.data || response.data.length === 0) {
                 setMessage('No faculty registered yet');
                 setMessageType('success');

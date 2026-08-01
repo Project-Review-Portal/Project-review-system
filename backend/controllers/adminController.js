@@ -1840,8 +1840,9 @@ exports.getAllFaculty = async (req, res) => {
         if (!includeExternal) {
             match.memberType = 'internal';
         }
-        // Include email, designation, and seniority in the response so frontend can display the correct fields
-        const faculty = await User.find(match).select('username name roles memberType email designation seniority');
+        const faculty = await User.find(match)
+            .select('username name roles memberType email designation seniority')
+            .sort({ seniority: 1 });
         res.json(faculty);
     } catch (error) {
         console.error('Error fetching faculty:', error);
