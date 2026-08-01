@@ -3,9 +3,28 @@ const exceljs = require('exceljs');
 
 exports.exportZerothReviewAttendance = async (req, res) => {
     try {
-        const { programme } = req.query;
+        const { programme, reviewType } = req.query;
         if (!programme) {
             return res.status(400).json({ message: 'Programme name is required.' });
+        }
+
+        const type = reviewType || 'review0';
+        let reviewLabel = 'Zeroth Review';
+        if (type === 'viva') {
+            reviewLabel = 'VIVA';
+        } else if (type.startsWith('review')) {
+            const num = type.replace('review', '');
+            if (num === '0') {
+                reviewLabel = 'Zeroth Review';
+            } else if (num === '1') {
+                reviewLabel = 'First Review';
+            } else if (num === '2') {
+                reviewLabel = 'Second Review';
+            } else if (num === '3') {
+                reviewLabel = 'Third Review';
+            } else {
+                reviewLabel = `Review ${num}`;
+            }
         }
 
         // Fetch all teams for the given programme
@@ -16,7 +35,7 @@ exports.exportZerothReviewAttendance = async (req, res) => {
             .sort({ teamName: 1 });
 
         const workbook = new exceljs.Workbook();
-        const worksheet = workbook.addWorksheet('Zeroth Review Attendance');
+        const worksheet = workbook.addWorksheet(`${reviewLabel} Attendance`);
 
         // Set column configurations (widths and keys)
         worksheet.columns = [
@@ -47,7 +66,7 @@ exports.exportZerothReviewAttendance = async (req, res) => {
         // 3. Review Title Heading
         worksheet.mergeCells('A3:F3');
         const cellA3 = worksheet.getCell('A3');
-        cellA3.value = 'Zeroth Review Attendance Sheet';
+        cellA3.value = `${reviewLabel} Attendance Sheet`;
         cellA3.font = { name: 'Times New Roman', size: 12, bold: true };
         cellA3.alignment = { vertical: 'middle', horizontal: 'center' };
         worksheet.getRow(3).height = 20;
@@ -155,9 +174,10 @@ exports.exportZerothReviewAttendance = async (req, res) => {
             'Content-Type',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         );
+        const filename = `${reviewLabel.replace(/\s+/g, '_')}_Attendance_${programme.replace(/\s+/g, '_')}.xlsx`;
         res.setHeader(
             'Content-Disposition',
-            `attachment; filename=Zeroth_Review_Attendance_${programme.replace(/\s+/g, '_')}.xlsx`
+            `attachment; filename=${filename}`
         );
 
         await workbook.xlsx.write(res);

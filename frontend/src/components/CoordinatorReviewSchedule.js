@@ -257,6 +257,52 @@ const CoordinatorReviewSchedule = () => {
     }
   };
 
+  const handleExportAttendance = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const prog = storedUser.programme || 'B.E. CSE';
+      const selectedType = form.reviewType;
+      
+      const response = await axios.get(
+        `${SERVER_API_KEY}/api/panels/coordinator/export-zeroth-attendance?programme=${encodeURIComponent(prog)}&reviewType=${selectedType}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: 'blob'
+        }
+      );
+
+      // Determine filename dynamically
+      const type = selectedType || 'review0';
+      let reviewLabel = 'Zeroth Review';
+      if (type === 'viva') {
+        reviewLabel = 'VIVA';
+      } else if (type.startsWith('review')) {
+        const num = type.replace('review', '');
+        if (num === '0') reviewLabel = 'Zeroth Review';
+        else if (num === '1') reviewLabel = 'First Review';
+        else if (num === '2') reviewLabel = 'Second Review';
+        else if (num === '3') reviewLabel = 'Third Review';
+        else reviewLabel = `Review ${num}`;
+      }
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${reviewLabel.replace(/\s+/g, '_')}_Attendance_${prog.replace(/\s+/g, '_')}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setMessage(`${reviewLabel} attendance sheet exported successfully!`);
+      setError('');
+    } catch (err) {
+      console.error('Error exporting attendance:', err);
+      setError('Failed to export attendance sheet.');
+      setMessage('');
+    }
+  };
+
   // Check if user has coordinator role in roles array
   const isCoordinator = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
   if (user && !isCoordinator) {
@@ -310,9 +356,25 @@ const CoordinatorReviewSchedule = () => {
   // Sort dates chronologically
   const sortedDates = Array.from(dateGroupsMap.values()).sort((a, b) => a.dateVal - b.dateVal);
 
+  // Selected review type display label
+  const selectedReviewTypeObj = reviewTypes.find(rt => rt.value === form.reviewType);
+  const selectedLabel = selectedReviewTypeObj ? selectedReviewTypeObj.label : 'Review';
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-md max-w-7xl mx-auto w-full">
-      <h2 className="text-2xl font-bold mb-4">Review Schedule</h2>
+      <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
+        <h2 className="text-2xl font-bold text-slate-800">Review Schedule</h2>
+        <button
+          type="button"
+          onClick={handleExportAttendance}
+          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow transition-colors flex items-center gap-2 text-sm"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export {selectedLabel} Attendance (Excel)
+        </button>
+      </div>
       {isReadOnly && (
         <div className="mb-4 p-3 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded font-medium text-center">
           ℹ️ You are viewing this page in Read-Only Mode as an Assistant Coordinator.
