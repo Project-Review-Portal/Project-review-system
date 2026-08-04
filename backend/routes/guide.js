@@ -27,6 +27,9 @@ router.get('/selection-dates', auth, guideController.getGuideSelectionDatesPubli
 // New route for getting assigned teams
 router.get('/assigned-teams', auth, authorize(['guide', 'panel', 'coordinator', 'admin']), guideController.getAssignedTeams);
 
+// Dedicated route to fetch all teams guided by the guide for marking page
+router.get('/marking-teams', auth, authorize(['guide', 'admin']), guideController.getGuidedTeamsForMarking);
+
 // New route for getting review period dates
 router.get('/review-period-dates', auth, guideController.getReviewPeriodDatesPublic);
 

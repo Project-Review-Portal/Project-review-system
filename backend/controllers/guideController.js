@@ -371,6 +371,23 @@ exports.getAssignedTeams = async (req, res) => {
     }
 };
 
+// New dedicated endpoint to get all teams guided by the logged-in guide for marking
+exports.getGuidedTeamsForMarking = async (req, res) => {
+    try {
+        const guideId = req.user.id;
+
+        // Query strictly for teams where this guide is assigned and status is approved
+        const teams = await Team.find({ guidePreference: guideId, status: 'approved' })
+            .populate('teamLeader', 'name username rollNumber')
+            .populate('members', 'name username rollNumber');
+
+        res.json(teams);
+    } catch (error) {
+        console.error('Error fetching guided teams for marking:', error);
+        res.status(500).json({ message: 'Error fetching guided teams for marking' });
+    }
+};
+
 // Get review period dates
 exports.getReviewPeriodDatesPublic = async (req, res) => {
     try {
