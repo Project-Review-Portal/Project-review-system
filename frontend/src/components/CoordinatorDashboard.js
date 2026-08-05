@@ -11,6 +11,8 @@ import CoordinatorLetterLiveEditorCK from './CoordinatorLetterLiveEditorCK';
 import GuideUploadAttendance from './guide/GuideUploadAttendance';
 import CoordinatorVivaPanelFormation from './coordinator/CoordinatorVivaPanelFormation';
 import MaterialsTab from './coordinator/materials/MaterialsTab';
+import CoordinatorMarkingScheme from './coordinator/CoordinatorMarkingScheme';
+
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const CoordinatorRulesDashboard = () => {
     const [teamFormationOpen, setTeamFormationOpen] = useState(true);
@@ -244,6 +246,7 @@ const CoordinatorDashboard = () => {
                     <Route path="materials" element={<MaterialsTab />} />
                     <Route path="materials/*" element={<MaterialsTab />} />
                     <Route path="instruction-template" element={<CoordinatorInstructionTemplate />} />
+                    <Route path="marking-scheme" element={<CoordinatorMarkingScheme />} />
                     <Route path="*" element={<Navigate to="dashboard" replace />} />
                 </Routes>
             </div>

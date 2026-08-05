@@ -533,7 +533,7 @@ exports.getReviewPeriodDatesPublic = async (req, res) => {
 // Submit marks for a team (Panel)
 exports.submitMarks = async (req, res) => {
     try {
-        const { teamId, studentId, mark1, mark2, mark3, mark4, slotType } = req.body;
+        const { teamId, studentId, components, slotType } = req.body;
 
         // Validate slotType
         const { validSlotTypes } = await getReviewSettings();
@@ -545,14 +545,17 @@ exports.submitMarks = async (req, res) => {
             return res.status(400).json({ message: 'Review 0 is attendance-only. No marks can be submitted for it.' });
         }
 
+        if (!Array.isArray(components) || components.length === 0) {
+            return res.status(400).json({ message: 'components array is required and must not be empty.' });
+        }
+
         // External examiners can only mark Viva
         if (req.user.memberType === 'external' && slotType !== 'viva') {
             return res.status(403).json({ message: 'External panel members can only mark Viva.' });
         }
         const panelMemberId = req.user.id;
 
-        const totalMarks = mark1 + mark2 + mark3 + mark4;
-        const percentage = (totalMarks / 40) * 100;
+        const totalMarks = components.reduce((sum, c) => sum + (Number(c.value) || 0), 0);
 
         const panels = await Panel.find({ members: panelMemberId });
         if (panels.length === 0) {
@@ -573,19 +576,28 @@ exports.submitMarks = async (req, res) => {
             return res.status(400).json({ message: 'Student is not a member of this team.' });
         }
 
+        // Compute percentage from marking scheme
+        const MarkingScheme = require('../models/MarkingScheme');
+        let percentage = null;
+        if (team.panel) {
+            const scheme = await MarkingScheme.findOne({ panel: team.panel, slotType });
+            if (scheme && scheme.components.length > 0) {
+                const maxTotal = scheme.components.reduce((sum, c) => sum + c.maxMarks, 0);
+                if (maxTotal > 0) percentage = (totalMarks / maxTotal) * 100;
+            }
+        }
+
         const mark = await Mark.findOneAndUpdate(
             { student: studentId, team: teamId, markedBy: panelMemberId, slotType },
             {
-                mark1,
-                mark2,
-                mark3,
-                mark4,
-                totalMarks: totalMarks,
-                percentage: percentage,
+                components: components.map(c => ({ name: c.name, value: Number(c.value) })),
+                totalMarks,
+                percentage,
                 role: 'panel',
-                slotType
+                slotType,
+                updatedAt: Date.now()
             },
-            { upsert: true, new: true, setDefaultsOnInsert: true }
+            { upsert: true, new: true, setDefaultsOnInsert: true, overwrite: false }
         );
 
         res.json({ message: 'Marks submitted successfully', mark });
@@ -617,10 +629,7 @@ exports.getMarks = async (req, res) => {
                 const studentId = mark.student.toString();
                 if (!formattedMarks[studentId]) formattedMarks[studentId] = {};
                 formattedMarks[studentId][mark.slotType] = {
-                    mark1: mark.mark1,
-                    mark2: mark.mark2,
-                    mark3: mark.mark3,
-                    mark4: mark.mark4,
+                    components: mark.components || [],
                     totalMarks: mark.totalMarks,
                     percentage: mark.percentage,
                 };

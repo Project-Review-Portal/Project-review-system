@@ -75,6 +75,7 @@ const documentRoutes = require('./routes/simpleDocument'); // Using simple versi
 // const internalExaminerRoutes = require('./routes/internalExaminer'); // Temporarily disabled
 const externalExaminerRoutes = require('./routes/externalExaminer');
 const programmeRoutes = require('./routes/programme');
+const markingSchemeRoutes = require('./routes/markingScheme');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
@@ -89,6 +90,7 @@ app.use('/api/documents', documentRoutes);
 // app.use('/api/internal-examiner', internalExaminerRoutes); // Temporarily disabled
 app.use('/api/external-examiner', externalExaminerRoutes);
 app.use('/api/programmes', programmeRoutes);
+app.use('/api/marking-scheme', markingSchemeRoutes);
 
 // Serve static files
 app.use('/uploads', express.static('uploads'));
