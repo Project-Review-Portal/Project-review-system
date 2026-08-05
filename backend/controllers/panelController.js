@@ -382,7 +382,9 @@ exports.getPanelReviewSchedules = async (req, res) => {
 exports.getAssignedTeamsForPanel = async (req, res) => {
     try {
         const userId = req.user.id;
-        const userRole = req.user.role;
+        const userRole = req.headers['x-selected-role'];
+        const selectedProgramme=req.headers['x-selected-programme'];
+        console.log(userRole,selectedProgramme);
         const rolesArray = Array.isArray(req.user.roles) ? req.user.roles.map(r => (typeof r === 'string' ? r : r.role)).filter(Boolean) : [];
         console.log('User ID:', userId, 'Role:', userRole, 'Roles array:', rolesArray);
 
@@ -391,7 +393,7 @@ exports.getAssignedTeamsForPanel = async (req, res) => {
         if (userRole === 'panel' || rolesArray.includes('panel')) {
             // For panel members, find teams assigned to their panels using Team.panel for source of truth
             console.log('User is a panel member, finding teams assigned to their panels');
-            const panels = await Panel.find({ members: userId });
+            const panels = await Panel.find({ members: userId ,programme:selectedProgramme});
             console.log('Found panels for user:', panels.length);
 
             if (panels.length === 0) {
