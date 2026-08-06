@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626"; 
 
@@ -10,6 +11,17 @@ const ReviewsVivaSettings = () => {
     const [message, setMessage] = useState(null); // { type: 'success'|'error', text: string }
 
     const token = localStorage.getItem('token');
+
+    useEffect(() => {
+        if (message) {
+            if (message.type === 'success') {
+                toast.success(message.text);
+            } else {
+                toast.error(message.text);
+            }
+            setMessage(null);
+        }
+    }, [message]);
 
     useEffect(() => {
         fetchSettings();
@@ -78,18 +90,7 @@ const ReviewsVivaSettings = () => {
                 attendance, and marking logic will use these settings automatically.
             </p>
 
-            {/* Alert message */}
-            {message && (
-                <div
-                    className={`mb-4 px-4 py-3 rounded text-sm font-medium ${
-                        message.type === 'success'
-                            ? 'bg-green-50 text-green-800 border border-green-200'
-                            : 'bg-red-50 text-red-800 border border-red-200'
-                    }`}
-                >
-                    {message.text}
-                </div>
-            )}
+
 
             {/* Number of Reviews */}
             <div className="mb-6">

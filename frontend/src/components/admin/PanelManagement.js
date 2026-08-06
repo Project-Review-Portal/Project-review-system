@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
@@ -16,6 +17,20 @@ const PanelManagement = ({ panelType = 'review', programme }) => {
     const [coordinators, setCoordinators] = useState([]); // All coordinators
     const [selectedCoordinator, setSelectedCoordinator] = useState(null); // String ID
     const [selectedAssistantCoordinators, setSelectedAssistantCoordinators] = useState([]); // Array of String IDs
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError('');
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (message) {
+            toast.success(message);
+            setMessage('');
+        }
+    }, [message]);
 
     useEffect(() => {
         fetchData();
@@ -195,16 +210,7 @@ const PanelManagement = ({ panelType = 'review', programme }) => {
                 )}
             </div>
             
-            {message && (
-                <div className="p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl">
-                    {message}
-                </div>
-            )}
-            {error && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl">
-                    {error}
-                </div>
-            )}
+
 
             {/* Master Panels Table View */}
             <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-md bg-white">

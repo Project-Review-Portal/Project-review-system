@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
@@ -11,6 +12,20 @@ const MaxTeamSizeSettings = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [message, setMessage] = useState(null);
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError(null);
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (message) {
+            toast.success(message);
+            setMessage(null);
+        }
+    }, [message]);
 
     useEffect(() => {
         fetchSettings();
@@ -76,22 +91,11 @@ const MaxTeamSizeSettings = () => {
     };
 
     if (loading) return <div className="text-center p-4">Loading settings...</div>;
-    if (error) return <div className="text-red-500 p-4">{error}</div>;
 
     return (
         <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-2xl font-bold mb-6">Admin Settings</h2>
 
-            {message && (
-                <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
-                    {message}
-                </div>
-            )}
-            {error && (
-                <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-                    {error}
-                </div>
-            )}
+            <h2 className="text-2xl font-bold mb-6">Admin Settings</h2>
 
             {/* Max Team Size Setting */}
             <div className="mb-8 p-4 border rounded-lg">

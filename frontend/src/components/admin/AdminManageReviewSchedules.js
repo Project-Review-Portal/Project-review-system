@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
@@ -21,6 +22,27 @@ const AdminManageReviewSchedules = ({ programme }) => {
     const [selectedPanelForSlot, setSelectedPanelForSlot] = useState(null);
     const [notificationMessage, setNotificationMessage] = useState('');
     const [slotTypes, setSlotTypes] = useState(['review1', 'review2', 'review3', 'viva']);
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError(null);
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (successMessage) {
+            toast.success(successMessage);
+            setSuccessMessage('');
+        }
+    }, [successMessage]);
+
+    useEffect(() => {
+        if (notificationMessage) {
+            toast.info(notificationMessage);
+            setNotificationMessage('');
+        }
+    }, [notificationMessage]);
 
     useEffect(() => {
         fetchData();
@@ -109,10 +131,10 @@ const AdminManageReviewSchedules = ({ programme }) => {
     };
 
     if (loading) return <div className="text-center p-4">Loading data...</div>;
-    if (error) return <div className="text-red-500 p-4">{error}</div>;
 
     return (
         <div className="bg-white p-6 rounded-lg shadow">
+
             <h2 className="text-2xl font-bold mb-6">Manage Review Schedules</h2>
 
           

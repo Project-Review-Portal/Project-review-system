@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
@@ -10,6 +11,20 @@ const AdminTeams = () => {
     const [message, setMessage] = useState('');
 
     const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` };
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError('');
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (message) {
+            toast.success(message);
+            setMessage('');
+        }
+    }, [message]);
 
     const fetchTeams = async () => {
         setLoading(true);
@@ -47,8 +62,7 @@ const AdminTeams = () => {
     return (
         <div className="bg-white p-6 rounded-lg shadow space-y-4">
             <h2 className="text-2xl font-semibold">Teams</h2>
-            {message && <div className="p-3 bg-green-100 text-green-700 rounded">{message}</div>}
-            {error && <div className="p-3 bg-red-100 text-red-700 rounded">{error}</div>}
+
 
             {teams.length === 0 ? (
                 <p className="text-gray-500">No teams found.</p>

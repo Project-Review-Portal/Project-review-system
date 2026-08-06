@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
@@ -18,6 +19,27 @@ const MyTeam = () => {
     const [inviteSuccess, setInviteSuccess] = useState('');
 
     const user = JSON.parse(localStorage.getItem('user'));
+
+    useEffect(() => {
+        if (apiError) {
+            toast.error(apiError);
+            setApiError('');
+        }
+    }, [apiError]);
+
+    useEffect(() => {
+        if (inviteError) {
+            toast.error(inviteError);
+            setInviteError('');
+        }
+    }, [inviteError]);
+
+    useEffect(() => {
+        if (inviteSuccess) {
+            toast.success(inviteSuccess);
+            setInviteSuccess('');
+        }
+    }, [inviteSuccess]);
     const currentUserId = user?._id || user?.id;
 
     // Memoize fetchMyTeam using useCallback to fix the dependency warning safely
@@ -230,9 +252,6 @@ const MyTeam = () => {
             <div className="p-3 bg-blue-50 text-blue-700 rounded border border-blue-100">
                 <h3 className="font-semibold text-lg">Team Name: {team.teamName}</h3>
             </div>
-
-            {inviteError && <div className="text-sm text-red-600 bg-red-50 p-3 rounded border border-red-200">{inviteError}</div>}
-            {inviteSuccess && <div className="text-sm text-green-600 bg-green-50 p-3 rounded border border-green-200">{inviteSuccess}</div>}
 
             {team.isLocked && maxTeamSize !== 1 && (
                 <div className="p-4 bg-green-50 border-l-4 border-green-500 text-green-800 rounded shadow-sm">

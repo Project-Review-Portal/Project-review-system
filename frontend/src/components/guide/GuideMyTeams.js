@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
@@ -7,6 +8,13 @@ const GuideMyTeams = () => {
     const [approvedTeams, setApprovedTeams] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError('');
+        }
+    }, [error]);
 
     useEffect(() => {
         fetchApprovedTeams();
@@ -48,11 +56,7 @@ const GuideMyTeams = () => {
         <div className="bg-white p-6 rounded-lg shadow space-y-6">
             <h2 className="text-2xl font-semibold mb-4">My Teams</h2>
 
-            {error && (
-                <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-                    {error}
-                </div>
-            )}
+
 
             {approvedTeams.length === 0 ? (
                 <p className="text-gray-500">No teams approved by you yet.</p>

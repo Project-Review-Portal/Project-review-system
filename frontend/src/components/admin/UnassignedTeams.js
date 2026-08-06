@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 import '../../styles/AuthForms.css'; // Reusing styling
 import '../../styles/Dashboard.css'; // For team list display
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626"; 
@@ -8,6 +9,20 @@ const UnassignedTeams = () => {
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError('');
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (message) {
+            toast.success(message);
+            setMessage('');
+        }
+    }, [message]);
 
     useEffect(() => {
         const fetchUnassignedTeams = async () => {
@@ -48,8 +63,7 @@ const UnassignedTeams = () => {
         <div className="auth-container">
             <div className="auth-card">
                 <h2 className="auth-title">Unassigned Teams (After Period End)</h2>
-                {error && <p className="error-message">{error}</p>}
-                {message && <p className="success-message">{message}</p>}
+
 
                 {unassignedTeams.length === 0 && !error ? (
                     <p>All approved teams have a guide, or the assignment period has not yet ended, or no teams meet the criteria.</p>

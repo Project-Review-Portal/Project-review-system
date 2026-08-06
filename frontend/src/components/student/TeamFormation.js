@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
@@ -15,6 +16,20 @@ const TeamFormation = () => {
     const [existingTeam, setExistingTeam] = useState(null);
     const [teamFormationOpen, setTeamFormationOpen] = useState(true);
     const [invitations, setInvitations] = useState([]);
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError('');
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (success) {
+            toast.success(success);
+            setSuccess('');
+        }
+    }, [success]);
 
     useEffect(() => {
         fetchData();
@@ -267,16 +282,7 @@ const TeamFormation = () => {
                     <strong>Notice:</strong> You have pending team invitations. You must decline all invitations before you can form your own team.
                 </div>
             )}
-            {error && (
-                <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
-                    {error}
-                </div>
-            )}
-            {success && (
-                <div className="mb-4 p-2 bg-green-100 text-green-700 rounded">
-                    {success}
-                </div>
-            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">

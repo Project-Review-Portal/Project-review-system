@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
@@ -16,6 +17,20 @@ const AllocationsDashboard = ({ programme }) => {
     const [warningModalOpen, setWarningModalOpen] = useState(false);
     const [warningModalSummary, setWarningModalSummary] = useState({ title: '', message: '', warnings: [] });
     const [autoAssigning, setAutoAssigning] = useState(false);
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError('');
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (message) {
+            toast.success(message);
+            setMessage('');
+        }
+    }, [message]);
 
     // Store allocations as a map: { teamId: { guideId, panelId } }
     const [allocations, setAllocations] = useState({});
@@ -366,8 +381,7 @@ const AllocationsDashboard = ({ programme }) => {
                 </div>
             </div>
 
-            {message && <div className="p-3 bg-green-100 text-green-700 rounded transition-all">{message}</div>}
-            {error && <div className="p-3 bg-red-100 text-red-700 rounded">{error}</div>}
+
 
             {teams.length === 0 ? (
                 <p className="text-slate-500 font-medium">No teams found.</p>

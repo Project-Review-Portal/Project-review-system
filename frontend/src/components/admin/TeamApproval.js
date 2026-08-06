@@ -1,11 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 import '../../styles/TeamApproval.css'; // Import new CSS
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const TeamApproval = () => {
     const [teams, setTeams] = useState([]);
     const [message, setMessage] = useState('');
     const [messageType, setMessageType] = useState('');
+
+    useEffect(() => {
+        if (message) {
+            if (messageType === 'success') {
+                toast.success(message);
+            } else {
+                toast.error(message);
+            }
+            setMessage('');
+            setMessageType('');
+        }
+    }, [message, messageType]);
 
     const fetchTeams = async () => {
         try {
@@ -51,7 +64,7 @@ const TeamApproval = () => {
     return (
         <div className="team-approval-container">
             <h2>Team Approval & Rejection</h2>
-            {message && <p className={`message ${messageType}`}>{message}</p>}
+
             {teams.length === 0 ? (
                 <p className="no-teams-message">No pending teams to display.</p>
             ) : (

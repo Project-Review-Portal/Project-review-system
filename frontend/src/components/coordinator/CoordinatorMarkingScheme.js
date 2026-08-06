@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY = process.env.REACT_APP_SERVER_API_KEY || 'http://localhost:3626';
 
@@ -18,6 +19,20 @@ const CoordinatorMarkingScheme = () => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError('');
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (success) {
+            toast.success(success);
+            setSuccess('');
+        }
+    }, [success]);
 
     // Initial load: fetch panels and slot types
     useEffect(() => {
@@ -138,20 +153,6 @@ const CoordinatorMarkingScheme = () => {
                     </div>
                 </div>
             </div>
-
-            {/* Alerts */}
-            {error && (
-                <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                    <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    {error}
-                </div>
-            )}
-            {success && (
-                <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-                    <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    {success}
-                </div>
-            )}
 
             {panels.length === 0 ? (
                 <div className="p-10 bg-white rounded-xl shadow-sm border border-gray-100 text-center text-gray-500">

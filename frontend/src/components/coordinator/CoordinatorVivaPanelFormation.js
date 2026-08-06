@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
@@ -22,14 +23,15 @@ const CoordinatorVivaPanelFormation = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Auto-dismiss messages
     useEffect(() => {
-        if (message && messageType === 'success') {
-            const timer = setTimeout(() => {
-                setMessage('');
-                setMessageType('');
-            }, 5000);
-            return () => clearTimeout(timer);
+        if (message) {
+            if (messageType === 'success') {
+                toast.success(message);
+            } else {
+                toast.error(message);
+            }
+            setMessage('');
+            setMessageType('');
         }
     }, [message, messageType]);
 
@@ -141,12 +143,7 @@ const CoordinatorVivaPanelFormation = () => {
                 </p>
             </div>
 
-            {message && (
-                <div className={`p-4 rounded-xl border flex items-center gap-3 ${messageType === 'success' ? 'border-emerald-100 bg-emerald-50 text-emerald-800' : 'border-rose-100 bg-rose-50 text-rose-800'}`}>
-                    <span className="text-lg">{messageType === 'success' ? '✅' : '⚠️'}</span>
-                    <p className="text-sm font-semibold">{message}</p>
-                </div>
-            )}
+
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Left: Prefilled Internal Panel Members */}

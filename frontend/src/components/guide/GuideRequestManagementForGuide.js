@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
@@ -17,6 +18,20 @@ const GuideRequestManagementForGuide = () => {
         approvedCount: 0,
         maxTeams: 0
     });
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError('');
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (message) {
+            toast.success(message);
+            setMessage('');
+        }
+    }, [message]);
 
     useEffect(() => {
         fetchGuideData();
@@ -143,16 +158,7 @@ const GuideRequestManagementForGuide = () => {
                 )}
             </div>
 
-            {message && (
-                <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
-                    {message}
-                </div>
-            )}
-            {error && (
-                <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-                    {error}
-                </div>
-            )}
+
 
             {!isRequestPeriodActive && (
                 <div className="mb-4 p-3 bg-yellow-100 text-yellow-700 rounded">

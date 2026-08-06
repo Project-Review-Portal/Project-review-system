@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY = process.env.REACT_APP_SERVER_API_KEY || "http://localhost:3626";
 
@@ -15,6 +16,20 @@ const GuideReview = () => {
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState('');
     const [guideUser, setGuideUser] = useState(null);
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError(null);
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (successMessage) {
+            toast.success(successMessage);
+            setSuccessMessage('');
+        }
+    }, [successMessage]);
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
@@ -240,8 +255,7 @@ const GuideReview = () => {
                         </div>
                     </div>
 
-                    {successMessage && <div className="p-3 bg-green-100 text-green-700 rounded font-semibold text-sm">{successMessage}</div>}
-                    {error && <div className="p-3 bg-red-100 text-red-700 rounded font-semibold text-sm">{error}</div>}
+
 
                     {loadingSlots ? (
                         <div className="text-center py-12 font-bold text-gray-500">Loading timetable slots...</div>

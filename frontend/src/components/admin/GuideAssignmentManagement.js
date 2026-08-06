@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const GuideAssignmentManagement = () => {
     const [unassignedTeams, setUnassignedTeams] = useState([]);
@@ -11,6 +12,20 @@ const GuideAssignmentManagement = () => {
     const [error, setError] = useState('');
     const [selectedGuide, setSelectedGuide] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError('');
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (message) {
+            toast.success(message);
+            setMessage('');
+        }
+    }, [message]);
 
     useEffect(() => {
         fetchManagementData();
@@ -145,16 +160,7 @@ const GuideAssignmentManagement = () => {
         <div className="bg-white p-6 rounded-lg shadow space-y-6">
             <h2 className="text-2xl font-semibold mb-4">Guide Assignment Management</h2>
 
-            {message && (
-                <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
-                    {message}
-                </div>
-            )}
-            {error && (
-                <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-                    {error}
-                </div>
-            )}
+
 
             {!selectionHasEnded && (
                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">

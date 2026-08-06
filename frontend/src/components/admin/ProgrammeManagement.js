@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
@@ -11,6 +12,18 @@ const ProgrammeManagement = () => {
     const [editingId, setEditingId] = useState(null);
     const [editingName, setEditingName] = useState('');
     const [newName, setNewName] = useState('');
+
+    useEffect(() => {
+        if (message) {
+            if (messageType === 'success') {
+                toast.success(message);
+            } else {
+                toast.error(message);
+            }
+            setMessage('');
+            setMessageType('');
+        }
+    }, [message, messageType]);
     const [csvFileName, setCsvFileName] = useState('');
 
     const token = localStorage.getItem('token');
@@ -156,11 +169,7 @@ const ProgrammeManagement = () => {
                 Manage the list of PG programmes. Each programme will appear as a separate dashboard button on the admin home page.
             </p>
 
-            {message && (
-                <div className={`mb-4 p-3 rounded ${messageType === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-700'}`}>
-                    {message}
-                </div>
-            )}
+
 
             {/* CSV Upload */}
             <div className="mb-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100">

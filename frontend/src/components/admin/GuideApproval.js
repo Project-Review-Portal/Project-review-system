@@ -1,11 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 import '../../styles/AuthForms.css'; // Reusing styling
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626"; 
 const GuideAllotmentApproval = () => {
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError('');
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (message) {
+            toast.success(message);
+            setMessage('');
+        }
+    }, [message]);
 
     const handleApproveAllotment = async () => {
         setLoading(true);
@@ -35,8 +50,7 @@ const GuideAllotmentApproval = () => {
         <div className="auth-container">
             <div className="auth-card">
                 <h2 className="auth-title">Approve Guide Allotment</h2>
-                {error && <p className="error-message">{error}</p>}
-                {message && <p className="success-message">{message}</p>}
+
 
                 <p>Click the button below to approve your guide allotment request.</p>
                 <p className="info-message">

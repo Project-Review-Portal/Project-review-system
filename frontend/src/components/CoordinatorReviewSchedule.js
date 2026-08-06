@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../utils/toast';
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const DURATION_OPTIONS = [10, 15, 20, 25, 30];
 
@@ -28,6 +29,20 @@ const CoordinatorReviewSchedule = () => {
   const [allottedSchedules, setAllottedSchedules] = useState([]);
   const [loadingSchedules, setLoadingSchedules] = useState(false);
   const [selectedSlotType, setSelectedSlotType] = useState('review0');
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      setError('');
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (message) {
+      toast.success(message);
+      setMessage('');
+    }
+  }, [message]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -380,8 +395,7 @@ const CoordinatorReviewSchedule = () => {
           ℹ️ You are viewing this page in Read-Only Mode as an Assistant Coordinator.
         </div>
       )}
-      {message && <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">{message}</div>}
-      {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
+
       
       {step === 1 && (
         <form onSubmit={handleGenerateSlots} className="space-y-4 max-w-3xl">

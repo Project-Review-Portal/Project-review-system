@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
@@ -37,6 +38,20 @@ const GuideSelectionSettings = () => {
 
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError('');
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (message) {
+            toast.success(message);
+            setMessage('');
+        }
+    }, [message]);
 
     useEffect(() => {
         fetchCurrentSettings();
@@ -105,16 +120,7 @@ const GuideSelectionSettings = () => {
         <div className="bg-white p-6 rounded-lg shadow max-w-xl">
             <h2 className="text-2xl font-semibold mb-2">Guide Selection Request Settings</h2>
 
-            {message && (
-                <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
-                    {message}
-                </div>
-            )}
-            {error && (
-                <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-                    {error}
-                </div>
-            )}
+
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>

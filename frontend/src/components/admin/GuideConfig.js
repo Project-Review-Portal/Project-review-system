@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 import '../../styles/AuthForms.css'; // Reusing styling
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const GuideConfig = () => {
@@ -8,6 +9,20 @@ const GuideConfig = () => {
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError('');
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (message) {
+            toast.success(message);
+            setMessage('');
+        }
+    }, [message]);
 
     useEffect(() => {
         const fetchConfig = async () => {
@@ -92,8 +107,7 @@ const GuideConfig = () => {
         <div className="auth-container">
             <div className="auth-card">
                 <h2 className="auth-title">Guide Configuration</h2>
-                {error && <p className="error-message">{error}</p>}
-                {message && <p className="success-message">{message}</p>}
+
 
                 <form onSubmit={handleSetMaxTeamsPerGuide}>
                     <div className="form-group">

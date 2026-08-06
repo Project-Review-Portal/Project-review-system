@@ -29,10 +29,12 @@ import GuideMe from './components/GuideMe';
 import GuideFinalReports from './components/guide/FinalReports';
 import CoordinatorLetterLiveEditorCK from './components/CoordinatorLetterLiveEditorCK';
 import ResetPassword from './components/ResetPassword';
+import { ToastContainer } from './utils/toast';
 
 const App = () => {
   return (
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <ToastContainer />
             <Routes>
                 <Route path="/" element={<Login />} />
                 <Route path="/role-selection" element={<RoleSelection />} />

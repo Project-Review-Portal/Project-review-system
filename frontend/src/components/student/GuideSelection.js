@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 import '../../styles/GuideSelection.css'; // Import new CSS
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
@@ -11,6 +12,18 @@ const GuideSelection = () => {
     const [messageType, setMessageType] = useState(''); // 'success' or 'error'
     const [teamInfo, setTeamInfo] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (message) {
+            if (messageType === 'success') {
+                toast.success(message);
+            } else {
+                toast.error(message);
+            }
+            setMessage('');
+            setMessageType('');
+        }
+    }, [message, messageType]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -132,7 +145,7 @@ const GuideSelection = () => {
                     </select>
                 </div>
                 <button type="submit">Request Guide</button>
-                {message && <p className={`message ${messageType}`}>{message}</p>}
+
             </form>
         </div>
     );
