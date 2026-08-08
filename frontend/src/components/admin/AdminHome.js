@@ -86,7 +86,12 @@ const AdminHome = () => {
                                 subtitle="B.E. Computer Science and Engineering programme"
                                 icon="📚"
                                 color="bg-white border-gray-200 hover:border-emerald-300"
-                                onClick={() => navigate('/admin-dashboard/programme/B.E.%20CSE')}
+                                onClick={() => {
+                                    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+                                    storedUser.programme = 'B.E. CSE';
+                                    localStorage.setItem('user', JSON.stringify(storedUser));
+                                    navigate('/admin-dashboard/programme/B.E.%20CSE');
+                                }}
                             />
                             {programmes.map(pg => (
                                 <ListItem
@@ -95,7 +100,12 @@ const AdminHome = () => {
                                     subtitle="PG programme"
                                     icon="🎓"
                                     color="bg-white border-gray-200 hover:border-purple-300"
-                                    onClick={() => navigate(`/admin-dashboard/programme/${encodeURIComponent(pg.name)}`)}
+                                    onClick={() => {
+                                        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+                                        storedUser.programme = pg.name;
+                                        localStorage.setItem('user', JSON.stringify(storedUser));
+                                        navigate(`/admin-dashboard/programme/${encodeURIComponent(pg.name)}`);
+                                    }}
                                 />
                             ))}
                             {programmes.length === 0 && (

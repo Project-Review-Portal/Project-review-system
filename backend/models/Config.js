@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const configSchema = new mongoose.Schema({
+    programme: {
+        type: String,
+        required: true,
+        trim: true,
+    },
     maxTeamSize: {
         type: Number,
         default: 4,
@@ -43,4 +48,7 @@ const configSchema = new mongoose.Schema({
     }
 });
 
-module.exports = mongoose.model('Config', configSchema); 
+// One config document per programme — no duplicates allowed
+configSchema.index({ programme: 1 }, { unique: true });
+
+module.exports = mongoose.model('Config', configSchema);

@@ -28,7 +28,7 @@ const toDisplayString = (localDTString) => {
     });
 };
 
-const GuideSelectionSettings = () => {
+const GuideSelectionSettings = ({ programme }) => {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate]     = useState('');
     const [saved, setSaved]         = useState(null); // what's actually in DB
@@ -37,7 +37,10 @@ const GuideSelectionSettings = () => {
     const [loading, setLoading]     = useState(false);
 
     const token = localStorage.getItem('token');
-    const headers = { Authorization: `Bearer ${token}` };
+    const headers = { 
+        Authorization: `Bearer ${token}`,
+        ...(programme ? { 'X-Selected-Programme': programme } : {})
+    };
 
     useEffect(() => {
         if (error) {
@@ -55,7 +58,7 @@ const GuideSelectionSettings = () => {
 
     useEffect(() => {
         fetchCurrentSettings();
-    }, []);
+    }, [programme]);
 
     const fetchCurrentSettings = async () => {
         try {
@@ -106,7 +109,7 @@ const GuideSelectionSettings = () => {
             );
 
             setSaved({ start: startDate, end: endDate });
-            setMessage('Guide selection dates updated successfully!');
+            setMessage(`Guide selection dates updated successfully for ${programme || 'programme'}!`);
             setTimeout(() => setMessage(''), 4000);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to update settings');
@@ -118,7 +121,8 @@ const GuideSelectionSettings = () => {
 
     return (
         <div className="bg-white p-6 rounded-lg shadow max-w-xl">
-            <h2 className="text-2xl font-semibold mb-2">Guide Selection Request Settings</h2>
+            <h2 className="text-2xl font-semibold mb-1">Guide Selection Request Settings</h2>
+            {programme && <p className="text-sm text-indigo-600 font-semibold mb-4">Active Programme: {programme}</p>}
 
 
 

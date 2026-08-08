@@ -1,4 +1,22 @@
 const Programme = require('../models/Programme');
+const Config = require('../models/Config');
+
+// Helper to ensure Config doc exists for a programme
+const ensureConfigForProgramme = async (programmeName) => {
+    await Config.findOneAndUpdate(
+        { programme: programmeName },
+        {
+            $setOnInsert: {
+                programme: programmeName,
+                maxTeamSize: 4,
+                numReviews: 3,
+                vivaRequired: true,
+                teamFormationOpen: true
+            }
+        },
+        { upsert: true, new: true }
+    );
+};
 
 // Get all programmes
 exports.getAllProgrammes = async (req, res) => {
@@ -25,6 +43,8 @@ exports.addProgramme = async (req, res) => {
         }
         const programme = new Programme({ name: trimmedName });
         await programme.save();
+        await ensureConfigForProgramme(trimmedName);
+
         res.status(201).json({ message: 'Programme added successfully', programme });
     } catch (error) {
         console.error('Error adding programme:', error);
@@ -49,6 +69,7 @@ exports.bulkAddProgrammes = async (req, res) => {
             const existing = await Programme.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
             if (existing) { skipped.push(name); continue; }
             await new Programme({ name }).save();
+            await ensureConfigForProgramme(name);
             added++;
         }
 
@@ -69,16 +90,24 @@ exports.updateProgramme = async (req, res) => {
         }
         const trimmedName = name.trim();
 
+        const oldProgramme = await Programme.findById(id);
+        if (!oldProgramme) return res.status(404).json({ message: 'Programme not found' });
+
         // Check no collision with another doc
         const conflict = await Programme.findOne({ name: { $regex: new RegExp(`^${trimmedName}$`, 'i') }, _id: { $ne: id } });
         if (conflict) {
             return res.status(409).json({ message: `Programme "${trimmedName}" already exists` });
         }
 
-        const programme = await Programme.findByIdAndUpdate(id, { name: trimmedName }, { new: true });
-        if (!programme) return res.status(404).json({ message: 'Programme not found' });
+        const oldName = oldProgramme.name;
+        oldProgramme.name = trimmedName;
+        await oldProgramme.save();
 
-        res.json({ message: 'Programme updated', programme });
+        // Update Config programme field if old Config existed
+        await Config.findOneAndUpdate({ programme: oldName }, { programme: trimmedName });
+        await ensureConfigForProgramme(trimmedName);
+
+        res.json({ message: 'Programme updated', programme: oldProgramme });
     } catch (error) {
         console.error('Error updating programme:', error);
         res.status(500).json({ message: 'Server error' });
@@ -91,9 +120,13 @@ exports.deleteProgramme = async (req, res) => {
         const { id } = req.params;
         const programme = await Programme.findByIdAndDelete(id);
         if (!programme) return res.status(404).json({ message: 'Programme not found' });
+
+        await Config.deleteOne({ programme: programme.name });
+
         res.json({ message: `Programme "${programme.name}" deleted` });
     } catch (error) {
         console.error('Error deleting programme:', error);
         res.status(500).json({ message: 'Server error' });
     }
 };
+

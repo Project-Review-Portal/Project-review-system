@@ -50,7 +50,8 @@ exports.checkPreviousScheduleExists = async (req, res) => {
     }
 
     // Get dynamic settings to determine prerequisite chain
-    const { numReviews } = await getReviewSettings();
+    const programme = req.headers['x-selected-programme'];
+    const { numReviews } = await getReviewSettings(programme);
 
     // 1. Determine what prerequisite slotTypes are required globally for this reviewType
     let requiredTypes = [];

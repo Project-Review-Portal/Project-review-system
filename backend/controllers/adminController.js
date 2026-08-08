@@ -35,8 +35,8 @@ const hasTeamCompletedReview = async (teamId, reviewKey) => {
 };
 
 // Helper: Validate prerequisite chain for target slotType (dynamic based on config)
-const validatePrerequisiteForSlotType = async (teamId, slotType) => {
-    const { numReviews, vivaRequired, validSlotTypes } = await getReviewSettings();
+const validatePrerequisiteForSlotType = async (teamId, slotType, programme = null) => {
+    const { numReviews, vivaRequired, validSlotTypes } = await getReviewSettings(programme);
 
     if (!validSlotTypes.includes(slotType)) {
         return { ok: false, message: `Invalid slotType '${slotType}'. Valid types: ${validSlotTypes.join(', ')}` };
@@ -94,6 +94,9 @@ const doesUserHaveClash = async (userId, proposedStartTime, proposedEndTime, exi
 
 exports.setMaxTeamSize = async (req, res) => {
     try {
+        const programme = req.headers['x-selected-programme'];
+        if (!programme) return res.status(400).json({ message: 'Programme header (x-selected-programme) is required.' });
+
         const { maxTeamSize } = req.body;
         const newMax = Number(maxTeamSize);
 
@@ -102,15 +105,14 @@ exports.setMaxTeamSize = async (req, res) => {
         }
 
         // Capture old max BEFORE saving so we can determine direction of change
-        let config = await Config.findOne();
-        const oldMax = config ? Number(config.maxTeamSize) : newMax;
+        const existing = await Config.findOne({ programme });
+        const oldMax = existing ? Number(existing.maxTeamSize) : newMax;
 
-        if (!config) {
-            config = new Config({ maxTeamSize: newMax });
-        } else {
-            config.maxTeamSize = newMax;
-        }
-
+        const config = await Config.findOneAndUpdate(
+            { programme },
+            { $set: { maxTeamSize: newMax } },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
         await config.save();
 
         let disbandedCount = 0;
@@ -199,7 +201,9 @@ exports.setMaxTeamSize = async (req, res) => {
 
 exports.getMaxTeamSize = async (req, res) => {
     try {
-        const config = await Config.findOne();
+        const programme = req.headers['x-selected-programme'];
+        if (!programme) return res.status(400).json({ message: 'Programme header (x-selected-programme) is required.' });
+        const config = await Config.findOne({ programme });
         res.json({ maxTeamSize: config ? config.maxTeamSize : 4 });
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
@@ -208,6 +212,9 @@ exports.getMaxTeamSize = async (req, res) => {
 
 exports.setGuideSelectionDates = async (req, res) => {
     try {
+        const programme = req.headers['x-selected-programme'];
+        if (!programme) return res.status(400).json({ message: 'Programme header (x-selected-programme) is required.' });
+
         const { startDate, endDate } = req.body;
 
         if (!startDate || !endDate) {
@@ -226,18 +233,11 @@ exports.setGuideSelectionDates = async (req, res) => {
             return res.status(400).json({ message: 'End date must be after start date' });
         }
 
-        let config = await Config.findOne();
-        if (!config) {
-            config = new Config({ guideSelectionStartDate: start, guideSelectionEndDate: end, teamFormationOpen: true });
-        } else {
-            config.guideSelectionStartDate = start;
-            config.guideSelectionEndDate = end;
-            config.teamFormationOpen = true; // Keep team formation always open
-        }
-
-        await config.save();
-
-        // Removed auto-creation of solo teams
+        const config = await Config.findOneAndUpdate(
+            { programme },
+            { $set: { guideSelectionStartDate: start, guideSelectionEndDate: end, teamFormationOpen: true } },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
 
         res.json({ message: 'Guide selection dates updated successfully', config });
     } catch (error) {
@@ -248,7 +248,9 @@ exports.setGuideSelectionDates = async (req, res) => {
 
 exports.getGuideSelectionDates = async (req, res) => {
     try {
-        const config = await Config.findOne();
+        const programme = req.headers['x-selected-programme'];
+        if (!programme) return res.status(400).json({ message: 'Programme header (x-selected-programme) is required.' });
+        const config = await Config.findOne({ programme });
         res.json({
             startDate: config ? config.guideSelectionStartDate : null,
             endDate: config ? config.guideSelectionEndDate : null,
@@ -262,13 +264,13 @@ exports.getGuideSelectionDates = async (req, res) => {
 // Ensure team formation is always open
 exports.ensureTeamFormationOpen = async (req, res) => {
     try {
-        let config = await Config.findOne();
-        if (!config) {
-            config = new Config({ teamFormationOpen: true });
-        } else {
-            config.teamFormationOpen = true;
-        }
-        await config.save();
+        const programme = req.headers['x-selected-programme'];
+        if (!programme) return res.status(400).json({ message: 'Programme header (x-selected-programme) is required.' });
+        const config = await Config.findOneAndUpdate(
+            { programme },
+            { $set: { teamFormationOpen: true } },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
         res.json({ message: 'Team formation is now open', config });
     } catch (error) {
         console.error('Error ensuring team formation is open:', error);
@@ -722,6 +724,9 @@ exports.getTeamPanelAssignments = async (req, res) => {
 // Admin: Set review period dates
 exports.setReviewPeriodDates = async (req, res) => {
     try {
+        const programme = req.headers['x-selected-programme'];
+        if (!programme) return res.status(400).json({ message: 'Programme header (x-selected-programme) is required.' });
+
         const { startDate, endDate } = req.body;
 
         if (!startDate || !endDate) {
@@ -739,15 +744,11 @@ exports.setReviewPeriodDates = async (req, res) => {
             return res.status(400).json({ message: 'End date must be after start date' });
         }
 
-        let config = await Config.findOne();
-        if (!config) {
-            config = new Config({ reviewPeriodStartDate: start, reviewPeriodEndDate: end });
-        } else {
-            config.reviewPeriodStartDate = start;
-            config.reviewPeriodEndDate = end;
-        }
-
-        await config.save();
+        const config = await Config.findOneAndUpdate(
+            { programme },
+            { $set: { reviewPeriodStartDate: start, reviewPeriodEndDate: end } },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
         res.json({ message: 'Review period dates updated successfully', config });
 
     } catch (error) {
@@ -759,9 +760,11 @@ exports.setReviewPeriodDates = async (req, res) => {
 // Admin: Get review period dates
 exports.getReviewPeriodDates = async (req, res) => {
     try {
-        const config = await Config.findOne();
+        const programme = req.headers['x-selected-programme'];
+        if (!programme) return res.status(400).json({ message: 'Programme header (x-selected-programme) is required.' });
+        const config = await Config.findOne({ programme });
         if (!config) {
-            return res.status(404).json({ message: 'Review period dates not set' });
+            return res.json({ startDate: null, endDate: null });
         }
         res.json({
             startDate: config.reviewPeriodStartDate,
@@ -800,11 +803,12 @@ exports.createReviewSchedule = async (req, res) => {
         }
 
         // Determine target slot type dynamically from config
-        const { validSlotTypes } = await getReviewSettings();
+        const programme = req.headers['x-selected-programme'];
+        const { validSlotTypes } = await getReviewSettings(programme);
         const targetSlot = slotType && validSlotTypes.includes(slotType) ? slotType : validSlotTypes[0];
 
         // Enforce prerequisites for review2/review3
-        const prereq = await validatePrerequisiteForSlotType(teamId, targetSlot);
+        const prereq = await validatePrerequisiteForSlotType(teamId, targetSlot, programme);
         if (!prereq.ok) {
             return res.status(400).json({ message: prereq.message });
         }
@@ -1078,7 +1082,8 @@ exports.getAttendanceRecords = async (req, res) => {
 // Admin: Get daily attendance and marks records for all teams (for admin view)
 exports.getDailyAttendanceRecords = async (req, res) => {
     try {
-        const { validSlotTypes } = await getReviewSettings();
+        const programme = req.headers['x-selected-programme'] || req.query.programme;
+        const { validSlotTypes } = await getReviewSettings(programme);
         const totalEvents = validSlotTypes.length || 1;
 
         const teamFilter = {};
@@ -1231,7 +1236,8 @@ exports.deleteTeam = async (req, res) => {
 exports.generateSchedules = async (req, res) => {
     try {
         // Accept optional slotType; default to first valid slot from config
-        const { validSlotTypes } = await getReviewSettings();
+        const programme = req.headers['x-selected-programme'];
+        const { validSlotTypes } = await getReviewSettings(programme);
         const targetSlot = req.body && validSlotTypes.includes(req.body.slotType) ? req.body.slotType : validSlotTypes[0];
 
         // Get all teams that need schedules
@@ -1240,7 +1246,7 @@ exports.generateSchedules = async (req, res) => {
             .populate('panel', 'name');
 
         // Get review period dates
-        const config = await Config.findOne();
+        const config = await Config.findOne({ programme });
         if (!config || !config.reviewPeriodStartDate || !config.reviewPeriodEndDate) {
             return res.status(400).json({ message: 'Review period dates not set' });
         }
@@ -1303,17 +1309,18 @@ exports.generateSlotForTeam = async (req, res) => {
         }
 
         // Decide target slot type dynamically from config
-        const { validSlotTypes } = await getReviewSettings();
+        const programme = req.headers['x-selected-programme'] || team.programme;
+        const { validSlotTypes } = await getReviewSettings(programme);
         const targetSlot = slotType && validSlotTypes.includes(slotType) ? slotType : validSlotTypes[0];
 
         // Enforce prerequisites
-        const prereq = await validatePrerequisiteForSlotType(team._id, targetSlot);
+        const prereq = await validatePrerequisiteForSlotType(team._id, targetSlot, programme);
         if (!prereq.ok) {
             return res.status(400).json({ message: prereq.message });
         }
 
         // Get review period dates
-        const config = await Config.findOne();
+        const config = await Config.findOne({ programme });
         if (!config || !config.reviewPeriodStartDate || !config.reviewPeriodEndDate) {
             return res.status(400).json({ message: 'Review period dates not set' });
         }
@@ -2135,7 +2142,9 @@ exports.deleteAllDesignationTeamLimits = async (req, res) => {
 // Admin: Get current reviews/viva settings
 exports.getReviewsVivaSettings = async (req, res) => {
     try {
-        const config = await Config.findOne();
+        const programme = req.headers['x-selected-programme'];
+        if (!programme) return res.status(400).json({ message: 'Programme header (x-selected-programme) is required.' });
+        const config = await Config.findOne({ programme });
         res.json({
             numReviews: config ? config.numReviews : 3,
             vivaRequired: config ? config.vivaRequired : true
@@ -2149,6 +2158,9 @@ exports.getReviewsVivaSettings = async (req, res) => {
 // Admin: Update reviews/viva settings
 exports.setReviewsVivaSettings = async (req, res) => {
     try {
+        const programme = req.headers['x-selected-programme'];
+        if (!programme) return res.status(400).json({ message: 'Programme header (x-selected-programme) is required.' });
+
         const { numReviews, vivaRequired } = req.body;
 
         if (numReviews === undefined || vivaRequired === undefined) {
@@ -2160,15 +2172,11 @@ exports.setReviewsVivaSettings = async (req, res) => {
             return res.status(400).json({ message: 'numReviews must be a number between 1 and 10.' });
         }
 
-        let config = await Config.findOne();
-        if (!config) {
-            config = new Config({ numReviews: n, vivaRequired: !!vivaRequired });
-        } else {
-            config.numReviews = n;
-            config.vivaRequired = !!vivaRequired;
-        }
-
-        await config.save();
+        const config = await Config.findOneAndUpdate(
+            { programme },
+            { $set: { numReviews: n, vivaRequired: !!vivaRequired } },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
         res.json({ message: 'Reviews/Viva settings updated successfully', numReviews: config.numReviews, vivaRequired: config.vivaRequired });
     } catch (error) {
         console.error('Error updating reviews/viva settings:', error);

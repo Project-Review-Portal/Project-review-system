@@ -3,30 +3,37 @@ import MaxTeamSizeSettings from './MaxTeamSizeSettings';
 import GuideSelectionSettings from './GuideSelectionSettings';
 import ReviewsVivaSettings from './ReviewsVivaSettings';
 
-const AdminSettings = () => {
+const AdminSettings = ({ programme = 'B.E. CSE' }) => {
     const [activeTab, setActiveTab] = useState('guide-selection');
 
     const renderTabContent = () => {
         switch (activeTab) {
             case 'guide-selection':
-                return <GuideSelectionSettings />;
+                return <GuideSelectionSettings programme={programme} />;
             case 'team-size':
-                return <MaxTeamSizeSettings />;
+                return <MaxTeamSizeSettings programme={programme} />;
             case 'reviews':
-                return <ReviewsVivaSettings />;
+                return <ReviewsVivaSettings programme={programme} />;
             default:
-                return <MaxTeamSizeSettings />;
+                return <MaxTeamSizeSettings programme={programme} />;
         }
     };
 
     return (
         <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
             {/* Header section with rich gradient */}
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-8 text-white">
-                <h1 className="text-3xl text-center font-extrabold tracking-tight">Admin Settings</h1>
-                {/* <p className="mt-2 text-indigo-100 text-sm md:text-base">
-                    Manage team sizes, guide selection timelines, and reviews & viva configurations from a centralized dashboard.
-                </p> */}
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-6 text-white flex flex-col md:flex-row justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-extrabold tracking-tight">Admin Settings</h1>
+                    <p className="text-indigo-100 text-sm mt-1">
+                        Programme-specific configurations
+                    </p>
+                </div>
+                {programme && (
+                    <div className="mt-3 md:mt-0 bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/30 text-white font-semibold text-sm">
+                        Editing Settings for: <span className="underline decoration-indigo-300 font-bold">{programme}</span>
+                    </div>
+                )}
             </div>
 
             {/* Tab navigation */}

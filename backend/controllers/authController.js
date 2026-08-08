@@ -383,7 +383,8 @@ exports.resetPasswordOtp = async (req, res) => {
 exports.getReviewSettings = async (req, res) => {
     try {
         const { getReviewSettings } = require('../utils/reviewSettings');
-        const settings = await getReviewSettings();
+        const programme = req.headers['x-selected-programme'] || (req.user ? req.user.programme : null);
+        const settings = await getReviewSettings(programme);
         return res.json(settings);
     } catch (error) {
         console.error('Error fetching review settings:', error);

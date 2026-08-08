@@ -4,7 +4,7 @@ import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
-const MaxTeamSizeSettings = () => {
+const MaxTeamSizeSettings = ({ programme }) => {
     const [maxTeamSize, setMaxTeamSize] = useState(4);
     const [currentMaxTeamSize, setCurrentMaxTeamSize] = useState(4); // tracks the last saved value
     const [reviewPeriodStartDate, setReviewPeriodStartDate] = useState('');
@@ -29,14 +29,18 @@ const MaxTeamSizeSettings = () => {
 
     useEffect(() => {
         fetchSettings();
-    }, []);
+    }, [programme]);
 
     const fetchSettings = async () => {
         try {
             const token = localStorage.getItem('token');
+            const headers = { 
+                Authorization: `Bearer ${token}`,
+                ...(programme ? { 'X-Selected-Programme': programme } : {})
+            };
             const [teamSizeRes, reviewPeriodRes] = await Promise.all([
-                axios.get(`${SERVER_API_KEY}/api/admin/team-size`, { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get(`${SERVER_API_KEY}/api/admin/review-period-dates`, { headers: { Authorization: `Bearer ${token}` } })
+                axios.get(`${SERVER_API_KEY}/api/admin/team-size`, { headers }),
+                axios.get(`${SERVER_API_KEY}/api/admin/review-period-dates`, { headers })
             ]);
             setMaxTeamSize(teamSizeRes.data.maxTeamSize);
             setCurrentMaxTeamSize(Number(teamSizeRes.data.maxTeamSize)); // sync the saved baseline
@@ -61,7 +65,7 @@ const MaxTeamSizeSettings = () => {
         // Warn admin before decreasing — teams may be permanently disbanded
         if (newMax < currentMaxTeamSize) {
             const confirmed = window.confirm(
-                `You are reducing the max team size from ${currentMaxTeamSize} to ${newMax}.\n\n` +
+                `You are reducing the max team size from ${currentMaxTeamSize} to ${newMax} for ${programme || 'this programme'}.\n\n` +
                 `Teams with more than ${newMax} members (including the leader) will be PERMANENTLY DISBANDED and all their data removed.\n\n` +
                 `Teams with ${newMax} or fewer members will be automatically unlocked.\n\nProceed?`
             );
@@ -70,12 +74,14 @@ const MaxTeamSizeSettings = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post(`${SERVER_API_KEY}/api/admin/team-size`, { maxTeamSize: newMax }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const headers = { 
+                Authorization: `Bearer ${token}`,
+                ...(programme ? { 'X-Selected-Programme': programme } : {})
+            };
+            const res = await axios.post(`${SERVER_API_KEY}/api/admin/team-size`, { maxTeamSize: newMax }, { headers });
 
             const { disbandedCount, unlockedCount } = res.data;
-            let msg = 'Max team size updated successfully!';
+            let msg = `Max team size updated successfully for ${programme || 'programme'}!`;
             if (disbandedCount > 0 || unlockedCount > 0) {
                 const parts = [];
                 if (disbandedCount > 0) parts.push(`${disbandedCount} team(s) disbanded`);
@@ -95,7 +101,8 @@ const MaxTeamSizeSettings = () => {
     return (
         <div className="bg-white p-6 rounded-lg shadow">
 
-            <h2 className="text-2xl font-bold mb-6">Admin Settings</h2>
+            <h2 className="text-2xl font-bold mb-2">Team Size Settings</h2>
+            {programme && <p className="text-sm text-indigo-600 font-semibold mb-6">Active Programme: {programme}</p>}
 
             {/* Max Team Size Setting */}
             <div className="mb-8 p-4 border rounded-lg">

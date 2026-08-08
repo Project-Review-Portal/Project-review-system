@@ -27,6 +27,17 @@ const ProgrammeDashboard = () => {
     const progIdx = pathParts.indexOf('programme');
     const section = progIdx >= 0 && pathParts[progIdx + 2] ? pathParts[progIdx + 2] : 'home';
 
+    // Sync programme to stored user in case of direct URL access/refresh
+    React.useEffect(() => {
+        try {
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            if (storedUser && storedUser.programme !== decodedProgramme) {
+                storedUser.programme = decodedProgramme;
+                localStorage.setItem('user', JSON.stringify(storedUser));
+            }
+        } catch (e) {}
+    }, [decodedProgramme]);
+
     const renderSection = () => {
         switch (section) {
             case 'guide-me':
@@ -34,7 +45,7 @@ const ProgrammeDashboard = () => {
             case 'user-management':
                 return <UserManagement key={`user-${decodedProgramme}`} programme={decodedProgramme} studentsOnly />;
             case 'admin-settings':
-                return <AdminSettings />;
+                return <AdminSettings key={`settings-${decodedProgramme}`} programme={decodedProgramme} />;
             case 'review-panels':
                 return <PanelManagement key={`review-${decodedProgramme}`} panelType="review" programme={decodedProgramme} />;
             case 'allocations':

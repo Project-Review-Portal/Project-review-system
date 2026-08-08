@@ -434,7 +434,8 @@ exports.getDailyAttendance = async (req, res) => {
         const attendanceRecords = await Attendance.find({ team: { $in: teamIds } });
 
         // Build the list of review keys dynamically from config
-        const { validSlotTypes } = await getReviewSettings();
+        const programme = req.headers['x-selected-programme'] || (req.user ? req.user.programme : null);
+        const { validSlotTypes } = await getReviewSettings(programme);
 
         const formattedAttendance = {};
         for (const record of attendanceRecords) {
@@ -616,7 +617,8 @@ exports.submitMarks = async (req, res) => {
     try {
         const { teamId, studentId, components, slotType } = req.body;
 
-        const { validSlotTypes } = await getReviewSettings();
+        const programme = req.headers['x-selected-programme'] || (req.user ? req.user.programme : null);
+        const { validSlotTypes } = await getReviewSettings(programme);
         if (!slotType || !validSlotTypes.includes(slotType)) {
             return res.status(400).json({ message: `Invalid or missing slotType. Expected one of: ${validSlotTypes.join(', ')}.` });
         }

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626"; 
 
-const ReviewsVivaSettings = () => {
+const ReviewsVivaSettings = ({ programme }) => {
     const [numReviews, setNumReviews] = useState(3);
     const [vivaRequired, setVivaRequired] = useState(true);
     const [loading, setLoading] = useState(true);
@@ -26,21 +27,22 @@ const ReviewsVivaSettings = () => {
     useEffect(() => {
         fetchSettings();
         // eslint-disable-next-line
-    }, []);
+    }, [programme]);
 
     const fetchSettings = async () => {
         setLoading(true);
         setMessage(null);
         try {
-            const res = await fetch(`${SERVER_API_KEY}/api/admin/reviews-viva-settings`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (!res.ok) throw new Error('Failed to fetch settings');
-            const data = await res.json();
+            const headers = { 
+                Authorization: `Bearer ${token}`,
+                ...(programme ? { 'X-Selected-Programme': programme } : {})
+            };
+            const res = await axios.get(`${SERVER_API_KEY}/api/admin/reviews-viva-settings`, { headers });
+            const data = res.data;
             setNumReviews(data.numReviews ?? 3);
             setVivaRequired(data.vivaRequired ?? true);
         } catch (err) {
-            setMessage({ type: 'error', text: err.message || 'Error fetching settings' });
+            setMessage({ type: 'error', text: err.response?.data?.message || err.message || 'Error fetching settings' });
         } finally {
             setLoading(false);
         }
@@ -50,19 +52,19 @@ const ReviewsVivaSettings = () => {
         setSaving(true);
         setMessage(null);
         try {
-            const res = await fetch(`${SERVER_API_KEY}/api/admin/reviews-viva-settings`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify({ numReviews, vivaRequired })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'Failed to save settings');
+            const headers = { 
+                Authorization: `Bearer ${token}`,
+                ...(programme ? { 'X-Selected-Programme': programme } : {})
+            };
+            const res = await axios.post(
+                `${SERVER_API_KEY}/api/admin/reviews-viva-settings`,
+                { numReviews, vivaRequired },
+                { headers }
+            );
+            const data = res.data;
             setMessage({ type: 'success', text: data.message || 'Settings saved successfully!' });
         } catch (err) {
-            setMessage({ type: 'error', text: err.message || 'Error saving settings' });
+            setMessage({ type: 'error', text: err.response?.data?.message || err.message || 'Error saving settings' });
         } finally {
             setSaving(false);
         }
@@ -85,8 +87,9 @@ const ReviewsVivaSettings = () => {
     return (
         <div className="bg-white rounded-lg shadow p-6 max-w-xl">
             <h2 className="text-xl font-semibold text-gray-800 mb-1">Reviews / Viva Settings</h2>
+            {programme && <p className="text-sm text-indigo-600 font-semibold mb-3">Active Programme: {programme}</p>}
             <p className="text-sm text-gray-500 mb-6">
-                Configure how many reviews are required and whether a Viva is included. All scheduling,
+                Configure how many reviews are required and whether a Viva is included for {programme || 'this programme'}. All scheduling,
                 attendance, and marking logic will use these settings automatically.
             </p>
 
