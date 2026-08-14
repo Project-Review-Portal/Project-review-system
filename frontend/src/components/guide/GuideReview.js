@@ -326,41 +326,43 @@ const GuideReview = () => {
 
 
                     {/* Seniority Queue Status Banner */}
-                    {queueStatus === null ? (
-                        <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 animate-pulse">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            Checking your queue position...
-                        </div>
-                    ) : queueStatus.queueComplete ? (
-                        <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 font-semibold">
-                            <span>✅</span> All guides have confirmed their allocations for this review type.
-                        </div>
-                    ) : queueStatus.myTurn ? (
-                        <div className="flex items-center gap-2 px-4 py-3 bg-emerald-50 border border-emerald-300 rounded-lg text-sm text-emerald-800 font-semibold">
-                            <span>🟢</span>
-                            <span>It's your turn! Assign your teams to available slots below, then click <strong>"Confirm My Allocations"</strong> when done.</span>
-                            {queueStatus.alreadyConfirmed && (
-                                <span className="ml-2 px-2 py-0.5 bg-emerald-200 text-emerald-900 rounded-full text-xs">Waiting for co-level guides to also confirm</span>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="px-4 py-3 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-900">
-                            <div className="font-semibold flex items-center gap-1.5 mb-1">
-                                <span>⏳</span> Waiting for your turn
+                    {filteredSlots.length > 0 && (
+                        queueStatus === null ? (
+                            <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 animate-pulse">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                Checking your queue position...
                             </div>
-                            <div className="text-xs text-amber-700">
-                                Currently:{' '}
-                                {queueStatus.currentGuides && queueStatus.currentGuides.length > 0
-                                    ? queueStatus.currentGuides.map((g, i) => (
-                                        <span key={i} className="font-bold">{g.name}{queueStatus.currentGuides.length > 1 && i < queueStatus.currentGuides.length - 1 ? ', ' : ''}</span>
-                                    ))
-                                    : 'Another guide'
-                                }
-                                {' '}(seniority level {queueStatus.currentLevel}) is assigning slots.{' '}
-                                You are at position <strong>#{queueStatus.myPosition}</strong>.
-                                Slot dropdowns are read-only until it's your turn.
+                        ) : queueStatus.queueComplete ? (
+                            <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 font-semibold">
+                                <span>✅</span> All guides have confirmed their allocations for this review type.
                             </div>
-                        </div>
+                        ) : queueStatus.myTurn ? (
+                            <div className="flex items-center gap-2 px-4 py-3 bg-emerald-50 border border-emerald-300 rounded-lg text-sm text-emerald-800 font-semibold">
+                                <span>🟢</span>
+                                <span>It's your turn! Assign your teams to available slots below, then click <strong>"Confirm My Allocations"</strong> when done.</span>
+                                {queueStatus.alreadyConfirmed && (
+                                    <span className="ml-2 px-2 py-0.5 bg-emerald-200 text-emerald-900 rounded-full text-xs">Waiting for co-level guides to also confirm</span>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="px-4 py-3 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-900">
+                                <div className="font-semibold flex items-center gap-1.5 mb-1">
+                                    <span>⏳</span> Waiting for your turn
+                                </div>
+                                <div className="text-xs text-amber-700">
+                                    Currently:{' '}
+                                    {queueStatus.currentGuides && queueStatus.currentGuides.length > 0
+                                        ? queueStatus.currentGuides.map((g, i) => (
+                                            <span key={i} className="font-bold">{g.name}{queueStatus.currentGuides.length > 1 && i < queueStatus.currentGuides.length - 1 ? ', ' : ''}</span>
+                                        ))
+                                        : 'Another guide'
+                                    }
+                                    {' '}(seniority level {queueStatus.currentLevel}) is assigning slots.{' '}
+                                    You are at position <strong>#{queueStatus.myPosition}</strong>.
+                                    Slot dropdowns are read-only until it's your turn.
+                                </div>
+                            </div>
+                        )
                     )}
 
                     {loadingSlots ? (
