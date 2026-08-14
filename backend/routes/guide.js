@@ -21,6 +21,10 @@ router.get('/assigned-panels', auth, authorize(['guide', 'admin']), guideControl
 router.get('/panels/:panelId/slots', auth, authorize(['guide', 'admin']), guideController.getPanelSlotsForGuide);
 router.post('/save-slots', auth, authorize(['guide', 'admin']), guideController.savePanelSlotAssignments);
 
+// Seniority queue routes
+router.get('/panels/:panelId/queue-status', auth, authorize(['guide', 'admin']), guideController.getQueueStatus);
+router.post('/confirm-slots', auth, authorize(['guide', 'admin']), guideController.confirmSlotAssignments);
+
 // New route for fetching public guide selection dates
 router.get('/selection-dates', auth, guideController.getGuideSelectionDatesPublic);
 

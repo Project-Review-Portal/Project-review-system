@@ -29,6 +29,7 @@ const CoordinatorReviewSchedule = () => {
   const [allottedSchedules, setAllottedSchedules] = useState([]);
   const [loadingSchedules, setLoadingSchedules] = useState(false);
   const [selectedSlotType, setSelectedSlotType] = useState('review0');
+  const [panelStats, setPanelStats] = useState(null);  // { totalTeams, freeSlots, occupiedSlots, totalSlots, requiredSlots }
 
   useEffect(() => {
     if (error) {
@@ -195,10 +196,33 @@ const CoordinatorReviewSchedule = () => {
           );
       }
       setAllottedSchedules(fetchedSchedules);
+      // Refresh panel stats after saving slots
+      fetchPanelStats(form.reviewType);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save slots.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPanelStats = async (slotType) => {
+    try {
+      const token = localStorage.getItem('token');
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const programme = storedUser.programme;
+      const res = await axios.get(
+        `${SERVER_API_KEY}/api/panels/coordinator/panel-stats${slotType ? `?slotType=${slotType}` : ''}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...(programme ? { 'x-selected-programme': programme } : {})
+          }
+        }
+      );
+      setPanelStats(res.data);
+    } catch (err) {
+      // Non-critical; silently ignore
+      console.error('Failed to fetch panel stats:', err.message);
     }
   };
 
@@ -229,8 +253,19 @@ const CoordinatorReviewSchedule = () => {
     const hasCoordinatorRole = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
     if (hasCoordinatorRole) {
       fetchAllottedSchedules();
+      fetchPanelStats(form.reviewType);
     }
   }, [user]);
+
+  // Refresh panel stats when review type changes in the form
+  useEffect(() => {
+    if (user && form.reviewType) {
+      const hasCoordinatorRole = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
+      if (hasCoordinatorRole) {
+        fetchPanelStats(form.reviewType);
+      }
+    }
+  }, [form.reviewType, user]);
 
   const handleDeleteSchedule = async (scheduleId, hasAssignedTeam, teamName) => {
     const isReadOnly = user?.role === 'assistant coordinator';
@@ -397,6 +432,40 @@ const CoordinatorReviewSchedule = () => {
       )}
 
       
+      {step === 1 && panelStats && (
+        <div className="mb-5 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+          <div className="flex items-center gap-2 mb-3">
+            <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg>
+            <span className="text-sm font-bold text-slate-700 uppercase tracking-wide">
+              Panel Stats — {reviewTypes.find(rt => rt.value === form.reviewType)?.label || form.reviewType}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white rounded-lg border border-slate-200 p-3 text-center shadow-sm">
+              <div className="text-2xl font-extrabold text-indigo-600">{panelStats.totalTeams}</div>
+              <div className="text-xs text-slate-500 font-semibold mt-0.5 uppercase tracking-wide">Teams Assigned</div>
+            </div>
+            <div className="bg-white rounded-lg border border-slate-200 p-3 text-center shadow-sm">
+              <div className="text-2xl font-extrabold text-blue-500">{panelStats.totalSlots ?? (panelStats.freeSlots + panelStats.occupiedSlots)}</div>
+              <div className="text-xs text-slate-500 font-semibold mt-0.5 uppercase tracking-wide">
+                Free Slots Set
+                {panelStats.occupiedSlots > 0 && (
+                  <span className="ml-1 text-green-600">({panelStats.occupiedSlots} filled)</span>
+                )}
+              </div>
+            </div>
+            <div className={`bg-white rounded-lg border p-3 text-center shadow-sm ${panelStats.requiredSlots > 0 ? 'border-amber-300' : 'border-green-300'}`}>
+              <div className={`text-2xl font-extrabold ${panelStats.requiredSlots > 0 ? 'text-amber-500' : 'text-green-500'}`}>
+                {panelStats.requiredSlots > 0 ? `+${panelStats.requiredSlots}` : '✓'}
+              </div>
+              <div className={`text-xs font-semibold mt-0.5 uppercase tracking-wide ${panelStats.requiredSlots > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                {panelStats.requiredSlots > 0 ? `${panelStats.requiredSlots} More Slots Needed` : 'Enough Slots'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {step === 1 && (
         <form onSubmit={handleGenerateSlots} className="space-y-4 max-w-3xl">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

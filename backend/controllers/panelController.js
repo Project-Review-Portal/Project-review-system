@@ -7,6 +7,7 @@ const Team = require('../models/Team');
 const Config = require('../models/Config');
 const Mark = require('../models/Mark');
 const InstructionTemplate = require('../models/InstructionTemplate'); 
+const SlotAssignmentQueue = require('../models/SlotAssignmentQueue');
 const { getReviewSettings } = require('../utils/reviewSettings');
 const normalizeProgramme = (prog) => {
     if (!prog) return 'B.E. CSE';
@@ -844,12 +845,111 @@ exports.saveFreeSlotsForCoordinator = async (req, res) => {
                 isNotified: true
             });
         }
+        // ── Build / reset the seniority queue for this panel + slotType ──────────────────
+        try {
+            // 1. Collect all teams assigned to this panel (via TeamPanelAssignment or Team.panel)
+            const teamPanelAssignment = await TeamPanelAssignment.findOne({ panel: panel._id });
+            const teamIds = teamPanelAssignment ? teamPanelAssignment.teams : [];
+            const teams = await Team.find({ _id: { $in: teamIds } }).select('guidePreference');
+
+            // 2. Collect unique guides who have teams in this panel
+            const guideIdSet = new Set();
+            teams.forEach(t => { if (t.guidePreference) guideIdSet.add(t.guidePreference.toString()); });
+            const guideIds = Array.from(guideIdSet);
+
+            // 3. Fetch seniority for each guide
+            const guides = await User.find({ _id: { $in: guideIds } }).select('_id seniority');
+
+            // 4. Sort by seniority ascending (lower = higher priority), null seniority goes last
+            guides.sort((a, b) => {
+                const sa = a.seniority !== null && a.seniority !== undefined ? a.seniority : Infinity;
+                const sb = b.seniority !== null && b.seniority !== undefined ? b.seniority : Infinity;
+                return sa - sb;
+            });
+
+            // 5. Group guides by same seniority level
+            const guideOrder = [];
+            let prevSeniority = null;
+            guides.forEach(g => {
+                const sen = (g.seniority !== null && g.seniority !== undefined) ? g.seniority : Infinity;
+                if (sen !== prevSeniority) {
+                    guideOrder.push([g._id]);
+                    prevSeniority = sen;
+                } else {
+                    guideOrder[guideOrder.length - 1].push(g._id);
+                }
+            });
+
+            // 6. Upsert the queue (reset state)
+            const queueDoc = await SlotAssignmentQueue.findOneAndUpdate(
+                { panel: panel._id, slotType },
+                {
+                    $set: {
+                        guideOrder,
+                        currentLevel: 0,
+                        confirmedAtCurrentLevel: [],
+                        allConfirmedGuides: [],
+                        resetAt: new Date()
+                    }
+                },
+                { upsert: true, new: true }
+            );
+            console.log(`✅ SlotAssignmentQueue created/reset for panel ${panel._id} slotType=${slotType}, ${guideOrder.length} seniority levels`);
+
+            // 7. Auto-advance if level-0 guides have no unallocated teams for this slotType
+            await autoAdvanceQueue(queueDoc, panel._id, slotType);
+        } catch (qErr) {
+            // Queue build failure should not block the slot save response
+            console.error('⚠️ Failed to rebuild SlotAssignmentQueue:', qErr.message);
+        }
+
         res.json({ message: 'Free slots saved successfully!' });
     } catch (error) {
         console.error('Error saving free slots:', error);
         res.status(500).json({ message: 'Server error saving free slots' });
     }
 };
+
+// Helper: auto-advance the queue past levels where all guides have no unallocated teams
+async function autoAdvanceQueue(queueDoc, panelId, slotType) {
+    let changed = false;
+    while (queueDoc.currentLevel < queueDoc.guideOrder.length) {
+        const levelGuides = queueDoc.guideOrder[queueDoc.currentLevel];
+        // Check if any guide at this level has at least one team with no slot assigned yet
+        const levelGuideIds = levelGuides.map(id => id.toString());
+        const teamsAtLevel = await Team.find({ guidePreference: { $in: levelGuideIds }, panel: panelId }).select('_id');
+        const teamIdsAtLevel = teamsAtLevel.map(t => t._id.toString());
+        if (teamIdsAtLevel.length === 0) {
+            // No teams → auto-skip this level
+            queueDoc.currentLevel += 1;
+            changed = true;
+            continue;
+        }
+        // Check if all those teams already have an assigned slot
+        const unassignedSlot = await TimeTable.findOne({
+            panel: panelId,
+            slotType,
+            team: { $in: teamsAtLevel.map(t => t._id) }
+        });
+        const assignedCount = await TimeTable.countDocuments({
+            panel: panelId,
+            slotType,
+            team: { $in: teamsAtLevel.map(t => t._id) }
+        });
+        if (assignedCount >= teamIdsAtLevel.length) {
+            queueDoc.currentLevel += 1;
+            changed = true;
+        } else {
+            break; // There are still teams needing a slot at this level
+        }
+    }
+    if (changed) {
+        await SlotAssignmentQueue.findByIdAndUpdate(queueDoc._id, {
+            $set: { currentLevel: queueDoc.currentLevel }
+        });
+    }
+    return queueDoc;
+}
 
 // Coordinator: Assign slots to teams
 exports.assignSlotsForCoordinator = async (req, res) => {
@@ -1262,5 +1362,56 @@ exports.getCoordinatedTeams = async (req, res) => {
     } catch (error) {
         console.error('Error fetching coordinated teams:', error);
         res.status(500).json({ message: 'Server error while fetching coordinated teams', error: error.message });
+    }
+};
+
+// Coordinator: Get panel stats (total teams, free slots, occupied slots) for a given slotType
+exports.getPanelStats = async (req, res) => {
+    try {
+        const coordinatorId = req.user.id;
+        const { slotType } = req.query;
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+        const programme = normalizeProgramme(selectedProgramme);
+
+        // Find the coordinator's panel
+        let panel = await Panel.findOne({
+            $or: [
+                { coordinator: coordinatorId },
+                { assistantCoordinators: coordinatorId }
+            ],
+            programme
+        });
+        if (!panel) {
+            panel = await Panel.findOne({
+                $or: [
+                    { coordinator: coordinatorId },
+                    { assistantCoordinators: coordinatorId }
+                ]
+            });
+        }
+        if (!panel) {
+            return res.json({ totalTeams: 0, freeSlots: 0, occupiedSlots: 0, requiredSlots: 0 });
+        }
+
+        // Total teams assigned to this panel
+        const totalTeams = await Team.countDocuments({ panel: panel._id });
+
+        // Build the slot query
+        const slotQuery = { panel: panel._id };
+        if (slotType) slotQuery.slotType = slotType;
+
+        // Free slots: team is null
+        const freeSlots = await TimeTable.countDocuments({ ...slotQuery, team: null });
+
+        // Occupied slots: team is set
+        const occupiedSlots = await TimeTable.countDocuments({ ...slotQuery, team: { $ne: null } });
+
+        const totalSlots = freeSlots + occupiedSlots;
+        const requiredSlots = Math.max(0, totalTeams - totalSlots);
+
+        res.json({ totalTeams, freeSlots, occupiedSlots, totalSlots, requiredSlots });
+    } catch (error) {
+        console.error('Error fetching panel stats:', error);
+        res.status(500).json({ message: 'Server error fetching panel stats' });
     }
 };

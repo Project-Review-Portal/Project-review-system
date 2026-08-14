@@ -6,6 +6,7 @@ const Config = require('../models/Config');
 const Attendance = require('../models/Attendance');
 const Mark = require('../models/Mark');
 const FinalReport = require('../models/FinalReport');
+const SlotAssignmentQueue = require('../models/SlotAssignmentQueue');
 const fs = require('fs');
 const path = require('path');
 const { getReviewSettings } = require('../utils/reviewSettings');
@@ -931,6 +932,37 @@ exports.savePanelSlotAssignments = async (req, res) => {
         if (!panel) {
             return res.status(404).json({ message: 'Panel not found' });
         }
+
+        // ── Seniority queue gate check ───────────────────────────────────────
+        // Determine which slotType the guide is trying to assign
+        // (infer from the first assignment's slot, or accept as a body field)
+        const slotTypeToCheck = req.body.slotType || null;
+        if (slotTypeToCheck) {
+            const queue = await SlotAssignmentQueue.findOne({ panel: panelId, slotType: slotTypeToCheck });
+            if (queue && queue.guideOrder && queue.guideOrder.length > 0) {
+                // Guides at the current level
+                const currentLevelGuideIds = (queue.guideOrder[queue.currentLevel] || []).map(id => id.toString());
+                if (!currentLevelGuideIds.includes(guideId)) {
+                    // Find this guide's position
+                    let guideLevel = -1;
+                    for (let i = 0; i < queue.guideOrder.length; i++) {
+                        if (queue.guideOrder[i].some(id => id.toString() === guideId)) {
+                            guideLevel = i;
+                            break;
+                        }
+                    }
+                    if (guideLevel === -1) {
+                        // Guide is not in the queue at all — still allow (backward compat)
+                    } else {
+                        return res.status(403).json({
+                            message: 'It is not your turn yet. Please wait for the more senior guides to confirm their allocations.',
+                            myQueuePosition: guideLevel + 1,
+                            currentQueuePosition: queue.currentLevel + 1
+                        });
+                    }
+                }
+            }
+        }
         
         for (const assign of assignments) {
             const { slotId, teamId } = assign;
@@ -977,5 +1009,169 @@ exports.savePanelSlotAssignments = async (req, res) => {
     } catch (error) {
         console.error('Error saving slot assignments for guide:', error);
         res.status(500).json({ message: 'Server error saving assignments' });
+    }
+};
+
+// Guide: Get queue status for a panel + slotType (lightweight, for polling)
+exports.getQueueStatus = async (req, res) => {
+    try {
+        const { panelId } = req.params;
+        const { slotType } = req.query;
+        const guideId = req.user.id;
+
+        const queue = await SlotAssignmentQueue.findOne({ panel: panelId, slotType });
+        if (!queue || !queue.guideOrder || queue.guideOrder.length === 0) {
+            // No queue exists yet — allow freely
+            return res.json({
+                hasQueue: false,
+                myTurn: true,
+                queueComplete: false,
+                currentGuides: [],
+                myPosition: null,
+                totalLevels: 0
+            });
+        }
+
+        const currentLevel = queue.currentLevel;
+        const totalLevels = queue.guideOrder.length;
+        const queueComplete = currentLevel >= totalLevels;
+
+        // Find this guide's level
+        let myLevel = -1;
+        for (let i = 0; i < totalLevels; i++) {
+            if (queue.guideOrder[i].some(id => id.toString() === guideId)) {
+                myLevel = i;
+                break;
+            }
+        }
+
+        if (myLevel === -1) {
+            // Guide is not in this queue
+            return res.json({
+                hasQueue: true,
+                myTurn: false,
+                notInQueue: true,
+                queueComplete,
+                currentLevel,
+                totalLevels
+            });
+        }
+
+        const myTurn = !queueComplete && myLevel === currentLevel;
+
+        // Fetch names for current level guides
+        const currentLevelGuideIds = queueComplete ? [] : (queue.guideOrder[currentLevel] || []);
+        const currentGuideUsers = await User.find({ _id: { $in: currentLevelGuideIds } }).select('name seniority');
+
+        // Whether this guide has already confirmed at current level
+        const alreadyConfirmed = queue.confirmedAtCurrentLevel.some(id => id.toString() === guideId);
+
+        return res.json({
+            hasQueue: true,
+            myTurn,
+            queueComplete,
+            myPosition: myLevel + 1,
+            currentLevel: currentLevel + 1,
+            totalLevels,
+            alreadyConfirmed,
+            currentGuides: currentGuideUsers.map(u => ({ name: u.name, seniority: u.seniority }))
+        });
+    } catch (error) {
+        console.error('Error fetching queue status:', error);
+        res.status(500).json({ message: 'Server error fetching queue status' });
+    }
+};
+
+// Guide: Confirm their slot allocations and advance the queue
+exports.confirmSlotAssignments = async (req, res) => {
+    try {
+        const { panelId, slotType } = req.body;
+        const guideId = req.user.id;
+
+        if (!panelId || !slotType) {
+            return res.status(400).json({ message: 'panelId and slotType are required.' });
+        }
+
+        const queue = await SlotAssignmentQueue.findOne({ panel: panelId, slotType });
+        if (!queue) {
+            return res.json({ message: 'No queue found. Confirmation recorded.', queueComplete: true });
+        }
+
+        const currentLevel = queue.currentLevel;
+        const totalLevels = queue.guideOrder.length;
+
+        if (currentLevel >= totalLevels) {
+            return res.json({ message: 'Queue is already complete.', queueComplete: true });
+        }
+
+        // Verify this guide is at the current level
+        const currentLevelGuideIds = queue.guideOrder[currentLevel].map(id => id.toString());
+        if (!currentLevelGuideIds.includes(guideId)) {
+            return res.status(403).json({ message: 'It is not your turn to confirm.' });
+        }
+
+        // Add guide to confirmedAtCurrentLevel if not already there
+        if (!queue.confirmedAtCurrentLevel.some(id => id.toString() === guideId)) {
+            queue.confirmedAtCurrentLevel.push(guideId);
+            queue.allConfirmedGuides.push(guideId);
+        }
+
+        // Check if ALL guides at current level have confirmed
+        const allConfirmed = currentLevelGuideIds.every(id =>
+            queue.confirmedAtCurrentLevel.some(cid => cid.toString() === id)
+        );
+
+        if (allConfirmed) {
+            // Advance to next level
+            queue.currentLevel += 1;
+            queue.confirmedAtCurrentLevel = [];
+
+            // Auto-advance past levels with no pending teams
+            while (queue.currentLevel < totalLevels) {
+                const nextLevelIds = queue.guideOrder[queue.currentLevel].map(id => id.toString());
+                const teamsAtLevel = await Team.find({
+                    guidePreference: { $in: nextLevelIds },
+                    panel: panelId
+                }).select('_id');
+
+                if (teamsAtLevel.length === 0) {
+                    queue.currentLevel += 1;
+                    continue;
+                }
+
+                const assignedCount = await TimeTable.countDocuments({
+                    panel: panelId,
+                    slotType,
+                    team: { $in: teamsAtLevel.map(t => t._id) }
+                });
+
+                if (assignedCount >= teamsAtLevel.length) {
+                    queue.currentLevel += 1;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        await queue.save();
+
+        const newQueueComplete = queue.currentLevel >= totalLevels;
+        const newCurrentLevel = Math.min(queue.currentLevel, totalLevels - 1);
+        const nextGuideIds = newQueueComplete ? [] : (queue.guideOrder[queue.currentLevel] || []);
+        const nextGuides = await User.find({ _id: { $in: nextGuideIds } }).select('name seniority');
+
+        return res.json({
+            message: allConfirmed
+                ? (newQueueComplete ? 'All guides have confirmed. Slot allocation is complete!' : 'Your level confirmed. Next guide(s) can now assign slots.')
+                : 'Your confirmation recorded. Waiting for other guides at your seniority level.',
+            queueComplete: newQueueComplete,
+            allConfirmedAtLevel: allConfirmed,
+            currentLevel: queue.currentLevel + 1,
+            totalLevels,
+            nextGuides: nextGuides.map(u => ({ name: u.name, seniority: u.seniority }))
+        });
+    } catch (error) {
+        console.error('Error confirming slot assignments:', error);
+        res.status(500).json({ message: 'Server error confirming assignments' });
     }
 };

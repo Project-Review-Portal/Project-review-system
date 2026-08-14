@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { toast } from '../../utils/toast';
 
@@ -16,6 +16,9 @@ const GuideReview = () => {
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState('');
     const [guideUser, setGuideUser] = useState(null);
+    // Seniority queue state
+    const [queueStatus, setQueueStatus] = useState(null);  // null = not fetched yet
+    const [confirmingSlots, setConfirmingSlots] = useState(false);
 
     useEffect(() => {
         if (error) {
@@ -69,6 +72,7 @@ const GuideReview = () => {
         setModifiedAssignments({});
         setSuccessMessage('');
         setError(null);
+        setQueueStatus(null);
         setLoadingSlots(true);
         try {
             const token = localStorage.getItem('token');
@@ -85,16 +89,39 @@ const GuideReview = () => {
         }
     };
 
+    // Fetch queue status whenever panel or slotType changes
+    const fetchQueueStatus = useCallback(async (panelId, slotType) => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get(
+                `${SERVER_API_KEY}/api/guide/panels/${panelId}/queue-status?slotType=${slotType}`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setQueueStatus(res.data);
+        } catch (err) {
+            console.error('Error fetching queue status:', err);
+            // On error, default to allowing assignment (fail-open)
+            setQueueStatus({ hasQueue: false, myTurn: true });
+        }
+    }, []);
+
+    useEffect(() => {
+        if (selectedPanel && selectedSlotType) {
+            setQueueStatus(null);
+            fetchQueueStatus(selectedPanel._id, selectedSlotType);
+        }
+    }, [selectedPanel, selectedSlotType, fetchQueueStatus]);
+
     const handleCancelChanges = () => {
         setModifiedAssignments({});
         setSuccessMessage('');
         setError(null);
     };
 
-    const handleSaveChanges = async () => {
+    const handleSaveChanges = async (isCalledByConfirm = false) => {
         setError(null);
         setSuccessMessage('');
-        setLoadingSlots(true);
+        if (!isCalledByConfirm) setLoadingSlots(true);
         try {
             const token = localStorage.getItem('token');
             const updates = [];
@@ -109,12 +136,15 @@ const GuideReview = () => {
 
             await axios.post(`${SERVER_API_KEY}/api/guide/save-slots`, {
                 panelId: selectedPanel._id,
+                slotType: selectedSlotType,
                 assignments: updates
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            setSuccessMessage('Assignments saved successfully!');
+            if (!isCalledByConfirm) {
+                setSuccessMessage('Assignments saved successfully!');
+            }
             setModifiedAssignments({});
             
             // Refresh the slots for this panel
@@ -123,10 +153,48 @@ const GuideReview = () => {
             });
             setSlots(res.data.slots || []);
             setMyTeams(res.data.myTeams || []);
-            setLoadingSlots(false);
+            if (!isCalledByConfirm) setLoadingSlots(false);
+            return true; // success
         } catch (err) {
             console.error('Error saving assignments:', err);
             setError(err.response?.data?.message || 'Failed to save assignments.');
+            if (!isCalledByConfirm) setLoadingSlots(false);
+            return false; // failure
+        }
+    };
+
+    const handleConfirmAllocations = async () => {
+        setConfirmingSlots(true);
+        setError(null);
+        try {
+            // 1. Save any pending changes first
+            const saveOk = await handleSaveChanges(true);
+            if (!saveOk) {
+                setConfirmingSlots(false);
+                return;
+            }
+            // 2. Confirm in the queue
+            const token = localStorage.getItem('token');
+            const confirmRes = await axios.post(`${SERVER_API_KEY}/api/guide/confirm-slots`, {
+                panelId: selectedPanel._id,
+                slotType: selectedSlotType
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            toast.success(confirmRes.data.message || 'Allocations confirmed!');
+            // 3. Refresh queue status
+            await fetchQueueStatus(selectedPanel._id, selectedSlotType);
+            // 4. Refresh slots
+            const slotsRes = await axios.get(`${SERVER_API_KEY}/api/guide/panels/${selectedPanel._id}/slots`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setSlots(slotsRes.data.slots || []);
+            setMyTeams(slotsRes.data.myTeams || []);
+        } catch (err) {
+            console.error('Error confirming allocations:', err);
+            setError(err.response?.data?.message || 'Failed to confirm allocations.');
+        } finally {
+            setConfirmingSlots(false);
             setLoadingSlots(false);
         }
     };
@@ -257,6 +325,44 @@ const GuideReview = () => {
 
 
 
+                    {/* Seniority Queue Status Banner */}
+                    {queueStatus === null ? (
+                        <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 animate-pulse">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            Checking your queue position...
+                        </div>
+                    ) : queueStatus.queueComplete ? (
+                        <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 font-semibold">
+                            <span>✅</span> All guides have confirmed their allocations for this review type.
+                        </div>
+                    ) : queueStatus.myTurn ? (
+                        <div className="flex items-center gap-2 px-4 py-3 bg-emerald-50 border border-emerald-300 rounded-lg text-sm text-emerald-800 font-semibold">
+                            <span>🟢</span>
+                            <span>It's your turn! Assign your teams to available slots below, then click <strong>"Confirm My Allocations"</strong> when done.</span>
+                            {queueStatus.alreadyConfirmed && (
+                                <span className="ml-2 px-2 py-0.5 bg-emerald-200 text-emerald-900 rounded-full text-xs">Waiting for co-level guides to also confirm</span>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="px-4 py-3 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-900">
+                            <div className="font-semibold flex items-center gap-1.5 mb-1">
+                                <span>⏳</span> Waiting for your turn
+                            </div>
+                            <div className="text-xs text-amber-700">
+                                Currently:{' '}
+                                {queueStatus.currentGuides && queueStatus.currentGuides.length > 0
+                                    ? queueStatus.currentGuides.map((g, i) => (
+                                        <span key={i} className="font-bold">{g.name}{queueStatus.currentGuides.length > 1 && i < queueStatus.currentGuides.length - 1 ? ', ' : ''}</span>
+                                    ))
+                                    : 'Another guide'
+                                }
+                                {' '}(seniority level {queueStatus.currentLevel}) is assigning slots.{' '}
+                                You are at position <strong>#{queueStatus.myPosition}</strong>.
+                                Slot dropdowns are read-only until it's your turn.
+                            </div>
+                        </div>
+                    )}
+
                     {loadingSlots ? (
                         <div className="text-center py-12 font-bold text-gray-500">Loading timetable slots...</div>
                     ) : filteredSlots.length === 0 ? (
@@ -328,32 +434,38 @@ const GuideReview = () => {
                                                                     myTeams.some(t => t._id?.toString() === currentTeamId?.toString()) ||
                                                                     (slot.team?.guidePreference?._id?.toString() === guideUser?._id?.toString())
                                                                 );
+                                                                // Disable editing if it's not this guide's turn
+                                                                const canEdit = queueStatus === null || queueStatus.myTurn;
 
                                                                 if (!isAssigned) {
                                                                     return (
                                                                         <div key={sIdx} className="border p-3 bg-green-50/30 border-green-200 rounded-b text-center flex flex-col justify-between items-center transition-colors hover:bg-green-50/50 min-h-[105px]">
                                                                             <div className="text-[9px] uppercase font-extrabold text-green-700 tracking-wider mb-2">Free Slot</div>
-                                                                            <select
-                                                                                value=""
-                                                                                onChange={(e) => {
-                                                                                    const val = e.target.value;
-                                                                                    if (val) {
-                                                                                        setModifiedAssignments(prev => ({
-                                                                                            ...prev,
-                                                                                            [slot._id]: val
-                                                                                        }));
+                                                                            {canEdit ? (
+                                                                                <select
+                                                                                    value=""
+                                                                                    onChange={(e) => {
+                                                                                        const val = e.target.value;
+                                                                                        if (val) {
+                                                                                            setModifiedAssignments(prev => ({
+                                                                                                ...prev,
+                                                                                                [slot._id]: val
+                                                                                            }));
+                                                                                        }
+                                                                                    }}
+                                                                                    className="w-full border border-green-300 rounded px-2 py-1 text-xs bg-white text-gray-800 font-medium cursor-pointer shadow-sm hover:border-green-400 focus:outline-none"
+                                                                                >
+                                                                                    <option value="">-- Assign Team --</option>
+                                                                                    {myTeams
+                                                                                        .filter(t => !assignedTeamIds.has(t._id?.toString()))
+                                                                                        .map(t => (
+                                                                                            <option key={t._id} value={t._id}>{t.teamName}</option>
+                                                                                        ))
                                                                                     }
-                                                                                }}
-                                                                                className="w-full border border-green-300 rounded px-2 py-1 text-xs bg-white text-gray-800 font-medium cursor-pointer shadow-sm hover:border-green-400 focus:outline-none"
-                                                                            >
-                                                                                <option value="">-- Assign Team --</option>
-                                                                                {myTeams
-                                                                                    .filter(t => !assignedTeamIds.has(t._id?.toString()))
-                                                                                    .map(t => (
-                                                                                        <option key={t._id} value={t._id}>{t.teamName}</option>
-                                                                                    ))
-                                                                                }
-                                                                            </select>
+                                                                                </select>
+                                                                            ) : (
+                                                                                <div className="text-[10px] text-amber-600 font-semibold">Locked — not your turn</div>
+                                                                            )}
                                                                             <div className="text-[10px] text-gray-400 mt-2">Supervisor: —</div>
                                                                         </div>
                                                                     );
@@ -366,17 +478,19 @@ const GuideReview = () => {
                                                                                 <div className="font-bold text-gray-800 text-xs truncate max-w-full" title={teamObj?.teamName}>{teamObj?.teamName}</div>
                                                                                 <div className="text-[9px] text-indigo-600 font-semibold truncate max-w-full" title={`Supervisor: ${guideUser?.name || 'You'}`}>Supervisor: {guideUser?.name || 'You'}</div>
                                                                             </div>
-                                                                            <button
-                                                                                onClick={() => {
-                                                                                    setModifiedAssignments(prev => ({
-                                                                                        ...prev,
-                                                                                        [slot._id]: null // mark as cleared
-                                                                                    }));
-                                                                                }}
-                                                                                className="mt-2 px-2.5 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 hover:border-red-300 rounded text-[9px] font-bold uppercase transition shadow-sm w-full"
-                                                                            >
-                                                                                Unassign
-                                                                            </button>
+                                                                            {canEdit && (
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        setModifiedAssignments(prev => ({
+                                                                                            ...prev,
+                                                                                            [slot._id]: null // mark as cleared
+                                                                                        }));
+                                                                                    }}
+                                                                                    className="mt-2 px-2.5 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 hover:border-red-300 rounded text-[9px] font-bold uppercase transition shadow-sm w-full"
+                                                                                >
+                                                                                    Unassign
+                                                                                </button>
+                                                                            )}
                                                                         </div>
                                                                     );
                                                                 } else {
@@ -405,23 +519,38 @@ const GuideReview = () => {
                             </div>
 
                             {/* Batch Action Buttons */}
-                            {hasChanges && (
-                                <div className="flex justify-end gap-3 mt-6 border-t pt-4">
+                            {/* Show Save + Confirm buttons only when it's the guide's turn */}
+                            <div className="flex flex-wrap justify-end gap-3 mt-6 border-t pt-4">
+                                {/* Always show Confirm button if it's guide's turn (even without pending changes) */}
+                                {queueStatus?.myTurn && !queueStatus?.alreadyConfirmed && (
                                     <button
-                                        onClick={handleCancelChanges}
-                                        className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded shadow-sm transition text-sm uppercase tracking-wider"
+                                        onClick={handleConfirmAllocations}
+                                        disabled={confirmingSlots || loadingSlots}
+                                        className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow transition disabled:bg-emerald-300 text-sm uppercase tracking-wider flex items-center gap-2"
                                     >
-                                        Cancel Changes
+                                        {confirmingSlots ? (
+                                            <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Confirming...</>
+                                        ) : '✅ Confirm My Allocations'}
                                     </button>
-                                    <button
-                                        onClick={handleSaveChanges}
-                                        disabled={loadingSlots}
-                                        className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded shadow-sm transition disabled:bg-green-300 text-sm uppercase tracking-wider"
-                                    >
-                                        {loadingSlots ? 'Saving...' : 'Save Assignments'}
-                                    </button>
-                                </div>
-                            )}
+                                )}
+                                {queueStatus?.myTurn && !queueStatus?.alreadyConfirmed && hasChanges && (
+                                    <>
+                                        <button
+                                            onClick={handleCancelChanges}
+                                            className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded shadow-sm transition text-sm uppercase tracking-wider"
+                                        >
+                                            Cancel Changes
+                                        </button>
+                                        <button
+                                            onClick={() => handleSaveChanges()}
+                                            disabled={loadingSlots}
+                                            className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded shadow-sm transition disabled:bg-green-300 text-sm uppercase tracking-wider"
+                                        >
+                                            {loadingSlots ? 'Saving...' : 'Save Assignments'}
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>

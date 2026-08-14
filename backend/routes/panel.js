@@ -84,6 +84,9 @@ router.get('/coordinator/allotted-schedules', auth, authorize(['coordinator', 'a
 // Allow coordinator (or admin) to delete an allotted schedule they created
 router.delete('/coordinator/allotted-schedules/:scheduleId', auth, authorize(['coordinator', 'admin']), panelController.deleteAllottedSchedule);
 
+// Coordinator panel stats (teams assigned, free/occupied slots)
+router.get('/coordinator/panel-stats', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), panelController.getPanelStats);
+
 // Coordinator Viva Panel endpoints
 router.get('/coordinator/viva-panel', auth, authorize(['coordinator', 'assistant coordinator']), panelController.getCoordinatorVivaPanel);
 router.post('/coordinator/viva-panel', auth, authorize(['coordinator']), panelController.saveCoordinatorVivaPanel);
