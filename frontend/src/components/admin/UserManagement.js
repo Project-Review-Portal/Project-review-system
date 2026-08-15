@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
@@ -18,6 +19,8 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
         name: '',
         email_id: '',
         designation: '',
+        affiliation: '',
+        contactNumber: '',
         memberType: 'internal'
     });
 
@@ -26,8 +29,32 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
     const [newLimit, setNewLimit] = useState({ designation: '', ugLimit: '', pgLimit: '' });
     const [limitsSaved, setLimitsSaved] = useState(true);
     const [showLimitsPanel, setShowLimitsPanel] = useState(false);
+
+    useEffect(() => {
+        if (message) {
+            if (messageType === 'error') {
+                toast.error(message);
+            } else {
+                toast.success(message);
+            }
+            setMessage('');
+            setMessageType('');
+        }
+    }, [message, messageType]);
     const [limitMessage, setLimitMessage] = useState('');
     const [limitMessageType, setLimitMessageType] = useState('');
+
+    useEffect(() => {
+        if (limitMessage) {
+            if (limitMessageType === 'error') {
+                toast.error(limitMessage);
+            } else {
+                toast.success(limitMessage);
+            }
+            setLimitMessage('');
+            setLimitMessageType('');
+        }
+    }, [limitMessage, limitMessageType]);
     const [limitCsvFileName, setLimitCsvFileName] = useState('');
     const [deleteConfirmModal, setDeleteConfirmModal] = useState({ show: false, type: '', id: '', data: null });
 
@@ -106,7 +133,9 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
                 username: newFaculty.email_id,
                 email_id: newFaculty.email_id,
                 name: newFaculty.name,
-                designation: newFaculty.designation || '',
+                designation: newFaculty.memberType === 'external' ? '' : (newFaculty.designation || ''),
+                affiliation: newFaculty.memberType === 'external' ? (newFaculty.affiliation || '') : '',
+                contactNumber: newFaculty.memberType === 'external' ? (newFaculty.contactNumber || '') : '',
                 memberType: newFaculty.memberType,
                 seniority: newFaculty.seniority ? Number(newFaculty.seniority) : null
             }];
@@ -121,6 +150,8 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
                 name: '',
                 email_id: '',
                 designation: '',
+                affiliation: '',
+                contactNumber: '',
                 memberType: 'internal'
             });
 
@@ -589,6 +620,8 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
                 email_id: f.email || f.username || '',
                 name: f.name,
                 designation: f.designation || '',
+                affiliation: f.affiliation || '',
+                contactNumber: f.contactNumber || '',
                 memberType: f.memberType || 'internal'
             }));
             
@@ -713,16 +746,6 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-1">Designation</label>
-                            <input
-                                type="text"
-                                value={newFaculty.designation}
-                                onChange={(e) => setNewFaculty({ ...newFaculty, designation: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                placeholder="e.g. Professor"
-                            />
-                        </div>
-                        <div>
                             <label className="block text-xs font-semibold text-slate-500 mb-1">Member Type</label>
                             <select
                                 value={newFaculty.memberType}
@@ -733,6 +756,41 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
                                 <option value="external">External</option>
                             </select>
                         </div>
+                        {newFaculty.memberType === 'external' ? (
+                            <>
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Affiliation</label>
+                                    <input
+                                        type="text"
+                                        value={newFaculty.affiliation}
+                                        onChange={(e) => setNewFaculty({ ...newFaculty, affiliation: e.target.value })}
+                                        className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                        placeholder="e.g. MIT, Chennai"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Contact Number</label>
+                                    <input
+                                        type="tel"
+                                        value={newFaculty.contactNumber}
+                                        onChange={(e) => setNewFaculty({ ...newFaculty, contactNumber: e.target.value })}
+                                        className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                        placeholder="e.g. 9876543210"
+                                    />
+                                </div>
+                            </>
+                        ) : (
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-500 mb-1">Designation</label>
+                                <input
+                                    type="text"
+                                    value={newFaculty.designation}
+                                    onChange={(e) => setNewFaculty({ ...newFaculty, designation: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    placeholder="e.g. Professor"
+                                />
+                            </div>
+                        )}
                     </div>
                     <div className="flex justify-end">
                         <button
@@ -761,146 +819,178 @@ const UserManagement = ({ programme, globalOnly, studentsOnly }) => {
                     </button>
                 </div>
 
-                {facultyData.length > 0 && (
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full border border-gray-300">
-                            <thead>
-                                <tr className="bg-gray-100">
-                                    <th className="border px-4 py-2">S.No.</th>
-                                    <th className="border px-4 py-2">Email</th>
-                                    <th className="border px-4 py-2">Name</th>
-                                    <th className="border px-4 py-2">Designation</th>
-                                    <th className="border px-4 py-2">Member Type</th>
-                                    <th className="border px-4 py-2">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {facultyData.map((faculty, index) => (
-                                    <tr key={index}>
-                                        <td className="border px-4 py-2 text-center">
-                                            {editingFaculty === index ? (
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    value={faculty.seniority || ''}
-                                                    onChange={(e) => {
-                                                        const newData = [...facultyData];
-                                                        newData[index].seniority = e.target.value;
-                                                        setFacultyData(newData);
-                                                    }}
-                                                    className="w-20 px-2 py-1 border rounded text-sm text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                                />
-                                            ) : (
-                                                faculty.seniority || '—'
-                                            )}
-                                        </td>
-                                        <td className="border px-4 py-2">
-                                            {editingFaculty === index ? (
-                                                <input
-                                                    type="text"
-                                                    value={faculty.email_id}
-                                                    onChange={(e) => {
-                                                        const newData = [...facultyData];
-                                                        newData[index].email_id = e.target.value;
-                                                        setFacultyData(newData);
-                                                    }}
-                                                    className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                                />
-                                            ) : (
-                                                faculty.email_id
-                                            )}
-                                        </td>
-                                        <td className="border px-4 py-2">
-                                            {editingFaculty === index ? (
-                                                <input
-                                                    type="text"
-                                                    value={faculty.name}
-                                                    onChange={(e) => {
-                                                        const newData = [...facultyData];
-                                                        newData[index].name = e.target.value;
-                                                        setFacultyData(newData);
-                                                    }}
-                                                    className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                                />
-                                            ) : (
-                                                faculty.name
-                                            )}
-                                        </td>
-                                        <td className="border px-4 py-2">
-                                            {editingFaculty === index ? (
-                                                <input
-                                                    type="text"
-                                                    value={faculty.designation || ''}
-                                                    onChange={(e) => {
-                                                        const newData = [...facultyData];
-                                                        newData[index].designation = e.target.value;
-                                                        setFacultyData(newData);
-                                                    }}
-                                                    className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                                />
-                                            ) : (
-                                                faculty.designation || ''
-                                            )}
-                                        </td>
-                                        <td className="border px-4 py-2">
-                                            {editingFaculty === index ? (
-                                                <select
-                                                    value={faculty.memberType}
-                                                    onChange={(e) => {
-                                                        const newData = [...facultyData];
-                                                        newData[index].memberType = e.target.value;
-                                                        setFacultyData(newData);
-                                                    }}
-                                                    className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                                >
-                                                    <option value="internal">internal</option>
-                                                    <option value="external">external</option>
-                                                </select>
-                                            ) : (
-                                                <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${faculty.memberType === 'external' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-700'}`}>
-                                                    {faculty.memberType}
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="border px-4 py-2">
-                                            {editingFaculty === index ? (
-                                                <div>
-                                                    <button
-                                                        onClick={() => updateFaculty(index)}
-                                                        className="bg-green-500 text-white px-2 py-1 rounded mr-2 text-xs font-semibold"
-                                                    >
-                                                        Save
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setEditingFaculty(null)}
-                                                        className="bg-gray-500 text-white px-2 py-1 rounded text-xs font-semibold"
-                                                    >
-                                                        Cancel
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <div>
-                                                    <button
-                                                        onClick={() => setEditingFaculty(index)}
-                                                        className="bg-blue-500 text-white px-2 py-1 rounded mr-2 text-xs font-semibold"
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleRequestDeleteFaculty(faculty.email_id)}
-                                                        className="bg-red-500 text-white px-2 py-1 rounded text-xs font-semibold"
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </td>
+                {/* ── Internal Faculty Table ── */}
+                {facultyData.some(f => f.memberType !== 'external') && (
+                    <div className="mb-8">
+                        <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-xs font-semibold">Internal</span>
+                            Faculty Members
+                        </h4>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full border border-gray-300">
+                                <thead>
+                                    <tr className="bg-gray-100">
+                                        <th className="border px-4 py-2">S.No.</th>
+                                        <th className="border px-4 py-2">Email</th>
+                                        <th className="border px-4 py-2">Name</th>
+                                        <th className="border px-4 py-2">Designation</th>
+                                        <th className="border px-4 py-2">Actions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {facultyData
+                                        .map((faculty, index) => ({ faculty, index }))
+                                        .filter(({ faculty }) => faculty.memberType !== 'external')
+                                        .map(({ faculty, index }) => (
+                                            <tr key={index}>
+                                                <td className="border px-4 py-2 text-center">
+                                                    {editingFaculty === index ? (
+                                                        <input
+                                                            type="number" min="1"
+                                                            value={faculty.seniority || ''}
+                                                            onChange={(e) => { const nd = [...facultyData]; nd[index].seniority = e.target.value; setFacultyData(nd); }}
+                                                            className="w-20 px-2 py-1 border rounded text-sm text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                        />
+                                                    ) : (faculty.seniority || '—')}
+                                                </td>
+                                                <td className="border px-4 py-2">
+                                                    {editingFaculty === index ? (
+                                                        <input type="text" value={faculty.email_id}
+                                                            onChange={(e) => { const nd = [...facultyData]; nd[index].email_id = e.target.value; setFacultyData(nd); }}
+                                                            className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                        />
+                                                    ) : faculty.email_id}
+                                                </td>
+                                                <td className="border px-4 py-2">
+                                                    {editingFaculty === index ? (
+                                                        <input type="text" value={faculty.name}
+                                                            onChange={(e) => { const nd = [...facultyData]; nd[index].name = e.target.value; setFacultyData(nd); }}
+                                                            className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                        />
+                                                    ) : faculty.name}
+                                                </td>
+                                                <td className="border px-4 py-2">
+                                                    {editingFaculty === index ? (
+                                                        <input type="text" value={faculty.designation || ''}
+                                                            onChange={(e) => { const nd = [...facultyData]; nd[index].designation = e.target.value; setFacultyData(nd); }}
+                                                            className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                            placeholder="Designation"
+                                                        />
+                                                    ) : (faculty.designation || '')}
+                                                </td>
+                                                <td className="border px-4 py-2">
+                                                    {editingFaculty === index ? (
+                                                        <div>
+                                                            <button onClick={() => updateFaculty(index)} className="bg-green-500 text-white px-2 py-1 rounded mr-2 text-xs font-semibold">Save</button>
+                                                            <button onClick={() => setEditingFaculty(null)} className="bg-gray-500 text-white px-2 py-1 rounded text-xs font-semibold">Cancel</button>
+                                                        </div>
+                                                    ) : (
+                                                        <div>
+                                                            <button onClick={() => setEditingFaculty(index)} className="bg-blue-500 text-white px-2 py-1 rounded mr-2 text-xs font-semibold">Edit</button>
+                                                            <button onClick={() => handleRequestDeleteFaculty(faculty.email_id)} className="bg-red-500 text-white px-2 py-1 rounded text-xs font-semibold">Delete</button>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
+
+                {/* ── External Faculty Table ── */}
+                {facultyData.some(f => f.memberType === 'external') && (
+                    <div className="mb-8">
+                        <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-semibold">External</span>
+                            Faculty Members
+                        </h4>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full border border-gray-300">
+                                <thead>
+                                    <tr className="bg-amber-50">
+                                        <th className="border px-4 py-2">S.No.</th>
+                                        <th className="border px-4 py-2">Email</th>
+                                        <th className="border px-4 py-2">Name</th>
+                                        <th className="border px-4 py-2">Affiliation</th>
+                                        <th className="border px-4 py-2">Contact No.</th>
+                                        <th className="border px-4 py-2">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {facultyData
+                                        .map((faculty, index) => ({ faculty, index }))
+                                        .filter(({ faculty }) => faculty.memberType === 'external')
+                                        .map(({ faculty, index }) => (
+                                            <tr key={index}>
+                                                <td className="border px-4 py-2 text-center">
+                                                    {editingFaculty === index ? (
+                                                        <input
+                                                            type="number" min="1"
+                                                            value={faculty.seniority || ''}
+                                                            onChange={(e) => { const nd = [...facultyData]; nd[index].seniority = e.target.value; setFacultyData(nd); }}
+                                                            className="w-20 px-2 py-1 border rounded text-sm text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                        />
+                                                    ) : (faculty.seniority || '—')}
+                                                </td>
+                                                <td className="border px-4 py-2">
+                                                    {editingFaculty === index ? (
+                                                        <input type="text" value={faculty.email_id}
+                                                            onChange={(e) => { const nd = [...facultyData]; nd[index].email_id = e.target.value; setFacultyData(nd); }}
+                                                            className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                        />
+                                                    ) : faculty.email_id}
+                                                </td>
+                                                <td className="border px-4 py-2">
+                                                    {editingFaculty === index ? (
+                                                        <input type="text" value={faculty.name}
+                                                            onChange={(e) => { const nd = [...facultyData]; nd[index].name = e.target.value; setFacultyData(nd); }}
+                                                            className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                        />
+                                                    ) : faculty.name}
+                                                </td>
+                                                <td className="border px-4 py-2">
+                                                    {editingFaculty === index ? (
+                                                        <input type="text" value={faculty.affiliation || ''}
+                                                            onChange={(e) => { const nd = [...facultyData]; nd[index].affiliation = e.target.value; setFacultyData(nd); }}
+                                                            className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                            placeholder="e.g. MIT, Chennai"
+                                                        />
+                                                    ) : (faculty.affiliation || <span className="text-gray-400 text-xs italic">—</span>)}
+                                                </td>
+                                                <td className="border px-4 py-2">
+                                                    {editingFaculty === index ? (
+                                                        <input type="tel" value={faculty.contactNumber || ''}
+                                                            onChange={(e) => { const nd = [...facultyData]; nd[index].contactNumber = e.target.value; setFacultyData(nd); }}
+                                                            className="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                            placeholder="e.g. 9876543210"
+                                                        />
+                                                    ) : (faculty.contactNumber || <span className="text-gray-400 text-xs italic">—</span>)}
+                                                </td>
+                                                <td className="border px-4 py-2">
+                                                    {editingFaculty === index ? (
+                                                        <div>
+                                                            <button onClick={() => updateFaculty(index)} className="bg-green-500 text-white px-2 py-1 rounded mr-2 text-xs font-semibold">Save</button>
+                                                            <button onClick={() => setEditingFaculty(null)} className="bg-gray-500 text-white px-2 py-1 rounded text-xs font-semibold">Cancel</button>
+                                                        </div>
+                                                    ) : (
+                                                        <div>
+                                                            <button onClick={() => setEditingFaculty(index)} className="bg-blue-500 text-white px-2 py-1 rounded mr-2 text-xs font-semibold">Edit</button>
+                                                            <button onClick={() => handleRequestDeleteFaculty(faculty.email_id)} className="bg-red-500 text-white px-2 py-1 rounded text-xs font-semibold">Delete</button>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* Designation limits settings block */}
+
 
                 {/* Designation limits settings block */}
                 <hr className="my-8 border-gray-200" />

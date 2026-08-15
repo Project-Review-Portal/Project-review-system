@@ -15,6 +15,16 @@ const userSchema = new mongoose.Schema({
         required: false,
         default: ''
     },
+    affiliation: {
+        type: String,
+        required: false,
+        default: ''
+    },
+    contactNumber: {
+        type: String,
+        required: false,
+        default: ''
+    },
     email: {
         type: String,
         required: false,

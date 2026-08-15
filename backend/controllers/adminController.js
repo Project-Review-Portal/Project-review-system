@@ -1418,7 +1418,7 @@ exports.uploadFaculty = async (req, res) => {
             try {
                 // Expect email_id, name, memberType
                 const emailId = faculty.email_id || faculty.email || faculty.facultyId;
-                const { name, memberType, designation, seniority } = faculty;
+                const { name, memberType, designation, seniority, affiliation, contactNumber } = faculty;
 
                 // Validate required fields
                 if (!emailId || !name) {
@@ -1464,7 +1464,9 @@ exports.uploadFaculty = async (req, res) => {
                 const user = new User({
                     username: emailId, // use email as username for faculty
                     name,
-                    designation: designation || '',
+                    designation: normalizedMemberType === 'external' ? '' : (designation || ''),
+                    affiliation: normalizedMemberType === 'external' ? (affiliation || '') : '',
+                    contactNumber: normalizedMemberType === 'external' ? (contactNumber || '') : '',
                     email: emailId,
                     password: hashedPassword,
                     role: 'guide',
@@ -1571,7 +1573,7 @@ exports.uploadStudents = async (req, res) => {
 exports.updateFaculty = async (req, res) => {
     try {
         const { facultyId } = req.params; // can be email or username
-        const { name, designation, memberType, seniority } = req.body;
+        const { name, designation, memberType, seniority, affiliation, contactNumber } = req.body;
 
         console.log('Updating faculty with identifier:', facultyId, 'and name:', name);
 
@@ -1589,11 +1591,20 @@ exports.updateFaculty = async (req, res) => {
 
         // Update user
         user.name = name;
-        if (designation !== undefined) {
-            user.designation = designation;
-        }
         if (memberType !== undefined) {
             user.memberType = memberType;
+        }
+        // For external: save affiliation & contactNumber, clear designation
+        // For internal: save designation, clear affiliation & contactNumber
+        const resolvedType = memberType !== undefined ? memberType : user.memberType;
+        if (resolvedType === 'external') {
+            user.designation = '';
+            if (affiliation !== undefined) user.affiliation = affiliation;
+            if (contactNumber !== undefined) user.contactNumber = contactNumber;
+        } else {
+            if (designation !== undefined) user.designation = designation;
+            user.affiliation = '';
+            user.contactNumber = '';
         }
         if (seniority !== undefined && seniority !== null && seniority !== '') {
             const sVal = Number(seniority);
@@ -1848,7 +1859,7 @@ exports.getAllFaculty = async (req, res) => {
             match.memberType = 'internal';
         }
         const faculty = await User.find(match)
-            .select('username name roles memberType email designation seniority')
+            .select('username name roles memberType email designation affiliation contactNumber seniority')
             .sort({ seniority: 1 });
         res.json(faculty);
     } catch (error) {

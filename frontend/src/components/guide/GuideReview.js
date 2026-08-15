@@ -55,7 +55,14 @@ const GuideReview = () => {
             
             let fetchedPanels = res.data || [];
             if (selectedProgramme) {
-                fetchedPanels = fetchedPanels.filter(p => p.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
+                const normSelected = selectedProgramme.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+                fetchedPanels = fetchedPanels.filter(p => {
+                    const normP = p.programme?.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || '';
+                    return normP === normSelected || 
+                           (normSelected.includes('cse') && normP.includes('cse')) ||
+                           (normSelected.includes('computerscience') && normP.includes('cse')) ||
+                           (normSelected.includes('cse') && normP.includes('computerscience'));
+                });
             }
 
             setPanels(fetchedPanels);
