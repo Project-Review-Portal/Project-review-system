@@ -349,8 +349,8 @@ exports.getAssignedTeams = async (req, res) => {
         }
 
         const teams = await Team.find(query)
-            .populate('teamLeader', 'name')
-            .populate('members', 'name');
+            .populate('teamLeader', 'name username')
+            .populate('members', 'name username');
 
         const teamIds = teams.map(t => t._id);
         const attendances = await Attendance.find({ team: { $in: teamIds } });

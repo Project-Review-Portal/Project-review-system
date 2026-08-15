@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+const SERVER_API_KEY = process.env.REACT_APP_SERVER_API_KEY || "http://localhost:3626";
 
 const GuideUploadAttendance = ({ programme }) => {
     const [assignedTeams, setAssignedTeams] = useState([]);
@@ -20,13 +20,7 @@ const GuideUploadAttendance = ({ programme }) => {
     });
 
     const showNotification = (title, message, type = 'success') => {
-        setNotification({
-            isOpen: true,
-            title,
-            message,
-            type
-        });
-        // Auto-dismiss after 4 seconds
+        setNotification({ isOpen: true, title, message, type });
         setTimeout(() => {
             setNotification(prev => ({ ...prev, isOpen: false }));
         }, 4000);
@@ -36,7 +30,7 @@ const GuideUploadAttendance = ({ programme }) => {
         const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
         setUserRole(storedUser.role);
         fetchData();
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const fetchData = async () => {
         try {
@@ -93,9 +87,6 @@ const GuideUploadAttendance = ({ programme }) => {
         }));
     };
 
-
-
-
     const handleSubmitAttendance = async (teamId) => {
         try {
             const token = localStorage.getItem('token');
@@ -111,7 +102,7 @@ const GuideUploadAttendance = ({ programme }) => {
                     isPresent: !!attendanceData[studentId]?.[event]
                 }));
             };
-            
+
             // Add team leader if exists
             if (team.teamLeader) {
                 studentAttendances.push({
@@ -119,7 +110,7 @@ const GuideUploadAttendance = ({ programme }) => {
                     assessments: formatAssessments(team.teamLeader._id)
                 });
             }
-            
+
             // Add team members
             team.members.forEach(member => {
                 studentAttendances.push({
@@ -127,7 +118,7 @@ const GuideUploadAttendance = ({ programme }) => {
                     assessments: formatAssessments(member._id)
                 });
             });
-            
+
             // Map frontend dates to schema format
             const formattedDates = Object.entries(reviewDates[teamId] || {}).map(([name, date]) => ({
                 name,
@@ -135,174 +126,173 @@ const GuideUploadAttendance = ({ programme }) => {
             }));
 
             // Sends the restructured array matching Mongoose schema
-            await axios.post(`${SERVER_API_KEY}/api/guide/upload-attendance`, { 
-                teamId, 
+            await axios.post(`${SERVER_API_KEY}/api/guide/upload-attendance`, {
+                teamId,
                 studentAttendances,
                 reviewDates: formattedDates
             }, { headers });
-            showNotification('Success', `Attendance for ${team.teamName} submitted successfully!`, 'success');
+            showNotification('Success', `Attendance for ${team.teamName} saved successfully!`, 'success');
             fetchData();
         } catch (err) {
             console.error('Error uploading attendance:', err);
-            showNotification('Error', err.response?.data?.message || 'Failed to upload attendance', 'error');
+            showNotification('Error', err.response?.data?.message || 'Failed to save attendance', 'error');
         }
-    };
-
-    const calculateAttendancePercentage = (studentId) => {
-        let presentCount = 0;
-        const studentAttendance = attendanceData[studentId];
-        if (studentAttendance) {
-            presentCount = reviewEvents.filter(event => studentAttendance[event]).length;
-        }
-        const percentage = (presentCount / reviewEvents.length) * 100;
-        return `${percentage.toFixed(0)}%`;
     };
 
     if (loading) return <div className="text-center p-8 text-slate-500 font-medium">Loading attendance data...</div>;
     if (error) return <div className="text-rose-500 p-8 font-medium">{error}</div>;
 
+    const isReadOnly = userRole === 'admin' || userRole === 'assistant coordinator';
+
     return (
-        <div className="bg-slate-50 p-6 sm:p-8 rounded-2xl border border-slate-100 shadow-sm space-y-8 relative">
+        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4 relative">
+
+            {/* Read-only banner */}
             {userRole === 'assistant coordinator' && (
-                <div className="p-3 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded font-medium text-center">
+                <div className="p-3 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded font-medium text-center text-sm">
                     ℹ️ You are viewing this page in Read-Only Mode as an Assistant Coordinator.
                 </div>
             )}
-            
-            {/* Custom Notification Toast */}
+
+            {/* Toast Notification */}
             {notification.isOpen && (
-                <div className="fixed top-6 right-6 z-50 transform transition-all duration-300 animate-in slide-in-from-top-4 sm:slide-in-from-right-4 max-w-sm w-full">
-                    <div className={`p-4 rounded-2xl shadow-xl border flex items-start gap-3 bg-white ${notification.type === 'success' ? 'border-emerald-100 bg-emerald-50/10' : 'border-rose-100 bg-rose-50/10'}`}>
+                <div className="fixed top-6 right-6 z-50 max-w-sm w-full">
+                    <div className={`p-4 rounded-2xl shadow-xl border flex items-start gap-3 bg-white ${notification.type === 'success' ? 'border-emerald-100' : 'border-rose-100'}`}>
                         <div className={`p-2 rounded-full ${notification.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                            {notification.type === 'success' ? (
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            ) : (
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                            )}
+                            {notification.type === 'success'
+                                ? <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                : <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                            }
                         </div>
                         <div className="flex-1">
                             <h4 className="font-bold text-slate-800 text-sm">{notification.title}</h4>
                             <p className="text-xs text-slate-500 mt-0.5">{notification.message}</p>
                         </div>
-                        <button 
-                            onClick={() => setNotification(prev => ({ ...prev, isOpen: false }))}
-                            className="text-slate-400 hover:text-slate-600 p-1 transition-colors"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        <button onClick={() => setNotification(prev => ({ ...prev, isOpen: false }))} className="text-slate-400 hover:text-slate-600 p-1">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </div>
                 </div>
             )}
 
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-6 gap-4">
-                <div>
-                    <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Review Attendance Management</h2>
-                    <p className="text-sm text-slate-500 mt-1 font-medium">Mark and submit review attendance records.</p>
-                </div>
+            {/* Page Header */}
+            <div className="border-b border-slate-200 pb-3">
+                <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Review Attendance Management</h2>
+                <p className="text-sm text-slate-500 mt-1">Mark and save review attendance for all assigned teams.</p>
             </div>
 
             {assignedTeams.length === 0 ? (
                 <div className="text-center py-12 bg-white rounded-xl border border-slate-100 shadow-sm">
-                    <svg className="w-12 h-12 text-slate-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    <svg className="w-12 h-12 text-slate-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                     <p className="text-slate-600 font-semibold text-lg">No teams found to mark attendance for.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-8">
-                    {assignedTeams.map(team => (
-                        <div key={team._id} className="border p-6 rounded-2xl transition-all duration-300 shadow-sm bg-white border-slate-100 hover:shadow-md">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4 border-b border-slate-100 pb-4">
-                                <div className="flex items-center gap-3">
-                                    <h3 className="text-2xl font-bold text-slate-800">{team.teamName}</h3>
-                                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
-                                        {team.programme || 'UG'}
-                                    </span>
-                                </div>
-                            </div>
-                            
-                            <div className="overflow-x-auto rounded-xl border border-slate-100 shadow-sm mb-6">
-                                <table className="min-w-full divide-y divide-slate-100 bg-white">
-                                    <thead className="bg-slate-50/75">
-                                        <tr>
-                                            <th className="py-3.5 px-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Student Name</th>
-                                            {reviewEvents.map(event => (
-                                                <th key={event} className="py-2.5 px-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-150">
-                                                    <div className="mb-1.5">{event.toUpperCase().replace('REVIEW', 'REVIEW ')}</div>
-                                                    <input
-                                                        type="datetime-local"
-                                                        value={reviewDates[team._id]?.[event] || ''}
-                                                        onChange={(e) => handleReviewDateChange(team._id, event, e.target.value)}
-                                                        disabled={userRole === 'admin' || userRole === 'assistant coordinator'}
-                                                        className="block mx-auto p-1 text-[11px] font-normal border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[140px] text-slate-800 bg-white disabled:bg-slate-100 disabled:text-slate-400"
-                                                    />
-                                                </th>
+                <>
+                    {/* Single unified attendance table */}
+                    <div className="overflow-x-auto rounded-lg border border-slate-200 shadow-sm">
+                        <table className="min-w-full bg-white">
+                            {/* Sticky dark header */}
+                            <thead>
+                                <tr className="bg-slate-800 text-white">
+                                    <th className="py-2.5 px-3 text-left text-xs font-bold uppercase tracking-wider">#</th>
+                                    <th className="py-2.5 px-3 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap">Roll No</th>
+                                    <th className="py-2.5 px-3 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap">Student Name</th>
+                                    {reviewEvents.map(event => (
+                                        <th key={event} className="py-2.5 px-4 text-center text-xs font-bold uppercase tracking-wider whitespace-nowrap">
+                                            {event === 'viva' ? 'Viva' : event.replace('review', 'Review ')}
+                                        </th>
+                                    ))}
+                                    {!isReadOnly && (
+                                        <th className="py-2.5 px-3 text-center text-xs font-bold uppercase tracking-wider">Action</th>
+                                    )}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {assignedTeams.map(team => {
+                                    const allStudents = [];
+                                    if (team.teamLeader) allStudents.push({ ...team.teamLeader, isLeader: true });
+                                    (team.members || []).forEach(m => allStudents.push({ ...m, isLeader: false }));
+                                    const colSpan = 3 + reviewEvents.length + (!isReadOnly ? 1 : 0);
+
+                                    return (
+                                        <React.Fragment key={team._id}>
+                                            {/* Team separator row — team name left, date inputs per review column right */}
+                                            <tr className="bg-indigo-50 border-t-2 border-indigo-200">
+                                                {/* Team name spans the first 3 fixed columns */}
+                                                <td colSpan={3} className="py-2 px-3">
+                                                    <span className="text-xs font-extrabold text-indigo-700 uppercase tracking-widest">{team.teamName}</span>
+                                                    <span className="ml-2 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-indigo-100 text-indigo-600">
+                                                        {team.programme || 'UG'}
+                                                    </span>
+                                                </td>
+                                                {/* One date input per review column, aligned with the column */}
+                                                {reviewEvents.map(event => (
+                                                    <td key={event} className="py-2 px-2 text-center">
+                                                        {!isReadOnly ? (
+                                                            <input
+                                                                type="datetime-local"
+                                                                value={reviewDates[team._id]?.[event] || ''}
+                                                                onChange={(e) => handleReviewDateChange(team._id, event, e.target.value)}
+                                                                className="w-full max-w-[145px] p-0.5 text-[10px] border border-indigo-200 rounded focus:outline-none focus:ring-1 focus:ring-indigo-400 text-slate-700 bg-white"
+                                                            />
+                                                        ) : (
+                                                            <span className="text-[10px] text-indigo-400 italic">
+                                                                {reviewDates[team._id]?.[event]
+                                                                    ? new Date(reviewDates[team._id][event]).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })
+                                                                    : '—'}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                ))}
+                                                {/* Empty action cell to keep columns aligned */}
+                                                {!isReadOnly && <td />}
+                                            </tr>
+
+                                            {/* Student rows */}
+                                            {allStudents.map((student, idx) => (
+                                                <tr key={student._id}
+                                                    className={student.isLeader ? 'bg-indigo-50/20 hover:bg-indigo-50/50' : 'hover:bg-slate-50/70'}>
+                                                    <td className="py-1.5 px-3 text-xs text-slate-400 text-center">{idx + 1}</td>
+                                                    <td className="py-1.5 px-3 text-xs font-semibold text-slate-700 whitespace-nowrap">
+                                                        {student.username || 'N/A'}
+                                                    </td>
+                                                    <td className="py-1.5 px-3 text-xs text-slate-800 whitespace-nowrap">
+                                                        {student.name}
+                                                    </td>
+                                                    {reviewEvents.map(event => {
+                                                        const isPresent = attendanceData[student._id]?.[event] || false;
+                                                        return (
+                                                            <td key={event} className="py-1.5 px-4 text-center">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isPresent}
+                                                                    onChange={(e) => handleAttendanceChange(student._id, event, e.target.checked)}
+                                                                    disabled={isReadOnly}
+                                                                    className="form-checkbox h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50 cursor-pointer"
+                                                                />
+                                                            </td>
+                                                        );
+                                                    })}
+                                                    {/* Save button — shown only in last student row of each team, spans all rows */}
+                                                    {!isReadOnly && idx === 0 && (
+                                                        <td rowSpan={allStudents.length} className="py-1.5 px-3 text-center align-middle">
+                                                            <button
+                                                                onClick={() => handleSubmitAttendance(team._id)}
+                                                                className="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider bg-indigo-600 hover:bg-indigo-700 text-white transition shadow-sm whitespace-nowrap"
+                                                            >
+                                                                Save
+                                                            </button>
+                                                        </td>
+                                                    )}
+                                                </tr>
                                             ))}
-                                            <th className="py-3.5 px-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Attendance %</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {/* Team Leader */}
-                                        {team.teamLeader && (
-                                            <tr key={team.teamLeader._id} className="hover:bg-slate-50/50 bg-indigo-50/30">
-                                                <td className="py-4 px-4 text-left text-sm text-slate-900 font-semibold">{team.teamLeader.name}{/*  <span className="ml-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">Leader</span> */}</td>
-                                                {reviewEvents.map(event => {
-                                                    const isPresent = attendanceData[team.teamLeader._id]?.[event] || false;
-                                                    return (
-                                                        <td key={event} className="py-4 px-4 text-center">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={isPresent}
-                                                                onChange={(e) => handleAttendanceChange(team.teamLeader._id, event, e.target.checked)}
-                                                                disabled={userRole === 'admin' || userRole === 'assistant coordinator'}
-                                                                className="form-checkbox h-5 w-5 rounded border-slate-300 focus:ring-indigo-500 transition duration-200 text-indigo-600 disabled:opacity-60"
-                                                            />
-                                                        </td>
-                                                    );
-                                                })}
-                                                <td className="py-4 px-4 text-center text-sm text-slate-900 font-bold">
-                                                    {calculateAttendancePercentage(team.teamLeader._id)}
-                                                </td>
-                                            </tr>
-                                        )}
-                                        {/* Team Members */}
-                                        {team.members && team.members.map(member => (
-                                            <tr key={member._id} className="hover:bg-slate-50/50">
-                                                <td className="py-4 px-4 text-left text-sm text-slate-800">{member.name}</td>
-                                                {reviewEvents.map(event => {
-                                                    const isPresent = attendanceData[member._id]?.[event] || false;
-                                                    return (
-                                                        <td key={event} className="py-4 px-4 text-center">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={isPresent}
-                                                                onChange={(e) => handleAttendanceChange(member._id, event, e.target.checked)}
-                                                                disabled={userRole === 'admin' || userRole === 'assistant coordinator'}
-                                                                className="form-checkbox h-5 w-5 rounded border-slate-300 focus:ring-indigo-500 transition duration-200 text-indigo-600 disabled:opacity-60"
-                                                            />
-                                                        </td>
-                                                    );
-                                                })}
-                                                <td className="py-4 px-4 text-center text-sm text-slate-800 font-bold">
-                                                    {calculateAttendancePercentage(member._id)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            
-                            {userRole !== 'admin' && userRole !== 'assistant coordinator' && (
-                                <div className="mt-4 flex flex-col sm:flex-row gap-4">
-                                    <button
-                                        onClick={() => handleSubmitAttendance(team._id)}
-                                        className="w-full px-5 py-3.5 rounded-xl font-bold tracking-wide transition-all duration-300 shadow-md bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-700 hover:to-violet-700 hover:shadow-lg hover:scale-[1.01]"
-                                    >
-                                        {`Submit Attendance for ${team.teamName}`}
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
+                                        </React.Fragment>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
             )}
         </div>
     );
