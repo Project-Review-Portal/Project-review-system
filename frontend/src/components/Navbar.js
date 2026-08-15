@@ -69,6 +69,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
             case 'coordinator':
                 return [
                     { label: 'Dashboard', path: '/coordinator-dashboard/dashboard' },
+                    { label: 'Registration', path: '/coordinator-dashboard/registration' },
                     { label: 'Viva Panel Formation', path: '/coordinator-dashboard/viva-panel-formation' },
                     { label: 'Assigned Teams', path: '/coordinator-dashboard/assigned-teams' },
                     { label: 'Upload Attendance', path: '/coordinator-dashboard/upload-attendance' },

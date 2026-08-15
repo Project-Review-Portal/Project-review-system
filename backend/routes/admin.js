@@ -59,16 +59,16 @@ router.get('/daily-attendance-records', auth, authorize(['admin']), adminControl
 router.get('/assigned-teams-summary', auth, authorize(['admin']), adminController.getAssignedTeamsSummary);
 
 // User Management Routes
-router.post('/upload-faculty', auth, authorize(['admin']), adminController.uploadFaculty);
+router.post('/upload-faculty', auth, authorize(['admin', 'coordinator']), adminController.uploadFaculty);
 router.post('/upload-students', auth, authorize(['admin']), adminController.uploadStudents);
-router.put('/update-faculty/:facultyId', auth, authorize(['admin']), adminController.updateFaculty);
+router.put('/update-faculty/:facultyId', auth, authorize(['admin', 'coordinator']), adminController.updateFaculty);
 router.put('/update-student/:regno', auth, authorize(['admin']), adminController.updateStudent);
-router.delete('/delete-faculty/:facultyId', auth, authorize(['admin']), adminController.deleteFaculty);
+router.delete('/delete-faculty/:facultyId', auth, authorize(['admin', 'coordinator']), adminController.deleteFaculty);
 router.delete('/delete-student/:regno', auth, authorize(['admin']), adminController.deleteStudent);
 router.get('/check-student-deletion/:regno', auth, authorize(['admin']), adminController.checkStudentDeletion);
-router.get('/check-faculty-deletion/:facultyId', auth, authorize(['admin']), adminController.checkFacultyDeletion);
+router.get('/check-faculty-deletion/:facultyId', auth, authorize(['admin', 'coordinator']), adminController.checkFacultyDeletion);
 router.delete('/delete-user/:userId', auth, authorize(['admin']), adminController.deleteUser);
-router.get('/faculty-list', auth, authorize(['admin']), adminController.getAllFaculty);
+router.get('/faculty-list', auth, authorize(['admin', 'coordinator', 'assistant coordinator']), adminController.getAllFaculty);
 router.get('/student-list', auth, authorize(['admin']), adminController.getAllStudents);
 
 router.get('/designation-team-limits', auth, authorize(['admin']), adminController.getDesignationTeamLimits);

@@ -1428,7 +1428,9 @@ exports.uploadFaculty = async (req, res) => {
 
                 // Normalize and validate memberType (internal/external)
                 let normalizedMemberType = null;
-                if (typeof memberType === 'string' && memberType.trim().length > 0) {
+                if (req.user && req.user.role === 'coordinator') {
+                    normalizedMemberType = 'external';
+                } else if (typeof memberType === 'string' && memberType.trim().length > 0) {
                     const mt = memberType.trim().toLowerCase();
                     if (mt === 'internal' || mt === 'external') {
                         normalizedMemberType = mt;
@@ -1589,6 +1591,16 @@ exports.updateFaculty = async (req, res) => {
             return res.status(400).json({ message: `User ${facultyId} is not a faculty member` });
         }
 
+        // Coordinator role security checks
+        if (req.user && req.user.role === 'coordinator') {
+            if (user.memberType !== 'external') {
+                return res.status(403).json({ message: 'Coordinators are restricted to managing external faculty members only.' });
+            }
+            if (memberType && memberType !== 'external') {
+                return res.status(403).json({ message: 'Coordinators cannot change member type to internal.' });
+            }
+        }
+
         // Update user
         user.name = name;
         if (memberType !== undefined) {
@@ -1672,6 +1684,11 @@ exports.deleteFaculty = async (req, res) => {
         const hasFacultyRole = user.roles.some(role => ['guide', 'panel', 'coordinator'].includes(role.role));
         if (!hasFacultyRole) {
             return res.status(400).json({ message: 'User is not a faculty member' });
+        }
+
+        // Coordinator role security checks
+        if (req.user && req.user.role === 'coordinator' && user.memberType !== 'external') {
+            return res.status(403).json({ message: 'Coordinators are restricted to deleting external faculty members only.' });
         }
 
         const facultyObjectId = user._id;
@@ -1816,6 +1833,11 @@ exports.checkFacultyDeletion = async (req, res) => {
         const user = await User.findOne({ $or: [{ username: facultyId }, { email: facultyId }] });
         if (!user) {
             return res.status(404).json({ message: 'Faculty member not found' });
+        }
+
+        // Coordinator role security checks
+        if (req.user && req.user.role === 'coordinator' && user.memberType !== 'external') {
+            return res.status(403).json({ message: 'Coordinators can only check deletion details for external faculty members.' });
         }
 
         const facultyObjectId = user._id;

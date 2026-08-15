@@ -12,6 +12,7 @@ import GuideUploadAttendance from './guide/GuideUploadAttendance';
 import CoordinatorVivaPanelFormation from './coordinator/CoordinatorVivaPanelFormation';
 import MaterialsTab from './coordinator/materials/MaterialsTab';
 import CoordinatorMarkingScheme from './coordinator/CoordinatorMarkingScheme';
+import CoordinatorRegistration from './coordinator/CoordinatorRegistration';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const CoordinatorRulesDashboard = () => {
@@ -238,6 +239,7 @@ const CoordinatorDashboard = () => {
                     {/* Show the new live editor on the existing letter-generation route */}
                     <Route path="letter-generation" element={<CoordinatorLetterLiveEditorCK />} />
                     <Route path="viva-panel-formation" element={<CoordinatorVivaPanelFormation />} />
+                    <Route path="registration" element={<CoordinatorRegistration />} />
                     <Route path="guide-me" element={<GuideMe userRole="coordinator" />} />
                     <Route path="assigned-teams" element={<CoordinatorAssignedTeams />} />
                     <Route path="upload-attendance" element={<GuideUploadAttendance />} />

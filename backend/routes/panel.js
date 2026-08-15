@@ -88,8 +88,11 @@ router.delete('/coordinator/allotted-schedules/:scheduleId', auth, authorize(['c
 router.get('/coordinator/panel-stats', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), panelController.getPanelStats);
 
 // Coordinator Viva Panel endpoints
-router.get('/coordinator/viva-panel', auth, authorize(['coordinator', 'assistant coordinator']), panelController.getCoordinatorVivaPanel);
+router.get('/coordinator/viva-panels', auth, authorize(['coordinator', 'assistant coordinator']), panelController.getCoordinatorVivaPanels);
 router.post('/coordinator/viva-panel', auth, authorize(['coordinator']), panelController.saveCoordinatorVivaPanel);
+router.delete('/coordinator/viva-panel/:id', auth, authorize(['coordinator']), panelController.deleteCoordinatorVivaPanel);
+router.get('/coordinator/viva-teams', auth, authorize(['coordinator', 'assistant coordinator']), panelController.getCoordinatorVivaTeams);
+router.post('/coordinator/assign-viva-panel', auth, authorize(['coordinator']), panelController.assignVivaPanelToTeam);
 
 // Debug route for coordinators to check their panel assignment
 router.get('/coordinator/panel-status', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), async (req, res) => {

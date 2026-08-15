@@ -1168,49 +1168,29 @@ exports.createInstructionTemplate = async (req, res) => {
   }
 };
 
+
 // Coordinator Viva Panel controllers
-exports.getCoordinatorVivaPanel = async (req, res) => {
+exports.getCoordinatorVivaPanels = async (req, res) => {
     try {
         const coordinatorId = req.user.id;
-        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
-        const programme = normalizeProgramme(selectedProgramme);
+        const { reviewPanelId } = req.query;
         
-        // Find the review panel where the user is coordinator
-        const reviewPanel = await Panel.findOne({ 
-            $or: [
-                { coordinator: coordinatorId },
-                { assistantCoordinators: coordinatorId }
-            ],
-            panelType: 'review', 
-            programme 
-        })
-            .populate('members', 'username name memberType designation')
-            .populate('coordinator', 'username name memberType designation')
-            .populate('assistantCoordinators', 'username name memberType designation');
-
-        if (!reviewPanel) {
-            return res.status(404).json({ message: `You are not assigned as a coordinator to any review panel under programme ${programme}.` });
+        if (!reviewPanelId) {
+            return res.status(400).json({ message: 'reviewPanelId query parameter is required.' });
         }
 
-        // Find the viva panel if it exists
-        const vivaPanel = await Panel.findOne({ 
-            $or: [
-                { coordinator: coordinatorId },
-                { assistantCoordinators: coordinatorId }
-            ],
-            panelType: 'viva', 
-            programme 
+        // Fetch all viva panels for this parentPanel
+        const vivaPanels = await Panel.find({
+            parentPanel: reviewPanelId,
+            panelType: 'viva'
         })
-            .populate('members', 'username name memberType designation')
-            .populate('coordinator', 'username name memberType designation')
-            .populate('assistantCoordinators', 'username name memberType designation');
+        .populate('members', 'username name memberType email designation affiliation contactNumber seniority')
+        .populate('coordinator', 'username name')
+        .populate('assistantCoordinators', 'username name');
 
-        res.json({
-            reviewPanel,
-            vivaPanel
-        });
+        res.json(vivaPanels);
     } catch (error) {
-        console.error('Error fetching coordinator viva panel:', error);
+        console.error('Error fetching coordinator viva panels:', error);
         res.status(500).json({ message: 'Server error' });
     }
 };
@@ -1218,91 +1198,162 @@ exports.getCoordinatorVivaPanel = async (req, res) => {
 exports.saveCoordinatorVivaPanel = async (req, res) => {
     try {
         const coordinatorId = req.user.id;
-        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
-        const programme = normalizeProgramme(selectedProgramme);
-        const { externalMemberIds } = req.body; // Array of external examiner IDs
+        const { panelId, name, members, reviewPanelId } = req.body;
 
-        if (!Array.isArray(externalMemberIds)) {
-            return res.status(400).json({ message: 'externalMemberIds must be an array.' });
+        if (!name || !members || !reviewPanelId) {
+            return res.status(400).json({ message: 'Name, members, and reviewPanelId are required.' });
         }
 
-        // Find the review panel where the user is coordinator
-        const reviewPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'review', programme });
+        // Find the review panel to get program context and assistant coordinators
+        const reviewPanel = await Panel.findById(reviewPanelId);
         if (!reviewPanel) {
-            return res.status(404).json({ message: `You are not assigned as a coordinator to any review panel under programme ${programme}.` });
+            return res.status(404).json({ message: 'Parent review panel not found.' });
         }
 
-        // Validate that externalMemberIds are indeed external examiners
-        const externalDetails = await User.find({ _id: { $in: externalMemberIds } });
-        for (const ext of externalDetails) {
-            if (ext.memberType !== 'external') {
-                return res.status(400).json({ message: `Member ${ext.name} is not an external faculty member.` });
+        // Validate that the user is the coordinator/assistant of this parent review panel
+        const isAuthorized = reviewPanel.coordinator.toString() === coordinatorId ||
+            reviewPanel.assistantCoordinators.some(id => id.toString() === coordinatorId);
+
+        if (!isAuthorized) {
+            return res.status(403).json({ message: 'You are not authorized to create viva panels for this review panel.' });
+        }
+
+        let vivaPanel;
+        if (panelId) {
+            // Update existing viva panel
+            vivaPanel = await Panel.findById(panelId);
+            if (!vivaPanel) {
+                return res.status(404).json({ message: 'Viva panel not found.' });
             }
+            vivaPanel.name = name;
+            vivaPanel.members = members;
+        } else {
+            // Create new viva panel
+            vivaPanel = new Panel({
+                name,
+                panelType: 'viva',
+                coordinator: reviewPanel.coordinator,
+                assistantCoordinators: reviewPanel.assistantCoordinators,
+                members,
+                programme: reviewPanel.programme,
+                parentPanel: reviewPanelId
+            });
         }
-
-        // Build members list:
-        // Prefilled: internal members of review panel + coordinator + assistant coordinators of review panel
-        // Plus: external members manually added
-        const reviewMembersDetails = await User.find({ _id: { $in: reviewPanel.members } });
-        const internalReviewMembers = reviewMembersDetails.filter(m => m.memberType === 'internal').map(m => m._id.toString());
-
-        const membersSet = new Set([
-            reviewPanel.coordinator.toString(),
-            ...reviewPanel.assistantCoordinators.map(id => id.toString()),
-            ...internalReviewMembers,
-            ...externalMemberIds.map(id => String(id))
-        ]);
-
-        const finalMembers = Array.from(membersSet);
-
-        // Find or create viva panel
-        let vivaPanel = await Panel.findOne({ coordinator: coordinatorId, panelType: 'viva', programme: reviewPanel.programme });
-        
-        if (!vivaPanel) {
-            const vivaPanelName = `Viva - ${reviewPanel.name}`;
-            
-            const existing = await Panel.findOne({ name: vivaPanelName, panelType: 'viva', programme: reviewPanel.programme });
-            if (existing) {
-                vivaPanel = existing;
-            } else {
-                vivaPanel = new Panel({
-                    name: vivaPanelName,
-                    panelType: 'viva',
-                    coordinator: reviewPanel.coordinator,
-                    assistantCoordinators: reviewPanel.assistantCoordinators,
-                    members: finalMembers,
-                    programme: reviewPanel.programme
-                });
-            }
-        }
-        
-        vivaPanel.coordinator = reviewPanel.coordinator;
-        vivaPanel.assistantCoordinators = reviewPanel.assistantCoordinators;
-        vivaPanel.members = finalMembers;
-        vivaPanel.programme = reviewPanel.programme;
 
         await vivaPanel.save();
-
-        // Assign this vivaPanel to all teams currently assigned to this coordinator's review panel
-        const Team = require('../models/Team');
-        const teams = await Team.find({ panel: reviewPanel._id });
-        const teamIds = teams.map(t => t._id);
-        if (teamIds.length > 0) {
-            await Team.updateMany(
-                { _id: { $in: teamIds } },
-                { $set: { vivaPanel: vivaPanel._id } }
-            );
-        }
-
-        res.json({
-            message: 'Viva panel saved and assigned to teams successfully!',
-            vivaPanel
-        });
+        res.json({ message: 'Viva panel saved successfully!', vivaPanel });
     } catch (error) {
         console.error('Error saving coordinator viva panel:', error);
+        if (error.code === 11000) {
+            return res.status(400).json({ message: 'A viva panel with this name already exists in this programme.' });
+        }
         res.status(500).json({ message: 'Server error' });
     }
 };
+
+exports.deleteCoordinatorVivaPanel = async (req, res) => {
+    try {
+        const coordinatorId = req.user.id;
+        const { id } = req.params;
+
+        const vivaPanel = await Panel.findById(id);
+        if (!vivaPanel) {
+            return res.status(404).json({ message: 'Viva panel not found.' });
+        }
+
+        // Verify ownership/coordinator authorization
+        if (vivaPanel.coordinator.toString() !== coordinatorId &&
+            !vivaPanel.assistantCoordinators.some(cid => cid.toString() === coordinatorId)) {
+            return res.status(403).json({ message: 'You are not authorized to delete this viva panel.' });
+        }
+
+        // Delete the panel
+        await Panel.deleteOne({ _id: id });
+
+        // Unset vivaPanel from any team referencing it
+        const Team = require('../models/Team');
+        await Team.updateMany({ vivaPanel: id }, { $set: { vivaPanel: null } });
+
+        res.json({ message: 'Viva panel deleted successfully!' });
+    } catch (error) {
+        console.error('Error deleting coordinator viva panel:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+exports.getCoordinatorVivaTeams = async (req, res) => {
+    try {
+        const coordinatorId = req.user.id;
+        const { reviewPanelId } = req.query;
+
+        if (!reviewPanelId) {
+            return res.status(400).json({ message: 'reviewPanelId query parameter is required.' });
+        }
+
+        const Team = require('../models/Team');
+        const teams = await Team.find({ panel: reviewPanelId })
+            .populate('teamLeader', 'username name')
+            .populate('members', 'username name')
+            .populate('vivaPanel', 'name');
+
+        res.json(teams);
+    } catch (error) {
+        console.error('Error fetching coordinator viva teams:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+exports.assignVivaPanelToTeam = async (req, res) => {
+    try {
+        const coordinatorId = req.user.id;
+        const { teamId, vivaPanelId } = req.body;
+
+        if (!teamId) {
+            return res.status(400).json({ message: 'teamId is required.' });
+        }
+
+        const Team = require('../models/Team');
+        const team = await Team.findById(teamId);
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found.' });
+        }
+
+        // Verify coordinator is authorized for this team (must be the team's review panel coordinator/assistant)
+        const parentReviewPanel = await Panel.findById(team.panel);
+        if (!parentReviewPanel) {
+            return res.status(400).json({ message: 'Team does not belong to any review panel.' });
+        }
+
+        const isAuthorized = parentReviewPanel.coordinator.toString() === coordinatorId ||
+            parentReviewPanel.assistantCoordinators.some(id => id.toString() === coordinatorId);
+
+        if (!isAuthorized) {
+            return res.status(403).json({ message: 'You do not coordinate this team\'s review panel.' });
+        }
+
+        // If assigning a viva panel, check that it exists and belongs to the same parent review panel
+        if (vivaPanelId) {
+            const vivaPanel = await Panel.findById(vivaPanelId);
+            if (!vivaPanel) {
+                return res.status(404).json({ message: 'Viva panel not found.' });
+            }
+            if (vivaPanel.parentPanel.toString() !== team.panel.toString()) {
+                return res.status(400).json({ message: 'Selected Viva panel does not belong to this team\'s review panel.' });
+            }
+            team.vivaPanel = vivaPanelId;
+        } else {
+            team.vivaPanel = null;
+        }
+
+        await team.save();
+        res.json({ message: 'Viva panel assigned successfully!', team });
+    } catch (error) {
+        console.error('Error assigning viva panel to team:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+
 // Get all teams coordinated by the logged-in coordinator 
 exports.getCoordinatedTeams = async (req, res) => {
     try {
