@@ -23,7 +23,7 @@ exports.getAvailableStudents = async (req, res) => {
 
         // Ensure current user is also excluded from available students
         teamMemberIds = [...new Set([...teamMemberIds.filter(Boolean).map(id => id.toString()), currentUserId.toString()])];
-        
+
         // Fetch current user to get their programme
         const currentUser = await User.findById(currentUserId);
         const userProgramme = currentUser ? (currentUser.programme || 'B.E. CSE') : 'B.E. CSE';
@@ -126,8 +126,8 @@ exports.createTeam = async (req, res) => {
 
         // Validate team size
         if (members.length + 1 > maxTeamSize) {
-            return res.status(400).json({ 
-                message: `Team size cannot exceed ${maxTeamSize} members` 
+            return res.status(400).json({
+                message: `Team size cannot exceed ${maxTeamSize} members`
             });
         }
 
@@ -139,13 +139,13 @@ exports.createTeam = async (req, res) => {
 
         // Retrieve all existing teams for this programme to generate the next sequential team name
         const existingTeams = await Team.find({ programme: leaderProgramme }, { teamName: 1 });
-        
+
         // Helper function to escape regex special characters in the programme name
         const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        
+
         // Match either "{Programme} Team {Number}" or the legacy "Team {Number}"
         const teamNameRegex = new RegExp(`^(?:${escapeRegExp(leaderProgramme)}\\s+)?Team\\s+(\\d+)$`, 'i');
-        
+
         const existingNumbers = new Set();
         if (existingTeams) {
             for (const team of existingTeams) {
@@ -157,7 +157,7 @@ exports.createTeam = async (req, res) => {
                 }
             }
         }
-        
+
         let numberTracker = 1;
         while (existingNumbers.has(numberTracker)) {
             numberTracker++;
@@ -171,10 +171,10 @@ exports.createTeam = async (req, res) => {
             teamLeader: teamLeaderId,
             programme: leaderProgramme,
             members: [], // Keep empty until invitations are accepted
-            memberStatus : members.map((m) => {
+            memberStatus: members.map((m) => {
                 return {
-                    user : m,
-                    status : 'pending'
+                    user: m,
+                    status: 'pending'
                 }
             }),
             isTeamComplete: false,
@@ -200,18 +200,18 @@ exports.getUserTeam = async (req, res) => {
                 { members: userId }
             ]
         }).populate('teamLeader members', 'username name')
-          .populate({
-              path: 'memberStatus.user',
-              select: 'username name'
-          })
-          .populate({ 
-              path: 'guidePreference', 
-              select: 'username name'
-          })
-          .populate({ // Populate rejectedGuides to display names
-              path: 'rejectedGuides',
-              select: 'username name'
-          });
+            .populate({
+                path: 'memberStatus.user',
+                select: 'username name'
+            })
+            .populate({
+                path: 'guidePreference',
+                select: 'username name'
+            })
+            .populate({ // Populate rejectedGuides to display names
+                path: 'rejectedGuides',
+                select: 'username name'
+            });
 
         if (!team) {
             console.log('getUserTeam: No team found for userId:', userId); // Detailed log
@@ -434,7 +434,7 @@ exports.getReportStatus = async (req, res) => {
         console.error('Error fetching report status:', error);
         res.status(500).json({ message: 'Server error' });
     }
-}; 
+};
 
 // Delete the current user's team (leader-only)
 exports.deleteMyTeam = async (req, res) => {
@@ -455,11 +455,11 @@ exports.deleteMyTeam = async (req, res) => {
         try {
             const TimeTable = require('../models/TimeTable');
             await TimeTable.deleteMany({ team: team._id });
-        } catch (e) {}
+        } catch (e) { }
         try {
             const TeamPanelAssignment = require('../models/TeamPanelAssignment');
             await TeamPanelAssignment.updateMany({}, { $pull: { teams: team._id } });
-        } catch (e) {}
+        } catch (e) { }
 
         await Team.findByIdAndDelete(team._id);
         return res.json({ message: 'Team deleted successfully' });
@@ -481,8 +481,8 @@ exports.getTeamInvitations = async (req, res) => {
                 }
             }
         }).populate('teamLeader', 'username name')
-          .populate('memberStatus.user', 'username name');
-        
+            .populate('memberStatus.user', 'username name');
+
         res.json(invitations);
     } catch (error) {
         console.error('Error fetching team invitations:', error);
@@ -515,7 +515,7 @@ exports.respondToInvitation = async (req, res) => {
             if (!team.members.includes(userId)) {
                 team.members.push(userId);
             }
-            
+
             // Recalculate if team is complete
             const allAccepted = team.memberStatus.length > 0 && team.memberStatus.every(m => m.status === 'accepted');
             team.isTeamComplete = allAccepted;
@@ -546,7 +546,7 @@ exports.respondToInvitation = async (req, res) => {
             // reject
             team.memberStatus[memberIdx].status = 'rejected';
             team.members = team.members.filter(m => m.toString() !== userId);
-            
+
             // Recalculate complete
             const allAccepted = team.memberStatus.length > 0 && team.memberStatus.every(m => m.status === 'accepted');
             team.isTeamComplete = allAccepted;
@@ -660,7 +660,7 @@ exports.requestLock = async (req, res) => {
     try {
         const userId = req.user.id;
         const team = await Team.findOne({ teamLeader: userId });
-        
+
         if (!team) {
             return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
         }
@@ -672,17 +672,17 @@ exports.requestLock = async (req, res) => {
         // CRITICAL CHECK: Enforce that no pending invitations exist before locking is authorized
         const hasPendingInvites = team.memberStatus.some(m => m.status === 'pending');
         if (hasPendingInvites) {
-            return res.status(400).json({ 
-                message: 'Cannot lock team. You have pending invitations. Please wait for them to respond or remove them before locking.' 
+            return res.status(400).json({
+                message: 'Cannot lock team. You have pending invitations. Please wait for them to respond or remove them before locking.'
             });
         }
 
         // Filter out accepted partners
         const acceptedMembers = team.memberStatus.filter(m => m.status === 'accepted');
         team.members = acceptedMembers.map(m => m.user);
-        team.isTeamComplete = true; 
+        team.isTeamComplete = true;
         team.isLocked = true;
-        
+
         // Reset lock approval consensus flags
         team.memberStatus.forEach(m => {
             if (m.status === 'accepted') {
@@ -691,9 +691,9 @@ exports.requestLock = async (req, res) => {
         });
 
         await team.save();
-        return res.json({ 
-            message: 'Your team configuration has been finalized and locked successfully!', 
-            team 
+        return res.json({
+            message: 'Your team configuration has been finalized and locked successfully!',
+            team
         });
     } catch (error) {
         console.error('Error locking team:', error);
