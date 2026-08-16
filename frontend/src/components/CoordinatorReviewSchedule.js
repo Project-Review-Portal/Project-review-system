@@ -30,6 +30,9 @@ const CoordinatorReviewSchedule = () => {
   const [loadingSchedules, setLoadingSchedules] = useState(false);
   const [selectedSlotType, setSelectedSlotType] = useState('review0');
   const [panelStats, setPanelStats] = useState(null);  // { totalTeams, freeSlots, occupiedSlots, totalSlots, requiredSlots }
+  const [panelTeams, setPanelTeams] = useState([]);
+  const [activeAssigningSlotId, setActiveAssigningSlotId] = useState(null);
+  const [selectedTeamToAssignId, setSelectedTeamToAssignId] = useState('');
 
   useEffect(() => {
     if (error) {
@@ -250,9 +253,23 @@ const CoordinatorReviewSchedule = () => {
         setLoadingSchedules(false);
       }
     };
+
+    const fetchPanelTeams = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await axios.get(`${SERVER_API_KEY}/api/panels/coordinator/panel-status`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setPanelTeams(res.data.teams || []);
+      } catch (err) {
+        console.error('Failed to fetch panel teams:', err);
+      }
+    };
+
     const hasCoordinatorRole = Array.isArray(user?.roles) && user.roles.some(r => ['coordinator', 'assistant coordinator'].includes(r.role));
     if (hasCoordinatorRole) {
       fetchAllottedSchedules();
+      fetchPanelTeams();
       fetchPanelStats(form.reviewType);
     }
   }, [user]);
@@ -266,6 +283,90 @@ const CoordinatorReviewSchedule = () => {
       }
     }
   }, [form.reviewType, user]);
+
+  const getNonAssignedTeams = (activeSlotType) => {
+    const assignedTeamIds = new Set(
+      allottedSchedules
+        .filter(sch => sch.slotType === activeSlotType && sch.team)
+        .map(sch => (sch.team._id || sch.team).toString())
+    );
+    return panelTeams.filter(t => !assignedTeamIds.has(t._id.toString()));
+  };
+
+  const handleAssignTeam = async (scheduleId) => {
+    if (!selectedTeamToAssignId) {
+      setError('Please select a team to assign.');
+      return;
+    }
+    setLoadingSchedules(true);
+    setError('');
+    setMessage('');
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${SERVER_API_KEY}/api/panels/coordinator/assign-slot-team`,
+        { scheduleId, teamId: selectedTeamToAssignId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      const res = await axios.get(`${SERVER_API_KEY}/api/panels/coordinator/allotted-schedules`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const selectedProgramme = storedUser.programme;
+      let fetchedSchedules = res.data || [];
+      if (selectedProgramme) {
+          fetchedSchedules = fetchedSchedules.filter(sch => 
+              (sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase()) ||
+              (sch.panel?.programme?.toLowerCase() === selectedProgramme?.toLowerCase())
+          );
+      }
+      setAllottedSchedules(fetchedSchedules);
+      setMessage('Team assigned to slot successfully!');
+      setActiveAssigningSlotId(null);
+      setSelectedTeamToAssignId('');
+      fetchPanelStats(form.reviewType);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to assign team');
+    } finally {
+      setLoadingSchedules(false);
+    }
+  };
+
+  const handleUnassignTeam = async (scheduleId) => {
+    if (!window.confirm('Are you sure you want to unassign the team from this slot?')) return;
+    setLoadingSchedules(true);
+    setError('');
+    setMessage('');
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${SERVER_API_KEY}/api/panels/coordinator/unassign-slot-team`,
+        { scheduleId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      const res = await axios.get(`${SERVER_API_KEY}/api/panels/coordinator/allotted-schedules`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const selectedProgramme = storedUser.programme;
+      let fetchedSchedules = res.data || [];
+      if (selectedProgramme) {
+          fetchedSchedules = fetchedSchedules.filter(sch => 
+              (sch.team?.programme?.toLowerCase() === selectedProgramme?.toLowerCase()) ||
+              (sch.panel?.programme?.toLowerCase() === selectedProgramme?.toLowerCase())
+          );
+      }
+      setAllottedSchedules(fetchedSchedules);
+      setMessage('Team unassigned from slot successfully!');
+      fetchPanelStats(form.reviewType);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to unassign team');
+    } finally {
+      setLoadingSchedules(false);
+    }
+  };
 
   const handleDeleteSchedule = async (scheduleId, hasAssignedTeam, teamName) => {
     const isReadOnly = user?.role === 'assistant coordinator';
@@ -669,14 +770,66 @@ const CoordinatorReviewSchedule = () => {
                                 <div key={sIdx} className="border p-3 bg-green-50/30 border-green-200 rounded-b text-center flex flex-col justify-between items-center transition-colors hover:bg-green-50/50 min-h-[105px]">
                                   <div className="text-[9px] uppercase font-extrabold text-green-700 tracking-wider">Free Slot</div>
                                   <div className="text-[10px] text-gray-400 my-1">Supervisor: —</div>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteSchedule(slot._id, false)}
-                                    className="px-2.5 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 hover:border-red-300 rounded text-[9px] font-bold uppercase transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed w-full"
-                                    disabled={isReadOnly}
-                                  >
-                                    Delete Slot
-                                  </button>
+                                  <div className="flex gap-1 w-full mt-2">
+                                    {activeAssigningSlotId === slot._id ? (
+                                      <div className="flex flex-col gap-1 w-full bg-white p-1 border rounded shadow-inner">
+                                        <select
+                                          value={selectedTeamToAssignId}
+                                          onChange={(e) => setSelectedTeamToAssignId(e.target.value)}
+                                          className="text-[9px] p-0.5 border rounded w-full bg-gray-50 focus:outline-none"
+                                        >
+                                          <option value="">-- Select Team --</option>
+                                          {getNonAssignedTeams(slot.slotType).map(t => (
+                                            <option key={t._id} value={t._id}>{t.teamName}</option>
+                                          ))}
+                                        </select>
+                                        <div className="flex gap-1 justify-end">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleAssignTeam(slot._id)}
+                                            className="px-1.5 py-0.5 bg-green-600 hover:bg-green-700 text-white rounded text-[8px] font-bold uppercase"
+                                          >
+                                            OK
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setActiveAssigningSlotId(null);
+                                              setSelectedTeamToAssignId('');
+                                            }}
+                                            className="px-1.5 py-0.5 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded text-[8px] font-bold uppercase"
+                                          >
+                                            X
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveAssigningSlotId(slot._id);
+                                            const unassigned = getNonAssignedTeams(slot.slotType);
+                                            if (unassigned.length > 0) {
+                                              setSelectedTeamToAssignId(unassigned[0]._id);
+                                            }
+                                          }}
+                                          className="flex-1 px-1.5 py-1 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 hover:border-green-300 rounded text-[9px] font-extrabold uppercase transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                          disabled={isReadOnly}
+                                        >
+                                          Assign
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteSchedule(slot._id, false)}
+                                          className="px-1.5 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 hover:border-red-300 rounded text-[9px] font-bold uppercase transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                          disabled={isReadOnly}
+                                        >
+                                          Delete
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
                               );
                             } else {
@@ -687,14 +840,24 @@ const CoordinatorReviewSchedule = () => {
                                     <div className="font-bold text-gray-800 text-xs mt-0.5 truncate max-w-full" title={teamName}>{teamName}</div>
                                     <div className="text-[9px] text-indigo-600 font-semibold truncate max-w-full" title={`Supervisor: ${supervisorName}`}>Supervisor: {supervisorName}</div>
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteSchedule(slot._id, true, teamName)}
-                                    className="mt-2 px-2.5 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 hover:border-red-300 rounded text-[9px] font-bold uppercase transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed w-full"
-                                    disabled={isReadOnly}
-                                  >
-                                    Delete Slot
-                                  </button>
+                                  <div className="flex gap-1 w-full mt-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUnassignTeam(slot._id)}
+                                      className="flex-1 px-1.5 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded text-[9px] font-extrabold uppercase transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                      disabled={isReadOnly}
+                                    >
+                                      Unassign
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteSchedule(slot._id, true, teamName)}
+                                      className="px-1.5 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 hover:border-red-300 rounded text-[9px] font-bold uppercase transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                      disabled={isReadOnly}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
                                 </div>
                               );
                             }

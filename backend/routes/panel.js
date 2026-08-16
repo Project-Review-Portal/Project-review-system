@@ -83,6 +83,8 @@ router.post('/coordinator/assign-slots', auth, authorize(['coordinator', 'admin'
 router.get('/coordinator/allotted-schedules', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), panelController.getAllottedSchedulesForCoordinator);
 // Allow coordinator (or admin) to delete an allotted schedule they created
 router.delete('/coordinator/allotted-schedules/:scheduleId', auth, authorize(['coordinator', 'admin']), panelController.deleteAllottedSchedule);
+router.post('/coordinator/assign-slot-team', auth, authorize(['coordinator', 'admin']), panelController.assignTeamToSlot);
+router.post('/coordinator/unassign-slot-team', auth, authorize(['coordinator', 'admin']), panelController.unassignTeamFromSlot);
 
 // Coordinator panel stats (teams assigned, free/occupied slots)
 router.get('/coordinator/panel-stats', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), panelController.getPanelStats);

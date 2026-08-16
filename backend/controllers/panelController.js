@@ -1513,3 +1513,119 @@ exports.getPanelStats = async (req, res) => {
         res.status(500).json({ message: 'Server error fetching panel stats' });
     }
 };
+
+exports.assignTeamToSlot = async (req, res) => {
+    try {
+        const { scheduleId, teamId } = req.body;
+        const coordinatorId = req.user.id;
+
+        if (!scheduleId || !teamId) {
+            return res.status(400).json({ message: 'Schedule ID and Team ID are required.' });
+        }
+
+        const isReadOnly = req.user.role === 'assistant coordinator';
+        if (isReadOnly) {
+            return res.status(403).json({ message: 'Action forbidden in Read-Only Mode.' });
+        }
+
+        // Find the timetable slot
+        const slot = await TimeTable.findById(scheduleId);
+        if (!slot) {
+            return res.status(404).json({ message: 'Slot not found.' });
+        }
+
+        // Verify the slot is assigned to a panel coordinated by this user
+        const panel = await Panel.findOne({
+            _id: slot.panel,
+            $or: [
+                { coordinator: coordinatorId },
+                { assistantCoordinators: coordinatorId }
+            ]
+        });
+        if (!panel) {
+            return res.status(403).json({ message: 'Access denied. You do not coordinate this panel.' });
+        }
+
+        if (slot.team) {
+            return res.status(400).json({ message: 'Slot is already occupied.' });
+        }
+
+        // Verify the team exists and belongs to this panel
+        const team = await Team.findOne({ _id: teamId, panel: panel._id });
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found or does not belong to this panel.' });
+        }
+
+        // Verify the team is not already assigned to any slot for this slotType
+        const alreadyAssigned = await TimeTable.findOne({
+            panel: panel._id,
+            slotType: slot.slotType,
+            team: teamId
+        });
+        if (alreadyAssigned) {
+            return res.status(400).json({ message: `Team is already assigned to a slot for ${slot.slotType}.` });
+        }
+
+        // Assign team to slot
+        slot.team = team._id;
+        slot.name = `${slot.slotType} for ${team.teamName}`;
+        slot.description = `${slot.slotType} scheduled by coordinator`;
+        slot.slotAssignedBy = coordinatorId;
+        await slot.save();
+
+        res.json({ message: 'Team assigned to slot successfully!', slot });
+    } catch (error) {
+        console.error('Error assigning team to slot:', error);
+        res.status(500).json({ message: 'Server error assigning team to slot' });
+    }
+};
+
+exports.unassignTeamFromSlot = async (req, res) => {
+    try {
+        const { scheduleId } = req.body;
+        const coordinatorId = req.user.id;
+
+        if (!scheduleId) {
+            return res.status(400).json({ message: 'Schedule ID is required.' });
+        }
+
+        const isReadOnly = req.user.role === 'assistant coordinator';
+        if (isReadOnly) {
+            return res.status(403).json({ message: 'Action forbidden in Read-Only Mode.' });
+        }
+
+        // Find the timetable slot
+        const slot = await TimeTable.findById(scheduleId);
+        if (!slot) {
+            return res.status(404).json({ message: 'Slot not found.' });
+        }
+
+        // Verify the slot is assigned to a panel coordinated by this user
+        const panel = await Panel.findOne({
+            _id: slot.panel,
+            $or: [
+                { coordinator: coordinatorId },
+                { assistantCoordinators: coordinatorId }
+            ]
+        });
+        if (!panel) {
+            return res.status(403).json({ message: 'Access denied. You do not coordinate this panel.' });
+        }
+
+        if (!slot.team) {
+            return res.status(400).json({ message: 'Slot is already free.' });
+        }
+
+        // Unassign team
+        slot.team = null;
+        slot.name = `${slot.slotType} (Free)`;
+        slot.description = `${slot.slotType} free slot created by coordinator`;
+        slot.slotAssignedBy = coordinatorId;
+        await slot.save();
+
+        res.json({ message: 'Team unassigned from slot successfully!', slot });
+    } catch (error) {
+        console.error('Error unassigning team from slot:', error);
+        res.status(500).json({ message: 'Server error unassigning team from slot' });
+    }
+};
