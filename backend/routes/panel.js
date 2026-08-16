@@ -85,6 +85,8 @@ router.get('/coordinator/allotted-schedules', auth, authorize(['coordinator', 'a
 router.delete('/coordinator/allotted-schedules/:scheduleId', auth, authorize(['coordinator', 'admin']), panelController.deleteAllottedSchedule);
 router.post('/coordinator/assign-slot-team', auth, authorize(['coordinator', 'admin']), panelController.assignTeamToSlot);
 router.post('/coordinator/unassign-slot-team', auth, authorize(['coordinator', 'admin']), panelController.unassignTeamFromSlot);
+router.get('/coordinator/instruction-templates', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), panelController.getCoordinatorInstructionTemplates);
+router.get('/panel/:panelId/instructions', auth, authorize(['guide', 'panel', 'coordinator', 'assistant coordinator', 'admin']), panelController.getPanelInstructions);
 
 // Coordinator panel stats (teams assigned, free/occupied slots)
 router.get('/coordinator/panel-stats', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), panelController.getPanelStats);

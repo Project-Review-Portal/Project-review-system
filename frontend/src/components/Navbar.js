@@ -33,6 +33,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     { label: 'Requests', path: '/guide-dashboard/requests' },
                     { label: 'My Teams', path: '/guide-dashboard/my-teams' },
                     { label: 'Review Schedules', path: '/guide-dashboard/review-schedules' },
+                    { label: 'Announcements', path: '/guide-dashboard/announcements' },
                     { label: 'Mark Teams', path: '/guide-dashboard/mark-teams' },
                     { label: 'Uploads', path: '/guide-dashboard/final-reports' },
                     { label: 'Guide Me', path: '/guide-dashboard/guide-me' }

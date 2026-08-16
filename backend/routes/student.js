@@ -8,5 +8,5 @@ router.get('/review-schedule', auth, authorize(['student']), studentController.g
 // Fetch instructions route using a query parameter
 router.get('/get-instructions-template', auth,authorize(['student']), studentController.getInstructionTemplate);
 // Download file route using a path parameter
-router.get('/download-template/:templateId', auth,authorize(['student']), studentController.downloadTemplateFile);
+router.get('/download-template/:templateId', auth,authorize(['student', 'coordinator', 'assistant coordinator', 'admin', 'panel', 'guide']), studentController.downloadTemplateFile);
 module.exports = router; 

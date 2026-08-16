@@ -7,6 +7,8 @@ const CoordinatorInstructionTemplate = () => {
   const [instructions, setInstructions] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [historyData, setHistoryData] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const fileInputRef = useRef(null);
 
   // Handle text input updates
@@ -71,9 +73,68 @@ const CoordinatorInstructionTemplate = () => {
       });
       console.log('Submission successful:', response.data);
       alert('Instructions and uploaded documents dispatched successfully to teams!');
+      setInstructions('');
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      fetchHistory();
     } catch (error) {
       console.error('Error submitting template details:', error);
       alert('Failed to submit form data. Please try again.');
+    }
+  };
+
+  const fetchHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${SERVER_API_KEY}/api/panels/coordinator/instruction-templates`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.data && response.data.success) {
+        setHistoryData(response.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch history:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  const handleDownload = async (templateId, actualFileName) => {
+    if (!templateId) return;
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${SERVER_API_KEY}/api/student/download-template/${templateId}`, {
+        responseType: 'blob', 
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.data.type === "application/json" || response.headers['content-type']?.includes('application/json')) {
+        const text = await response.data.text();
+        const errorObj = JSON.parse(text);
+        alert(`Download Failed: ${errorObj.message}`);
+        return;
+      }
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', actualFileName || 'instruction_document.txt'); 
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download pipeline failed:", err);
+      alert("Could not process your file download. Please try again later.");
     }
   };
 
@@ -211,6 +272,57 @@ const CoordinatorInstructionTemplate = () => {
 
           </form>
         </div>
+
+        {/* Broadcast History section */}
+        <div className="max-w-4xl mx-auto space-y-6 mt-8 pb-12">
+          <div className="border-b border-gray-200 pb-2">
+            <h2 className="text-lg font-bold text-gray-900">Broadcast History</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Track and view all previously sent announcements and instructions.</p>
+          </div>
+
+          {loadingHistory ? (
+            <div className="text-center text-gray-500 text-sm py-4">Loading broadcast history...</div>
+          ) : historyData.length === 0 ? (
+            <div className="text-center text-gray-400 text-sm py-6 bg-white border rounded border-dashed">No announcements sent yet.</div>
+          ) : (
+            <div className="space-y-4">
+              {historyData.map((template) => (
+                <div 
+                  key={template._id} 
+                  className="w-full bg-white border border-gray-200 rounded shadow-sm p-6 space-y-4 transition-all hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                      Instructions/Guidelines
+                    </span>
+                    <span className="text-xs font-medium text-gray-400 bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100">
+                      {new Date(template.createdAt).toLocaleDateString()} • {new Date(template.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+
+                  <div className="w-full text-gray-700 text-sm leading-relaxed bg-gray-50/50 rounded-lg p-4 border border-gray-100 whitespace-pre-wrap">
+                    {template.reviewInstructions}
+                  </div>
+
+                  {template.fileName && (
+                    <div className="pt-1">
+                      <button
+                        onClick={() => handleDownload(template._id, template.fileName)}
+                        className="inline-flex items-center justify-center bg-[#583be2] hover:bg-[#472fc5] text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 shadow-sm text-xs"
+                      >
+                        <svg className="w-3.5 h-3.5 mr-2" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
+                        </svg>
+                        Download Attachment: {template.fileName}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
       </div>
     </>
   );

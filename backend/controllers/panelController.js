@@ -1629,3 +1629,60 @@ exports.unassignTeamFromSlot = async (req, res) => {
         res.status(500).json({ message: 'Server error unassigning team from slot' });
     }
 };
+
+exports.getCoordinatorInstructionTemplates = async (req, res) => {
+    try {
+        const coordinatorId = req.user.id;
+        const selectedPanelId = req.headers['x-selected-panel-id'];
+        const mongoose = require('mongoose');
+
+        let query = { uploadedBy: coordinatorId };
+
+        if (selectedPanelId && mongoose.Types.ObjectId.isValid(selectedPanelId)) {
+            query.panels = selectedPanelId;
+        }
+
+        const templates = await InstructionTemplate.find(query)
+            .populate('uploadedBy', 'name')
+            .select('reviewInstructions filePath fileName uploadedBy createdAt')
+            .sort({ createdAt: -1 });
+
+        res.json({ success: true, data: templates });
+    } catch (error) {
+        console.error('Error fetching coordinator instruction templates:', error);
+        res.status(500).json({ message: 'Server error fetching announcements' });
+    }
+};
+
+exports.getPanelInstructions = async (req, res) => {
+    try {
+        const { panelId } = req.params;
+        const mongoose = require('mongoose');
+
+        if (!panelId || !mongoose.Types.ObjectId.isValid(panelId)) {
+            return res.status(400).json({ message: 'Invalid or missing panel ID.' });
+        }
+
+        const templates = await InstructionTemplate.find({ panels: panelId })
+            .populate('uploadedBy', 'name')
+            .select('reviewInstructions filePath fileName uploadedBy createdAt')
+            .sort({ createdAt: -1 });
+
+        let myTeams = [];
+        if (req.user && req.user.role === 'guide') {
+            const Team = require('../models/Team');
+            myTeams = await Team.find({
+                guidePreference: req.user.id,
+                $or: [{ panel: panelId }, { vivaPanel: panelId }]
+            })
+            .populate('teamLeader', 'name')
+            .populate('members', 'name')
+            .select('teamName teamLeader members');
+        }
+
+        res.json({ success: true, data: templates, myTeams });
+    } catch (error) {
+        console.error('Error fetching panel instructions:', error);
+        res.status(500).json({ message: 'Server error fetching instructions' });
+    }
+};
