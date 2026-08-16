@@ -13,6 +13,10 @@ const InstructionTemplateSchema = new mongoose.Schema({
     type: String,
     required: false, 
   },
+  attachments: [{
+    filePath: { type: String, required: true },
+    fileName: { type: String, required: true }
+  }],
   uploadedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

@@ -60,19 +60,17 @@ const CoordinatorInstructions = () => {
     fetchCoordinatorData();
   }, []);
 
-  // Secure file download using blob streams to handle header tokens cleanly
   const handleDownload = async (templateId, actualFileName) => {
     if (!templateId) return;
     
     try {
-      const response = await axios.get(`${SERVER_API_KEY}/api/student/download-template/${templateId}`, {
+      const response = await axios.get(`${SERVER_API_KEY}/api/student/download-template/${templateId}?fileName=${encodeURIComponent(actualFileName)}`, {
         responseType: 'blob', 
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
 
-      // Intercept and extract backend error responses sent as JSON inside blobs
       if (response.data.type === "application/json" || response.headers['content-type']?.includes('application/json')) {
         const text = await response.data.text();
         const errorObj = JSON.parse(text);
@@ -80,7 +78,6 @@ const CoordinatorInstructions = () => {
         return;
       }
 
-      // Generate virtual asset click payload to prompt clean file assembly
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -98,6 +95,16 @@ const CoordinatorInstructions = () => {
     }
   };
 
+  const getTemplateFiles = (template) => {
+    const files = [];
+    if (template.attachments && template.attachments.length > 0) {
+      files.push(...template.attachments);
+    } else if (template.fileName && template.filePath) {
+      files.push({ fileName: template.fileName, filePath: template.filePath });
+    }
+    return files;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -106,7 +113,6 @@ const CoordinatorInstructions = () => {
     );
   }
 
-  // Handle 404 blockages (e.g., Team not formed / Panel unassigned)
   if (errorState.isError && errorState.statusCode === 404) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
@@ -121,7 +127,6 @@ const CoordinatorInstructions = () => {
     );
   }
 
-  // Handle server errors (e.g., 500 Server Crashes, 401 Expirations)
   if (errorState.isError) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
@@ -168,22 +173,27 @@ const CoordinatorInstructions = () => {
               </span>
             </div>
 
-            <div className="w-full text-gray-700 text-sm leading-relaxed bg-gray-50/50 rounded-lg p-4 border border-gray-100">
+            <div className="w-full text-gray-700 text-sm leading-relaxed bg-gray-50/50 rounded-lg p-4 border border-gray-100 whitespace-pre-wrap">
               {template.reviewInstructions}
             </div>
 
-            {/* Downloader trigger bound cleanly with specific mapped data arguments */}
-            {template.fileName && (
-              <div className="pt-1">
-                <button
-                  onClick={() => handleDownload(template._id, template.fileName)}
-                  className="inline-flex items-center justify-center bg-[#583be2] hover:bg-[#472fc5] text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 shadow-sm text-xs"
-                >
-                  <svg className="w-3.5 h-3.5 mr-2" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
-                  </svg>
-                  Download Attachment: {template.fileName}
-                </button>
+            {getTemplateFiles(template).length > 0 && (
+              <div className="flex flex-col gap-2 pt-1">
+                <span className="text-[10px] uppercase font-bold text-gray-400">Attachments:</span>
+                <div className="flex flex-wrap gap-2">
+                  {getTemplateFiles(template).map((file, fIdx) => (
+                    <button
+                      key={fIdx}
+                      onClick={() => handleDownload(template._id, file.fileName)}
+                      className="inline-flex items-center justify-center bg-[#583be2] hover:bg-[#472fc5] text-white font-medium py-1.5 px-3 rounded-lg transition-colors duration-200 shadow-sm text-xs"
+                    >
+                      <svg className="w-3.5 h-3.5 mr-2" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
+                      </svg>
+                      {file.fileName}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>

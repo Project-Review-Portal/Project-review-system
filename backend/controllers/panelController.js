@@ -1143,7 +1143,7 @@ exports.deleteAllottedSchedule = async (req, res) => {
 exports.createInstructionTemplate = async (req, res) => {
   try {
     // 1. Safety logs
-    console.log("Uploaded file object context:", req.file);
+    console.log("Uploaded file object context:", req.files);
     console.log("Text fields form-data payload:", req.body);
 
     const { reviewInstructions } = req.body;
@@ -1182,11 +1182,26 @@ exports.createInstructionTemplate = async (req, res) => {
       panels: coordinatorPanelIds // Automatically binds all matching panels found in Step 4
     };
 
-    // 6. Conditionally append file parameters if an asset was uploaded
-    if (req.file) {
-      newTemplatePayload.filePath = req.file.path;         // System storage path
-      newTemplatePayload.fileName = req.file.originalname; // Saved as original filename per your requirement
+    // 6. Conditionally append file parameters if assets were uploaded
+    let attachments = [];
+    console.log('-------------------------------')
+    console.log({files: req.files})
+    if (req.files && req.files.length > 0) {
+      attachments = req.files.map(file => ({
+        filePath: file.path,
+        fileName: file.originalname
+      }));
+      newTemplatePayload.filePath = req.files[0].path;
+      newTemplatePayload.fileName = req.files[0].originalname;
+    } else if (req.file) {
+      attachments = [{
+        filePath: req.file.path,
+        fileName: req.file.originalname
+      }];
+      newTemplatePayload.filePath = req.file.path;
+      newTemplatePayload.fileName = req.file.originalname;
     }
+    newTemplatePayload.attachments = attachments;
 
     // 7. Persist records straight to MongoDB
     const templateDocument = new InstructionTemplate(newTemplatePayload);
@@ -1644,7 +1659,7 @@ exports.getCoordinatorInstructionTemplates = async (req, res) => {
 
         const templates = await InstructionTemplate.find(query)
             .populate('uploadedBy', 'name')
-            .select('reviewInstructions filePath fileName uploadedBy createdAt')
+            .select('reviewInstructions filePath fileName attachments uploadedBy createdAt')
             .sort({ createdAt: -1 });
 
         res.json({ success: true, data: templates });
@@ -1665,7 +1680,7 @@ exports.getPanelInstructions = async (req, res) => {
 
         const templates = await InstructionTemplate.find({ panels: panelId })
             .populate('uploadedBy', 'name')
-            .select('reviewInstructions filePath fileName uploadedBy createdAt')
+            .select('reviewInstructions filePath fileName attachments uploadedBy createdAt')
             .sort({ createdAt: -1 });
 
         let myTeams = [];

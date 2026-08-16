@@ -73,7 +73,7 @@ exports.getInstructionTemplate = async (req, res) => {
         // 5. Fetch instruction templates matching the extracted panel ID
         const templates = await InstructionTemplate.find({ panels: team.panel })
             .populate('uploadedBy', 'name') // Pulls only the coordinator's name from User table
-            .select('reviewInstructions filePath fileName uploadedBy createdAt')
+            .select('reviewInstructions filePath fileName attachments uploadedBy createdAt')
             .sort({ createdAt: -1 });
 
         if (!templates || templates.length === 0) {
@@ -100,8 +100,8 @@ exports.getInstructionTemplate = async (req, res) => {
 // GET: Stream file attachment matching a specific templateId passed via route parameters
 exports.downloadTemplateFile = async (req, res) => {
     try {
-        // Reads from URL path parameter: /api/download-instruction/XYZ
         const { templateId } = req.params;
+        const { fileName: requestedFileName } = req.query;
 
         const template = await InstructionTemplate.findById(templateId);
         
@@ -109,14 +109,27 @@ exports.downloadTemplateFile = async (req, res) => {
             return res.status(404).json({ message: 'Instruction template not found' });
         }
 
-        if (!template.filePath || !template.fileName) {
+        let targetFilePath = template.filePath;
+        let targetFileName = template.fileName;
+
+        if (requestedFileName && template.attachments && template.attachments.length > 0) {
+            const match = template.attachments.find(att => att.fileName === requestedFileName);
+            if (match) {
+                targetFilePath = match.filePath;
+                targetFileName = match.fileName;
+            }
+        }
+
+        if (!targetFilePath || !targetFileName) {
             return res.status(400).json({ message: 'No file is attached to this instruction template' });
         }
 
-        const filePath = path.join(__dirname, '..', template.filePath);
+        const absolutePath = path.isAbsolute(targetFilePath) 
+            ? targetFilePath 
+            : path.join(__dirname, '..', targetFilePath);
 
-        if (fs.existsSync(filePath)) {
-            res.download(filePath, template.fileName);
+        if (fs.existsSync(absolutePath)) {
+            res.download(absolutePath, targetFileName);
         } else {
             return res.status(404).json({ message: 'The requested file does not exist on the server' });
         }

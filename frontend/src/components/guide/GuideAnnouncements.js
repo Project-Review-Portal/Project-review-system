@@ -71,7 +71,7 @@ const GuideAnnouncements = () => {
         if (!templateId) return;
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get(`${SERVER_API_KEY}/api/student/download-template/${templateId}`, {
+            const response = await axios.get(`${SERVER_API_KEY}/api/student/download-template/${templateId}?fileName=${encodeURIComponent(actualFileName)}`, {
                 responseType: 'blob', 
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -97,6 +97,16 @@ const GuideAnnouncements = () => {
             console.error("Download pipeline failed:", err);
             alert("Could not process your file download. Please try again later.");
         }
+    };
+
+    const getTemplateFiles = (template) => {
+        const files = [];
+        if (template.attachments && template.attachments.length > 0) {
+            files.push(...template.attachments);
+        } else if (template.fileName && template.filePath) {
+            files.push({ fileName: template.fileName, filePath: template.filePath });
+        }
+        return files;
     };
 
     if (loading) {
@@ -202,17 +212,23 @@ const GuideAnnouncements = () => {
                                         {template.reviewInstructions}
                                     </div>
 
-                                    {template.fileName && (
-                                        <div className="pt-1">
-                                            <button
-                                                onClick={() => handleDownload(template._id, template.fileName)}
-                                                className="inline-flex items-center justify-center bg-[#583be2] hover:bg-[#472fc5] text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 shadow-sm text-xs"
-                                            >
-                                                <svg className="w-3.5 h-3.5 mr-2" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
-                                                </svg>
-                                                Download Attachment: {template.fileName}
-                                            </button>
+                                    {getTemplateFiles(template).length > 0 && (
+                                        <div className="flex flex-col gap-2 pt-1">
+                                            <span className="text-[10px] uppercase font-bold text-gray-400">Attachments:</span>
+                                            <div className="flex flex-wrap gap-2">
+                                                {getTemplateFiles(template).map((file, fIdx) => (
+                                                    <button
+                                                        key={fIdx}
+                                                        onClick={() => handleDownload(template._id, file.fileName)}
+                                                        className="inline-flex items-center justify-center bg-[#583be2] hover:bg-[#472fc5] text-white font-medium py-1.5 px-3 rounded-lg transition-colors duration-200 shadow-sm text-xs"
+                                                    >
+                                                        <svg className="w-3.5 h-3.5 mr-2" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
+                                                        </svg>
+                                                        {file.fileName}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     )}
                                 </div>

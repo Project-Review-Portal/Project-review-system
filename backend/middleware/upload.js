@@ -3,13 +3,13 @@ const path = require('path');
 
 // Set up storage engine
 const storage = multer.diskStorage({
-  destination: './uploads/general',
+  destination: path.join(__dirname, '..', 'uploads', 'general'),
   filename: function(req, file, cb){
     cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
   }
 });
 const storageReport = multer.diskStorage({
-  destination: './uploads/report',
+  destination: path.join(__dirname, '..', 'uploads', 'report'),
   filename: function(req, file, cb){
     cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
   }
@@ -25,7 +25,7 @@ const uploadReport = multer({
 }).single('report');
 
 const storageTemplate = multer.diskStorage({
-  destination: './uploads/review-templates', 
+  destination: path.join(__dirname, '..', 'uploads', 'review-templates'), 
   filename: function(req, file, cb){
     cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
   }
@@ -38,10 +38,10 @@ const uploadTemplate = multer({
     // Pass true instantly—bypassing any extension or mime matching constraints entirely
     cb(null, true);
   }
-}).single('reviewTemplate');
+}).array('reviewTemplate', 20);
 
 const storageMaterial = multer.diskStorage({
-  destination: './uploads/materials',
+  destination: path.join(__dirname, '..', 'uploads', 'materials'),
   filename: function(req, file, cb){
     cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
   }
