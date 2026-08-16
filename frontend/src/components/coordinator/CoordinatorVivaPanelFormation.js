@@ -46,22 +46,10 @@ const CoordinatorVivaPanelFormation = () => {
     const fetchInitialData = async () => {
         setLoading(true);
         try {
-            // 1. Fetch coordinator's review panels
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            const selectedProg = user.programme || 'UG';
-            console.log({selectedProg, user: user.programme})
-            const panelsRes = await axios.get(`${SERVER_API_KEY}/api/panels/coordinator/panel-status`, {
-                headers: { ...headers, 'x-selected-programme': selectedProg }
-            });
-            console.log({panelsRes})
-            
-            const coordPanels = panelsRes.data.panels || [];
-            setReviewPanels(coordPanels);
-            if (coordPanels.length > 0) {
-                setSelectedReviewPanelId(coordPanels[0]._id);
-            }
+            const activePanelId = localStorage.getItem('selectedPanelId') || '';
+            setSelectedReviewPanelId(activePanelId);
 
-            // 2. Fetch all faculty members (both internal and external)
+            // Fetch all faculty members (both internal and external)
             const facultyRes = await axios.get(`${SERVER_API_KEY}/api/admin/faculty-list?includeExternal=true`, { headers });
             setAllFaculty(facultyRes.data);
         } catch (error) {
@@ -181,32 +169,12 @@ const CoordinatorVivaPanelFormation = () => {
 
     return (
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6">
-            {/* Header / Review Panel Selector */}
+            {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800">Viva Panel Formation</h2>
                     <p className="text-xs text-slate-500 mt-1">Create multiple viva panels and assign them to teams coordinated by you.</p>
                 </div>
-                {reviewPanels.length > 1 ? (
-                    <div className="flex items-center gap-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Review Panel Context:</label>
-                        <select
-                            value={selectedReviewPanelId}
-                            onChange={(e) => setSelectedReviewPanelId(e.target.value)}
-                            className="text-xs px-3 py-2 border rounded-md font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
-                        >
-                            {reviewPanels.map(rp => (
-                                <option key={rp._id} value={rp._id}>{rp.name} ({rp.programme})</option>
-                            ))}
-                        </select>
-                    </div>
-                ) : (
-                    reviewPanels.length === 1 && (
-                        <span className="px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-150 text-indigo-700 text-xs font-bold uppercase tracking-wider">
-                            Coordinating: {reviewPanels[0].name} ({reviewPanels[0].programme})
-                        </span>
-                    )
-                )}
             </div>
 
             {/* List and Creation form block */}
