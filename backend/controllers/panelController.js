@@ -6,12 +6,15 @@ const Attendance = require('../models/Attendance');
 const Team = require('../models/Team');
 const Config = require('../models/Config');
 const Mark = require('../models/Mark');
-const InstructionTemplate = require('../models/InstructionTemplate');
+const InstructionTemplate = require('../models/InstructionTemplate'); 
 const SlotAssignmentQueue = require('../models/SlotAssignmentQueue');
 const { getReviewSettings } = require('../utils/reviewSettings');
 const normalizeProgramme = (prog) => {
     if (!prog) return 'B.E. CSE';
-    const clean = String(prog).trim();
+    let clean = String(prog).trim();
+    if (clean.includes(',')) {
+        clean = clean.split(',')[0].trim();
+    }
     if (clean.toLowerCase() === 'ug' || clean === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
         return 'B.E. CSE';
     }
@@ -62,8 +65,8 @@ exports.getAllPanels = async (req, res) => {
                     teamCount = await Team.countDocuments({ vivaPanel: panel._id });
                 } else {
                     const assignment = await TeamPanelAssignment.findOne({ panel: panel._id });
-                    teamCount = assignment && Array.isArray(assignment.teams)
-                        ? assignment.teams.length
+                    teamCount = assignment && Array.isArray(assignment.teams) 
+                        ? assignment.teams.length 
                         : 0;
                 }
 
@@ -113,15 +116,15 @@ exports.createPanel = async (req, res) => {
         }
         // Generate panel name based on current count for this panelType and programme
         const namePrefix = resolvedPanelType === 'viva' ? `${targetProgramme} Viva Panel` : `${targetProgramme} Panel`;
-
+        
         const existingPanelNames = await Panel.find({ panelType: resolvedPanelType, programme: targetProgramme }, { _id: 0, name: 1 });
-
+        
         // Helper function to escape regex special characters in the programme name
         const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
+        
         // Regex to extract the number at the end, handling legacy "Panel X", "Viva Panel X", and new "Programme [Viva] Panel X"
         const panelNameRegex = new RegExp(`^(?:${escapeRegExp(targetProgramme)}\\s+)?(?:Viva\\s+)?Panel\\s+(\\d+)$`, 'i');
-
+        
         const existingNumbers = new Set();
         if (existingPanelNames) {
             for (const p of existingPanelNames) {
@@ -133,12 +136,12 @@ exports.createPanel = async (req, res) => {
                 }
             }
         }
-
+        
         let numberTracker = 1;
         while (existingNumbers.has(numberTracker)) {
             numberTracker++;
         }
-
+        
         const newPanelName = `${namePrefix} ${numberTracker}`;
         const newPanel = new Panel({
             name: newPanelName,
@@ -188,15 +191,15 @@ exports.updatePanel = async (req, res) => {
         }
         await panel.save();
 
-        const teams = await Team.find({ panel: id });
+        const teams = await Team.find({ panel : id });
         const filteredTeams = teams.filter((t) => {
             // console.log({ members, coordinator, t : t.guidePreference })
             return members.includes(t.guidePreference.toString()) || coordinator === t.guidePreference.toString()
-        }).map((t) => t._id)
+        }).map((t) => t._id) 
         console.log('---------------------------<<')
         // console.log(await Team.find({ _id : { $in : filteredTeams._id} }))
         // console.log({f : filteredTeams})
-        await Team.updateMany({ _id: { $in: filteredTeams } }, { $set: { panel: null } })
+        await Team.updateMany({ _id : { $in : filteredTeams} }, { $set : { panel : null}})
 
         res.json({ message: 'Panel updated successfully!', panel });
     } catch (error) {
@@ -255,25 +258,25 @@ exports.getPanelReviewSchedules = async (req, res) => {
                 status: 'scheduled',
                 isNotified: true
             })
-                .populate({
-                    path: 'panel',
-                    select: 'name members coordinator',
-                    model: 'Panel',
-                    populate: [
-                        { path: 'members', select: 'username name memberType' },
-                        { path: 'coordinator', select: 'username name' }
-                    ]
-                })
-                .populate({
-                    path: 'team',
-                    select: 'teamName teamLeader members guidePreference programme',
-                    populate: [
-                        { path: 'teamLeader', select: 'name username' },
-                        { path: 'members', select: 'name username' },
-                        { path: 'guidePreference', select: 'name username' }
-                    ]
-                });
-
+            .populate({
+                path: 'panel',
+                select: 'name members coordinator',
+                model: 'Panel',
+                populate: [
+                    { path: 'members', select: 'username name memberType' },
+                    { path: 'coordinator', select: 'username name' }
+                ]
+            })
+            .populate({
+                path: 'team',
+                select: 'teamName teamLeader members guidePreference programme',
+                populate: [
+                    { path: 'teamLeader', select: 'name username' },
+                    { path: 'members', select: 'name username' },
+                    { path: 'guidePreference', select: 'name username' }
+                ]
+            });
+            
             console.log('Found review schedules for panel member:', reviewSchedules.length);
             // If external member, restrict to viva only
             if (req.user.memberType === 'external') {
@@ -298,7 +301,7 @@ exports.getPanelReviewSchedules = async (req, res) => {
             const Team = require('../models/Team');
             const teams = await Team.find({ guidePreference: userId }).select('_id');
             const teamIds = teams.map(team => team._id);
-
+            
             if (teamIds.length === 0) {
                 console.log('No teams found for guide');
                 return res.json([]);
@@ -309,20 +312,20 @@ exports.getPanelReviewSchedules = async (req, res) => {
                 status: 'scheduled',
                 isNotified: true
             })
-                .populate({
-                    path: 'panel',
-                    select: 'name members',
-                    model: 'Panel'
-                })
-                .populate({
-                    path: 'team',
-                    select: 'teamName teamLeader members programme',
-                    populate: [
-                        { path: 'teamLeader', select: 'name username' },
-                        { path: 'members', select: 'name username' }
-                    ]
-                });
-
+            .populate({
+                path: 'panel',
+                select: 'name members',
+                model: 'Panel'
+            })
+            .populate({
+                path: 'team',
+                select: 'teamName teamLeader members programme',
+                populate: [
+                    { path: 'teamLeader', select: 'name username' },
+                    { path: 'members', select: 'name username' }
+                ]
+            });
+            
             console.log('Found review schedules for guide:', reviewSchedules.length);
         } else {
             console.log('User role not supported for review schedules:', userRole);
@@ -332,7 +335,7 @@ exports.getPanelReviewSchedules = async (req, res) => {
         // Compute a friendly slotLabel for each schedule to help frontend display the correct review type
         const inferLabel = (s) => {
             const slotType = (s.slotType || s.type || '').toString().toLowerCase();
-            const name = (s.name || '').toString().toLowerCase();
+            const name = (s.name || '') .toString().toLowerCase();
             const desc = (s.description || '').toString().toLowerCase();
 
             const findInText = (txt) => {
@@ -384,8 +387,8 @@ exports.getAssignedTeamsForPanel = async (req, res) => {
     try {
         const userId = req.user.id;
         const userRole = req.headers['x-selected-role'];
-        const selectedProgramme = req.headers['x-selected-programme'];
-        console.log(userRole, selectedProgramme);
+        const selectedProgramme=req.headers['x-selected-programme'];
+        console.log(userRole,selectedProgramme);
         const rolesArray = Array.isArray(req.user.roles) ? req.user.roles.map(r => (typeof r === 'string' ? r : r.role)).filter(Boolean) : [];
         console.log('User ID:', userId, 'Role:', userRole, 'Roles array:', rolesArray);
 
@@ -394,7 +397,7 @@ exports.getAssignedTeamsForPanel = async (req, res) => {
         if (userRole === 'panel' || rolesArray.includes('panel')) {
             // For panel members, find teams assigned to their panels using Team.panel for source of truth
             console.log('User is a panel member, finding teams assigned to their panels');
-            const panels = await Panel.find({ members: userId, programme: selectedProgramme });
+            const panels = await Panel.find({ members: userId ,programme:selectedProgramme});
             console.log('Found panels for user:', panels.length);
 
             if (panels.length === 0) {
@@ -447,7 +450,7 @@ exports.getAssignedTeamsForPanel = async (req, res) => {
                 .populate('guidePreference', 'username name')
                 .populate('panel', 'name')
                 .populate('vivaPanel', 'name');
-
+            
             assignedTeams = teams.map(team => ({
                 ...team.toObject(),
                 panelName: 'Guide Assignment'
@@ -575,7 +578,7 @@ exports.submitMarks = async (req, res) => {
         // Check if student is either a team member or the team leader
         const isTeamMember = Array.isArray(team.members) && team.members.some(m => m && m.toString() === String(studentId));
         const isTeamLeader = team.teamLeader && team.teamLeader.toString() === String(studentId);
-
+        
         if (!isTeamMember && !isTeamLeader) {
             return res.status(400).json({ message: 'Student is not a member of this team.' });
         }
@@ -693,12 +696,12 @@ exports.generateSlotsForCoordinator = async (req, res) => {
         const coordinatorId = req.user.id;
         const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
         const programme = normalizeProgramme(selectedProgramme);
-        const panel = await Panel.findOne({ coordinator: coordinatorId, programme });
+        const panel = await Panel.findOne({ coordinator: coordinatorId, programme, panelType: 'review' });
         if (!panel) {
             console.log('❌ No panel found for coordinator:', coordinatorId, 'programme:', programme);
             return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
         }
-
+        
         console.log('✅ Found panel for coordinator:', panel._id, panel.name);
 
         // Find existing schedules for this panel on the specified date (to check for conflicts)
@@ -741,7 +744,7 @@ exports.generateSlotsForCoordinator = async (req, res) => {
         if (extraMin > 0) {
             extraMinutesMessage = `There are extra ${extraMin} minutes left over at the end of the specified time range.`;
         }
-
+        
         console.log('✅ Generated slots:', slots.length, '| Extra mins message:', extraMinutesMessage);
         res.json({ slots, extraMinutesMessage });
     } catch (error) {
@@ -758,7 +761,7 @@ exports.saveFreeSlotsForCoordinator = async (req, res) => {
         const coordinatorId = req.user.id;
         const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
         const programme = normalizeProgramme(selectedProgramme);
-        const panel = await Panel.findOne({ coordinator: coordinatorId, programme });
+        const panel = await Panel.findOne({ coordinator: coordinatorId, programme, panelType: 'review' });
         if (!panel) {
             return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
         }
@@ -774,7 +777,7 @@ exports.saveFreeSlotsForCoordinator = async (req, res) => {
         } else if (slots[0] && slots[0].start) {
             targetDate = new Date(slots[0].start);
         }
-
+        
         if (targetDate && !isNaN(targetDate.getTime())) {
             const dateOnly = new Date(targetDate);
             dateOnly.setHours(0, 0, 0, 0);
@@ -822,7 +825,7 @@ exports.saveFreeSlotsForCoordinator = async (req, res) => {
             if (endD <= startD) {
                 return res.status(400).json({ message: `End time must be after start time.` });
             }
-
+            
             // Compose period as HH:mm-HH:mm
             const pad = (n) => String(n).padStart(2, '0');
             const period = `${pad(startD.getHours())}:${pad(startD.getMinutes())}-${pad(endD.getHours())}:${pad(endD.getMinutes())}`;
@@ -959,11 +962,11 @@ exports.assignSlotsForCoordinator = async (req, res) => {
         const coordinatorId = req.user.id;
         const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
         const programme = normalizeProgramme(selectedProgramme);
-        const panel = await Panel.findOne({ coordinator: coordinatorId, programme });
+        const panel = await Panel.findOne({ coordinator: coordinatorId, programme, panelType: 'review' });
         if (!panel) {
             return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
         }
-
+        
         const teamIds = assignments.map(a => a.teamId);
         const teams = await Team.find({ '_id': { $in: teamIds } }).select('_id teamName');
         const teamMap = new Map(teams.map(t => [t._id.toString(), t.teamName]));
@@ -1035,6 +1038,7 @@ exports.getAllottedSchedulesForCoordinator = async (req, res) => {
         const coordinatorId = req.user.id;
         // Find panels where this user is coordinator or assistant coordinator
         const panels = await Panel.find({
+            panelType: 'review',
             $or: [
                 { coordinator: coordinatorId },
                 { assistantCoordinators: coordinatorId }
@@ -1102,70 +1106,70 @@ exports.deleteAllottedSchedule = async (req, res) => {
 
 //Coordinator: Sends instructions/template to students
 exports.createInstructionTemplate = async (req, res) => {
-    try {
-        // 1. Safety logs
-        console.log("Uploaded file object context:", req.file);
-        console.log("Text fields form-data payload:", req.body);
+  try {
+    // 1. Safety logs
+    console.log("Uploaded file object context:", req.file);
+    console.log("Text fields form-data payload:", req.body);
 
-        const { reviewInstructions } = req.body;
+    const { reviewInstructions } = req.body;
 
-        // 2. Hard Validation: Text instructions are explicitly required
-        if (!reviewInstructions || !reviewInstructions.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Validation Error: 'reviewInstructions' text body is required."
-            });
-        }
-
-        // 3. Extract and Verify User ID from Auth Middleware payload
-        const coordinatorId = req.user?._id;
-        if (!coordinatorId) {
-            return res.status(401).json({
-                success: false,
-                message: "Authentication Error: Unable to identify the submitting coordinator."
-            });
-        }
-
-        // 4. NEW: Dynamically query all panel IDs assigned to this coordinator
-        // .distinct('_id') returns a clean, flat array of ObjectIDs: [ObjectId('...'), ObjectId('...')]
-        const coordinatorPanelIds = await Panel.find({ coordinator: coordinatorId }).distinct('_id');
-
-        // 5. Structure the payload with the gathered data strings and panel arrays
-        const newTemplatePayload = {
-            reviewInstructions: reviewInstructions.trim(),
-            uploadedBy: coordinatorId,
-            panels: coordinatorPanelIds // Automatically binds all matching panels found in Step 4
-        };
-
-        // 6. Conditionally append file parameters if an asset was uploaded
-        if (req.file) {
-            newTemplatePayload.filePath = req.file.path;         // System storage path
-            newTemplatePayload.fileName = req.file.originalname; // Saved as original filename per your requirement
-        }
-
-        // 7. Persist records straight to MongoDB
-        const templateDocument = new InstructionTemplate(newTemplatePayload);
-        const savedDocument = await templateDocument.save();
-
-        // 8. Return response context payload back to your client application
-        return res.status(201).json({
-            success: true,
-            message: `Review guidelines dispatched successfully to your ${coordinatorPanelIds.length} assigned panels!`,
-            data: savedDocument
-        });
-
-    } catch (error) {
-        console.error("Critical database transaction error within createInstructionTemplate:", error);
-
-        if (error.name === 'ValidationError') {
-            return res.status(400).json({ success: false, message: error.message });
-        }
-
-        return res.status(500).json({
-            success: false,
-            message: "Internal Server Error: Failed to commit the instruction template records."
-        });
+    // 2. Hard Validation: Text instructions are explicitly required
+    if (!reviewInstructions || !reviewInstructions.trim()) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Validation Error: 'reviewInstructions' text body is required." 
+      });
     }
+
+    // 3. Extract and Verify User ID from Auth Middleware payload
+    const coordinatorId = req.user?._id;
+    if (!coordinatorId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication Error: Unable to identify the submitting coordinator."
+      });
+    }
+
+    // 4. NEW: Dynamically query all panel IDs assigned to this coordinator
+    // .distinct('_id') returns a clean, flat array of ObjectIDs: [ObjectId('...'), ObjectId('...')]
+    const coordinatorPanelIds = await Panel.find({ coordinator: coordinatorId, panelType: 'review' }).distinct('_id');
+
+    // 5. Structure the payload with the gathered data strings and panel arrays
+    const newTemplatePayload = {
+      reviewInstructions: reviewInstructions.trim(),
+      uploadedBy: coordinatorId,
+      panels: coordinatorPanelIds // Automatically binds all matching panels found in Step 4
+    };
+
+    // 6. Conditionally append file parameters if an asset was uploaded
+    if (req.file) {
+      newTemplatePayload.filePath = req.file.path;         // System storage path
+      newTemplatePayload.fileName = req.file.originalname; // Saved as original filename per your requirement
+    }
+
+    // 7. Persist records straight to MongoDB
+    const templateDocument = new InstructionTemplate(newTemplatePayload);
+    const savedDocument = await templateDocument.save();
+
+    // 8. Return response context payload back to your client application
+    return res.status(201).json({
+      success: true,
+      message: `Review guidelines dispatched successfully to your ${coordinatorPanelIds.length} assigned panels!`,
+      data: savedDocument
+    });
+
+  } catch (error) {
+    console.error("Critical database transaction error within createInstructionTemplate:", error);
+    
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    return res.status(500).json({ 
+      success: false,
+      message: "Internal Server Error: Failed to commit the instruction template records." 
+    });
+  }
 };
 
 
@@ -1174,7 +1178,7 @@ exports.getCoordinatorVivaPanels = async (req, res) => {
     try {
         const coordinatorId = req.user.id;
         const { reviewPanelId } = req.query;
-
+        
         if (!reviewPanelId) {
             return res.status(400).json({ message: 'reviewPanelId query parameter is required.' });
         }
@@ -1184,9 +1188,9 @@ exports.getCoordinatorVivaPanels = async (req, res) => {
             parentPanel: reviewPanelId,
             panelType: 'viva'
         })
-            .populate('members', 'username name memberType email designation affiliation contactNumber seniority')
-            .populate('coordinator', 'username name')
-            .populate('assistantCoordinators', 'username name');
+        .populate('members', 'username name memberType email designation affiliation contactNumber seniority')
+        .populate('coordinator', 'username name')
+        .populate('assistantCoordinators', 'username name');
 
         res.json(vivaPanels);
     } catch (error) {
@@ -1358,11 +1362,11 @@ exports.assignVivaPanelToTeam = async (req, res) => {
 exports.getCoordinatedTeams = async (req, res) => {
     try {
         const coordinatorId = req.user.id;
-
+        
         // 1. Get the raw value from headers or user object
         let rawProgramme = req.headers['x-selected-programme'] || req.user.programme;
         rawProgramme = normalizeProgramme(rawProgramme);
-
+        
         // 2. If it's a comma-separated string like "UG, UG", clean it up into an array of clean values
         let programmeArray = [];
         if (typeof rawProgramme === 'string') {
@@ -1380,17 +1384,18 @@ exports.getCoordinatedTeams = async (req, res) => {
         const regexFilters = programmeArray.map(prog => new RegExp(`^${prog}$`, 'i'));
 
         // 4. Find the panel matching the coordinator and ANY of the clean regex options
-        const panel = await Panel.findOne({
+        const panel = await Panel.findOne({ 
+            panelType: 'review',
             $or: [
                 { coordinator: coordinatorId },
                 { assistantCoordinators: coordinatorId }
             ],
-            programme: { $in: regexFilters }
+            programme: { $in: regexFilters } 
         });
-
+        
         if (!panel) {
-            return res.status(404).json({
-                message: `No panel found where you are assigned as a coordinator for programme matching "${rawProgramme}".`
+            return res.status(404).json({ 
+                message: `No panel found where you are assigned as a coordinator for programme matching "${rawProgramme}".` 
             });
         }
 
@@ -1426,6 +1431,7 @@ exports.getPanelStats = async (req, res) => {
 
         // Find the coordinator's panel
         let panel = await Panel.findOne({
+            panelType: 'review',
             $or: [
                 { coordinator: coordinatorId },
                 { assistantCoordinators: coordinatorId }
@@ -1434,6 +1440,7 @@ exports.getPanelStats = async (req, res) => {
         });
         if (!panel) {
             panel = await Panel.findOne({
+                panelType: 'review',
                 $or: [
                     { coordinator: coordinatorId },
                     { assistantCoordinators: coordinatorId }

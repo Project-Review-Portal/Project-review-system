@@ -166,10 +166,11 @@ axios.interceptors.request.use(
     try {
       const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
       if (storedUser) {
-        if (storedUser.role) {
+        const headersKeys = Object.keys(config.headers || {}).map(k => k.toLowerCase());
+        if (storedUser.role && !headersKeys.includes('x-selected-role')) {
           config.headers['X-Selected-Role'] = storedUser.role;
         }
-        if (storedUser.programme) {
+        if (storedUser.programme && !headersKeys.includes('x-selected-programme')) {
           config.headers['X-Selected-Programme'] = storedUser.programme;
         }
       }

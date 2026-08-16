@@ -15,7 +15,10 @@ function programmeRegex(programme) {
 
 const normalizeProgramme = (prog) => {
     if (!prog) return 'B.E. CSE';
-    const clean = String(prog).trim();
+    let clean = String(prog).trim();
+    if (clean.includes(',')) {
+        clean = clean.split(',')[0].trim();
+    }
     if (clean.toLowerCase() === 'ug' || clean === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
         return 'B.E. CSE';
     }

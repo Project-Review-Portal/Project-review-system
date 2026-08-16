@@ -96,17 +96,26 @@ router.post('/coordinator/assign-viva-panel', auth, authorize(['coordinator']), 
 
 // Debug route for coordinators to check their panel assignment
 router.get('/coordinator/panel-status', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), async (req, res) => {
+    console.log("entered-----------")
     try {
         const coordinatorId = req.user.id;
         
         // 1. Extract the program context from the headers (default to 'UG' if missing)
-        const userProgramme = req.headers['x-selected-programme'] || 'UG';
+        let userProgramme = req.headers['x-selected-programme'] || 'UG';
+        if (typeof userProgramme === 'string') {
+            userProgramme = userProgramme.split(',')[0].trim();
+        }
+        if (userProgramme.toLowerCase() === 'ug' || userProgramme === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
+            userProgramme = 'B.E. CSE';
+        }
+        console.log({reqhead: req.headers, userProgramme})
         // console.log(req.headers['x-selected-programme'] , 'UG')
         const Panel = require('../models/Panel');
         const Team = require('../models/Team');
         
         const panels = await Panel.find({ 
                     programme: userProgramme, // Assumes your Panel model maps a 'programme' string field
+                    panelType: 'review', // Ensure we only get parent review panels
                     $or: [
                         { coordinator: coordinatorId },
                         { assistantCoordinators: coordinatorId }

@@ -49,10 +49,12 @@ const CoordinatorVivaPanelFormation = () => {
             // 1. Fetch coordinator's review panels
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             const selectedProg = user.programme || 'UG';
+            console.log({selectedProg, user: user.programme})
             const panelsRes = await axios.get(`${SERVER_API_KEY}/api/panels/coordinator/panel-status`, {
                 headers: { ...headers, 'x-selected-programme': selectedProg }
             });
-
+            console.log({panelsRes})
+            
             const coordPanels = panelsRes.data.panels || [];
             setReviewPanels(coordPanels);
             if (coordPanels.length > 0) {

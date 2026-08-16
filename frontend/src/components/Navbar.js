@@ -91,8 +91,8 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
     return (
         <nav className="bg-indigo-600">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16">
-                    <div className="flex items-center">
+                <div className="flex items-center justify-between h-16 gap-4">
+                    <div className="flex items-center min-w-0 flex-1">
                         {user && (() => {
                             let text = '';
                             if (user.role === 'admin') {
@@ -126,8 +126,8 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                         </div>
                         
                         {/* Desktop Navigation */}
-                        <div className="hidden md:block ml-10">
-                            <div className="flex items-baseline space-x-1 overflow-x-auto scrollbar-hide max-w-4xl">
+                        <div className="hidden md:block ml-6 min-w-0 flex-1">
+                            <div className="flex items-baseline space-x-1 overflow-x-auto scrollbar-hide w-full">
                                 {getNavItems().map((item) => {
                                     const isActive = location.pathname === item.path;
 
@@ -148,7 +148,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     </div>
 
                     {/* Right side - User info and buttons */}
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 flex-shrink-0">
                         {/* <span className="text-white text-xs lg:text-sm hidden sm:block truncate max-w-32">Welcome!</span> */}
                         
                         {/* Switch Role button for faculty users with multiple roles */}
