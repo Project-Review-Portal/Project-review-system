@@ -11,6 +11,80 @@ const fs = require('fs');
 const path = require('path');
 const { getReviewSettings } = require('../utils/reviewSettings');
 
+const buildTeamQuery = async (req) => {
+    const userId = req.user.id;
+    const role = req.headers['x-selected-role'] || req.user.role;
+    const mongoose = require('mongoose');
+
+    let query = { status: 'approved' };
+
+    if (role === 'coordinator' || role === 'assistant coordinator') {
+        const selectedPanelId = req.headers['x-selected-panel-id'];
+        let panel;
+        if (selectedPanelId && mongoose.Types.ObjectId.isValid(selectedPanelId)) {
+            panel = await Panel.findOne({
+                _id: selectedPanelId,
+                panelType: 'review',
+                $or: [
+                    { coordinator: userId },
+                    { assistantCoordinators: userId }
+                ]
+            });
+        }
+        if (!panel) {
+            const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+            let cleanProg = String(selectedProgramme || 'B.E. CSE').trim();
+            if (cleanProg.includes(',')) cleanProg = cleanProg.split(',')[0].trim();
+            if (cleanProg.toLowerCase() === 'ug' || cleanProg === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
+                cleanProg = 'B.E. CSE';
+            }
+            panel = await Panel.findOne({
+                panelType: 'review',
+                $or: [
+                    { coordinator: userId },
+                    { assistantCoordinators: userId }
+                ],
+                programme: cleanProg
+            });
+        }
+
+        if (panel) {
+            query.panel = panel._id;
+        } else {
+            // Coordinator has no panels, return a query that matches nothing
+            query._id = null;
+        }
+    } else if (role === 'panel') {
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+        let cleanProg = String(selectedProgramme || 'B.E. CSE').trim();
+        if (cleanProg.includes(',')) cleanProg = cleanProg.split(',')[0].trim();
+        if (cleanProg.toLowerCase() === 'ug' || cleanProg === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
+            cleanProg = 'B.E. CSE';
+        }
+        const panels = await Panel.find({ members: userId, programme: cleanProg });
+        if (panels.length === 0) {
+            query._id = null;
+        } else {
+            query.panel = { $in: panels.map(p => p._id) };
+        }
+    } else if (role === 'admin') {
+        const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
+        if (selectedProgramme) {
+            let cleanProg = String(selectedProgramme).trim();
+            if (cleanProg.includes(',')) cleanProg = cleanProg.split(',')[0].trim();
+            if (cleanProg.toLowerCase() === 'ug' || cleanProg === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
+                cleanProg = 'B.E. CSE';
+            }
+            query.programme = cleanProg;
+        }
+    } else {
+        // Guide
+        query.guidePreference = userId;
+    }
+
+    return query;
+};
+
 // Get all pending guide requests for the logged-in guide
 exports.getGuideRequests = async (req, res) => {
     try {
@@ -331,22 +405,7 @@ exports.getGuideReviewSchedules = async (req, res) => {
 // Get assigned teams for a guide
 exports.getAssignedTeams = async (req, res) => {
     try {
-        const userId = req.user.id;
-        const role = req.user.role;
-        const subRoles = req.user.roles || [];
-
-        const isPanelOrCoordinatorOrAdmin = 
-            role === 'panel' || 
-            role === 'coordinator' || 
-            role === 'admin' ||
-            subRoles.some(r => r.role === 'panel' || r.role === 'coordinator' || r.role === 'admin');
-
-        let query = {};
-        if (isPanelOrCoordinatorOrAdmin) {
-            query = { status: 'approved' };
-        } else {
-            query = { guidePreference: userId, status: 'approved' };
-        }
+        const query = await buildTeamQuery(req);
 
         const teams = await Team.find(query)
             .populate('teamLeader', 'name username')
@@ -409,22 +468,7 @@ exports.getReviewPeriodDatesPublic = async (req, res) => {
 // Get daily attendance for guide's teams
 exports.getDailyAttendance = async (req, res) => {
     try {
-        const userId = req.user.id;
-        const role = req.user.role;
-        const subRoles = req.user.roles || [];
-
-        const isPanelOrCoordinatorOrAdmin = 
-            role === 'panel' || 
-            role === 'coordinator' || 
-            role === 'admin' ||
-            subRoles.some(r => r.role === 'panel' || r.role === 'coordinator' || r.role === 'admin');
-
-        let query = {};
-        if (isPanelOrCoordinatorOrAdmin) {
-            query = { status: 'approved' };
-        } else {
-            query = { guidePreference: userId, status: 'approved' };
-        }
+        const query = await buildTeamQuery(req);
 
         const teams = await Team.find(query).select('_id');
         if (teams.length === 0) {

@@ -454,7 +454,7 @@ exports.getAssignedTeamsForPanel = async (req, res) => {
             console.log('User is a coordinator, finding teams for their panel');
             const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
             const programme = normalizeProgramme(selectedProgramme);
-            const panel = await Panel.findOne({ coordinator: userId, programme });
+            const panel = await getCoordinatorPanel(req, programme);
             if (!panel) {
                 console.log('No panel found for coordinator');
                 return res.json([]);
