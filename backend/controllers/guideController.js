@@ -344,7 +344,17 @@ exports.requestTimeTable = async (req, res) => {
 // Get guide selection dates for public view
 exports.getGuideSelectionDatesPublic = async (req, res) => {
     try {
-        const config = await Config.findOne();
+        const selectedProgramme = req.headers['x-selected-programme'] || (req.user ? req.user.programme : null);
+        let cleanProg = String(selectedProgramme || 'B.E. CSE').trim();
+        if (cleanProg.includes(',')) cleanProg = cleanProg.split(',')[0].trim();
+        if (cleanProg.toLowerCase() === 'ug' || cleanProg === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
+            cleanProg = 'B.E. CSE';
+        }
+
+        let config = await Config.findOne({ programme: cleanProg });
+        if (!config) {
+            config = await Config.findOne();
+        }
         if (!config) {
             return res.status(404).json({ message: 'Configuration not found' });
         }
