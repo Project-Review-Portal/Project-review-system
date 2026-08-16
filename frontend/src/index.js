@@ -173,6 +173,10 @@ axios.interceptors.request.use(
         if (storedUser.programme && !headersKeys.includes('x-selected-programme')) {
           config.headers['X-Selected-Programme'] = storedUser.programme;
         }
+        const storedPanelId = localStorage.getItem('selectedPanelId');
+        if (storedPanelId && !headersKeys.includes('x-selected-panel-id')) {
+          config.headers['X-Selected-Panel-Id'] = storedPanelId;
+        }
       }
     } catch (e) {
       console.warn('Failed to parse user from localStorage for axios interceptor', e);

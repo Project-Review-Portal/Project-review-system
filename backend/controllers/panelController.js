@@ -20,6 +20,35 @@ const normalizeProgramme = (prog) => {
     }
     return clean;
 };
+
+const getCoordinatorPanel = async (req, programme) => {
+    const coordinatorId = req.user.id;
+    const selectedPanelId = req.headers['x-selected-panel-id'];
+    const mongoose = require('mongoose');
+    
+    let panel;
+    if (selectedPanelId && mongoose.Types.ObjectId.isValid(selectedPanelId)) {
+        panel = await Panel.findOne({
+            _id: selectedPanelId,
+            panelType: 'review',
+            $or: [
+                { coordinator: coordinatorId },
+                { assistantCoordinators: coordinatorId }
+            ]
+        });
+    }
+    if (!panel) {
+        panel = await Panel.findOne({
+            panelType: 'review',
+            $or: [
+                { coordinator: coordinatorId },
+                { assistantCoordinators: coordinatorId }
+            ],
+            programme
+        });
+    }
+    return panel;
+};
 exports.getAllPanels = async (req, res) => {
     try {
         // Support filtering by panelType query param
@@ -696,7 +725,7 @@ exports.generateSlotsForCoordinator = async (req, res) => {
         const coordinatorId = req.user.id;
         const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
         const programme = normalizeProgramme(selectedProgramme);
-        const panel = await Panel.findOne({ coordinator: coordinatorId, programme, panelType: 'review' });
+        const panel = await getCoordinatorPanel(req, programme);
         if (!panel) {
             console.log('❌ No panel found for coordinator:', coordinatorId, 'programme:', programme);
             return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
@@ -761,7 +790,7 @@ exports.saveFreeSlotsForCoordinator = async (req, res) => {
         const coordinatorId = req.user.id;
         const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
         const programme = normalizeProgramme(selectedProgramme);
-        const panel = await Panel.findOne({ coordinator: coordinatorId, programme, panelType: 'review' });
+        const panel = await getCoordinatorPanel(req, programme);
         if (!panel) {
             return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
         }
@@ -962,7 +991,7 @@ exports.assignSlotsForCoordinator = async (req, res) => {
         const coordinatorId = req.user.id;
         const selectedProgramme = req.headers['x-selected-programme'] || req.user.programme;
         const programme = normalizeProgramme(selectedProgramme);
-        const panel = await Panel.findOne({ coordinator: coordinatorId, programme, panelType: 'review' });
+        const panel = await getCoordinatorPanel(req, programme);
         if (!panel) {
             return res.status(404).json({ message: `No panel found for this coordinator under programme ${programme}.` });
         }
@@ -1037,13 +1066,19 @@ exports.getAllottedSchedulesForCoordinator = async (req, res) => {
     try {
         const coordinatorId = req.user.id;
         // Find panels where this user is coordinator or assistant coordinator
-        const panels = await Panel.find({
+        const selectedPanelId = req.headers['x-selected-panel-id'];
+        const mongoose = require('mongoose');
+        const query = {
             panelType: 'review',
             $or: [
                 { coordinator: coordinatorId },
                 { assistantCoordinators: coordinatorId }
             ]
-        });
+        };
+        if (selectedPanelId && mongoose.Types.ObjectId.isValid(selectedPanelId)) {
+            query._id = selectedPanelId;
+        }
+        const panels = await Panel.find(query);
         const panelIds = panels.map(p => p._id);
 
         const schedules = await TimeTable.find({ panel: { $in: panelIds } })
@@ -1132,7 +1167,13 @@ exports.createInstructionTemplate = async (req, res) => {
 
     // 4. NEW: Dynamically query all panel IDs assigned to this coordinator
     // .distinct('_id') returns a clean, flat array of ObjectIDs: [ObjectId('...'), ObjectId('...')]
-    const coordinatorPanelIds = await Panel.find({ coordinator: coordinatorId, panelType: 'review' }).distinct('_id');
+    const selectedPanelId = req.headers['x-selected-panel-id'];
+    const mongoose = require('mongoose');
+    const query = { coordinator: coordinatorId, panelType: 'review' };
+    if (selectedPanelId && mongoose.Types.ObjectId.isValid(selectedPanelId)) {
+        query._id = selectedPanelId;
+    }
+    const coordinatorPanelIds = await Panel.find(query).distinct('_id');
 
     // 5. Structure the payload with the gathered data strings and panel arrays
     const newTemplatePayload = {
@@ -1384,14 +1425,29 @@ exports.getCoordinatedTeams = async (req, res) => {
         const regexFilters = programmeArray.map(prog => new RegExp(`^${prog}$`, 'i'));
 
         // 4. Find the panel matching the coordinator and ANY of the clean regex options
-        const panel = await Panel.findOne({ 
-            panelType: 'review',
-            $or: [
-                { coordinator: coordinatorId },
-                { assistantCoordinators: coordinatorId }
-            ],
-            programme: { $in: regexFilters } 
-        });
+        const selectedPanelId = req.headers['x-selected-panel-id'];
+        const mongoose = require('mongoose');
+        let panel;
+        if (selectedPanelId && mongoose.Types.ObjectId.isValid(selectedPanelId)) {
+            panel = await Panel.findOne({
+                _id: selectedPanelId,
+                panelType: 'review',
+                $or: [
+                    { coordinator: coordinatorId },
+                    { assistantCoordinators: coordinatorId }
+                ]
+            });
+        }
+        if (!panel) {
+            panel = await Panel.findOne({ 
+                panelType: 'review',
+                $or: [
+                    { coordinator: coordinatorId },
+                    { assistantCoordinators: coordinatorId }
+                ],
+                programme: { $in: regexFilters } 
+            });
+        }
         
         if (!panel) {
             return res.status(404).json({ 
@@ -1430,23 +1486,7 @@ exports.getPanelStats = async (req, res) => {
         const programme = normalizeProgramme(selectedProgramme);
 
         // Find the coordinator's panel
-        let panel = await Panel.findOne({
-            panelType: 'review',
-            $or: [
-                { coordinator: coordinatorId },
-                { assistantCoordinators: coordinatorId }
-            ],
-            programme
-        });
-        if (!panel) {
-            panel = await Panel.findOne({
-                panelType: 'review',
-                $or: [
-                    { coordinator: coordinatorId },
-                    { assistantCoordinators: coordinatorId }
-                ]
-            });
-        }
+        let panel = await getCoordinatorPanel(req, programme);
         if (!panel) {
             return res.json({ totalTeams: 0, freeSlots: 0, occupiedSlots: 0, requiredSlots: 0 });
         }

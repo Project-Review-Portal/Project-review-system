@@ -133,15 +133,22 @@ router.get('/coordinator/panel-status', auth, authorize(['coordinator', 'assista
             });
         }
         
-        // 3. Find only teams belonging to this filtered slice of panels
-        const teams = await Team.find({ panel: { $in: panels.map(p => p._id) } })
+        const selectedPanelId = req.headers['x-selected-panel-id'];
+        let activePanel = panels[0];
+        if (selectedPanelId) {
+            const found = panels.find(p => p._id.toString() === selectedPanelId.toString());
+            if (found) activePanel = found;
+        }
+
+        // 3. Find only teams belonging to this active panel
+        const teams = await Team.find({ panel: activePanel._id })
             .populate('teamLeader', 'username name')
             .populate('members', 'username name')
             .populate('guidePreference', 'username name');
         
         res.json({
             hasPanel: true,
-            panel: panels[0],
+            panel: activePanel,
             panels: panels,
             teams: teams,
             coordinatorId: coordinatorId,

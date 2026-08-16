@@ -95,6 +95,9 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     <div className="flex items-center min-w-0 flex-1">
                         {user && (() => {
                             let text = '';
+                            let displayPanelsSelect = false;
+                            let coordinatorPanels = [];
+                            let activePanelId = '';
                             if (user.role === 'admin') {
                                 text = `Admin${activeProgramme ? ` (${activeProgramme})` : ''}`;
                             } else if (['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(user.role)) {
@@ -105,6 +108,18 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                                         ? 'Assistant Coordinator'
                                         : user.role.charAt(0).toUpperCase() + user.role.slice(1);
                                 text = `${roleLabel} (${displayProg})`;
+
+                                if (['coordinator', 'assistant coordinator'].includes(user.role)) {
+                                    try {
+                                        coordinatorPanels = JSON.parse(localStorage.getItem('coordinatorPanels') || '[]');
+                                        activePanelId = localStorage.getItem('selectedPanelId') || '';
+                                        if (coordinatorPanels.length > 1) {
+                                            displayPanelsSelect = true;
+                                        }
+                                    } catch (e) {
+                                        console.warn(e);
+                                    }
+                                }
                             } else if (user.role === 'student') {
                                 text = `${user.username} - ${user.name}`;
                             }
@@ -112,12 +127,33 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                             if (!text) return null;
 
                             return (
-                                <span className="text-indigo-200 font-semibold mr-3 bg-indigo-800/40 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm whitespace-nowrap flex items-center gap-1.5 shadow-inner">
-                                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                    </svg>
-                                    <span>{text}</span>
-                                </span>
+                                <div className="flex items-center gap-2 mr-3">
+                                    <span className="text-indigo-200 font-semibold bg-indigo-800/40 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm whitespace-nowrap flex items-center gap-1.5 shadow-inner">
+                                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                        <span>{text}</span>
+                                    </span>
+                                    {displayPanelsSelect && (
+                                        <select
+                                            value={activePanelId}
+                                            onChange={(e) => {
+                                                const panelId = e.target.value;
+                                                const selectedPanel = coordinatorPanels.find(p => p._id === panelId);
+                                                if (selectedPanel) {
+                                                    localStorage.setItem('selectedPanelId', selectedPanel._id);
+                                                    localStorage.setItem('selectedPanelName', selectedPanel.name);
+                                                    window.location.reload(); // Refresh the current page to reload using the new panel context
+                                                }
+                                            }}
+                                            className="text-xs px-2 py-1 border border-indigo-500 rounded bg-indigo-700 text-white font-semibold focus:outline-none focus:ring-1 focus:ring-white max-w-[140px] truncate"
+                                        >
+                                            {coordinatorPanels.map(p => (
+                                                <option key={p._id} value={p._id}>{p.name}</option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
                             );
                         })()}
                         <div className="flex-shrink-0 flex items-center">

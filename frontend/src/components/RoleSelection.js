@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 // Small sub-component to render a role row (no dropdown, separated by programme)
 const RoleRow = ({ roleObj, loading, getRoleDisplayName, handleRoleSelect }) => {
@@ -31,6 +32,8 @@ const RoleRow = ({ roleObj, loading, getRoleDisplayName, handleRoleSelect }) => 
 
 const RoleSelection = () => {
     const [loading, setLoading] = useState(false);
+    const [panelsToSelect, setPanelsToSelect] = useState([]);
+    const [pendingRoleObj, setPendingRoleObj] = useState(null);
     const navigate = useNavigate();
 
     // Get user data from localStorage
@@ -54,6 +57,38 @@ const RoleSelection = () => {
     const handleRoleSelect = async (roleObj) => {
         setLoading(true);
         try {
+            // If the role is coordinator or assistant coordinator, check if they have multiple panels
+            if (roleObj.role === 'coordinator' || roleObj.role === 'assistant coordinator') {
+                const token = localStorage.getItem('token');
+                const SERVER_API_KEY = process.env.REACT_APP_SERVER_API_KEY || "http://localhost:3626";
+                const panelsRes = await axios.get(`${SERVER_API_KEY}/api/panels/coordinator/panel-status`, {
+                    headers: { 
+                        Authorization: `Bearer ${token}`,
+                        'x-selected-programme': roleObj.programme
+                    }
+                });
+                const panels = panelsRes.data.panels || [];
+                if (panels.length > 1) {
+                    setPanelsToSelect(panels);
+                    setPendingRoleObj(roleObj);
+                    setLoading(false);
+                    return; // Halt and show panel selection menu
+                } else if (panels.length === 1) {
+                    // Auto-select the single panel
+                    localStorage.setItem('selectedPanelId', panels[0]._id);
+                    localStorage.setItem('selectedPanelName', panels[0].name);
+                    localStorage.setItem('coordinatorPanels', JSON.stringify(panels));
+                } else {
+                    localStorage.removeItem('selectedPanelId');
+                    localStorage.removeItem('selectedPanelName');
+                    localStorage.removeItem('coordinatorPanels');
+                }
+            } else {
+                localStorage.removeItem('selectedPanelId');
+                localStorage.removeItem('selectedPanelName');
+                localStorage.removeItem('coordinatorPanels');
+            }
+
             // Update the user's current role and programme in localStorage
             const updatedUser = {
                 ...user,
@@ -81,6 +116,24 @@ const RoleSelection = () => {
         }
     };
 
+    const handlePanelSelect = (panel) => {
+        if (!pendingRoleObj) return;
+        
+        // Update user storage
+        const updatedUser = {
+            ...user,
+            role: pendingRoleObj.role,
+            programme: pendingRoleObj.programme
+        };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        localStorage.setItem('selectedRole', JSON.stringify({ role: pendingRoleObj.role, programme: pendingRoleObj.programme }));
+        localStorage.setItem('selectedPanelId', panel._id);
+        localStorage.setItem('selectedPanelName', panel.name);
+        localStorage.setItem('coordinatorPanels', JSON.stringify(panelsToSelect));
+
+        navigate('/coordinator-dashboard/review-schedule');
+    };
+
     const getRoleDisplayName = (role) => {
         switch (role) {
             case 'guide':
@@ -95,6 +148,52 @@ const RoleSelection = () => {
                 return role.charAt(0).toUpperCase() + role.slice(1);
         }
     };
+
+    if (panelsToSelect.length > 0) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
+                    <div className="text-center">
+                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Select Panel</h2>
+                        <p className="text-gray-600 mb-6">You coordinate multiple panels for this programme. Choose one to monitor:</p>
+                    </div>
+
+                    <div className="space-y-4">
+                        {panelsToSelect.map((panel) => (
+                            <div key={panel._id} className="w-full p-4 rounded-lg border-2 bg-white border-gray-200 hover:border-indigo-500 transition">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <h3 className="font-semibold text-gray-900">{panel.name}</h3>
+                                        <p className="text-xs text-gray-500">Programme: {panel.programme}</p>
+                                    </div>
+                                    <div>
+                                        <button
+                                            onClick={() => handlePanelSelect(panel)}
+                                            className="text-indigo-600 font-semibold hover:underline"
+                                        >
+                                            Select
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="text-center pt-4 border-t">
+                        <button
+                            onClick={() => {
+                                setPanelsToSelect([]);
+                                setPendingRoleObj(null);
+                            }}
+                            className="text-sm text-gray-500 hover:text-gray-700 underline"
+                        >
+                            Back to Roles
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (uniqueRoles.length === 0) {
         return (
