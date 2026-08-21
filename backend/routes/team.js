@@ -38,10 +38,20 @@ router.get('/max-team-size', auth, teamController.getMaxTeamSizePublic);
 // Fetch multiple teams by ids
 router.get('/by-ids', auth, teamController.getTeamsByIds);
 
-// Public route to get config (teamFormationOpen, etc.)
+// Public route to get config (teamFormationOpen, etc.) per programme
 router.get('/config/public', async (req, res) => {
     try {
-        const config = await Config.findOne();
+        const programme = req.headers['x-selected-programme'] || req.headers['x-selected-program'] || req.query.programme;
+        console.log(programme);
+        let config = null;
+        if (programme) {
+            config = await Config.findOne({
+                programme: { $regex: new RegExp(`^${programme.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+            });
+        }
+        if (!config) {
+            config = await Config.findOne();
+        }
         // Always return teamFormationOpen as true
         res.json({
             teamFormationOpen: true, // Always allow team formation

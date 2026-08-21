@@ -330,7 +330,16 @@ exports.getAssignedPanel = async (req, res) => {
 // Get max team size for public view
 exports.getMaxTeamSizePublic = async (req, res) => {
     try {
-        const config = await Config.findOne();
+        const programme = req.headers['x-selected-programme'] || req.headers['x-selected-program'] || req.query.programme;
+        let config = null;
+        if (programme) {
+            config = await Config.findOne({
+                programme: { $regex: new RegExp(`^${programme.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+            });
+        }
+        if (!config) {
+            config = await Config.findOne();
+        }
         if (!config) {
             return res.status(404).json({ message: 'Configuration not found' });
         }
