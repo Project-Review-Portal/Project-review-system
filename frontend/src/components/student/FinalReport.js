@@ -133,7 +133,9 @@ const FinalReport = () => {
     // Check if there are any current drafts that can be submitted
     const hasDrafts = uploads.some(u => u.status === 'draft');
 
-    // Business Logic Validation: A required file is missing if there is no upload record OR its status is 'rejected'
+    // Business Logic Validation: A required file is missing if there is no upload record OR its status is rejected
+    const isRejectedStatus = (s) => ['rejected', 'guide_rejected', 'coordinator_rejected'].includes(s);
+
     const missingRequiredFiles = settings
         .filter(setting => setting.isRequired)
         .some(setting => {
@@ -142,14 +144,34 @@ const FinalReport = () => {
                     ? u.materialSetting._id.toString()
                     : u.materialSetting?.toString();
                 
-                return uploadedSettingId === setting._id.toString() && u.status !== 'rejected';
+                return uploadedSettingId === setting._id.toString() && !isRejectedStatus(u.status);
             });
         });
+
+    const getStatusBadge = (status) => {
+        switch (status) {
+            case 'approved':
+                return <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-green-100 text-green-800">Approved by Coordinator</span>;
+            case 'pending_coordinator':
+                return <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-indigo-100 text-indigo-800">Approved by Guide (Pending Coordinator)</span>;
+            case 'guide_rejected':
+                return <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-red-100 text-red-800">Rejected by Guide</span>;
+            case 'coordinator_rejected':
+                return <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-red-100 text-red-800">Rejected by Coordinator</span>;
+            case 'pending_guide':
+            case 'pending':
+            case 'uploaded':
+                return <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-yellow-100 text-yellow-800">Awaiting Guide Approval</span>;
+            case 'draft':
+                return <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-blue-100 text-blue-800">Draft</span>;
+            default:
+                return <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-gray-100 text-gray-800">{status}</span>;
+        }
+    };
 
     return (
         <div className="container mx-auto p-4 max-w-4xl">
             <h2 className="text-2xl font-bold mb-4">Required Materials / Uploads</h2>
-
 
             {!team.isLocked && (
                 <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4" role="alert">
@@ -181,19 +203,10 @@ const FinalReport = () => {
                                             {setting.isRequired && <span className="text-red-500 ml-1" title="Required">*</span>}
                                         </h3>
                                         <div className="text-sm text-gray-500">
-                                            Required: {setting.isRequired ? 'Yes' : 'No'} | Format: {Array.isArray(setting.fileType) ? setting.fileType.map(t => `.${t}`).join(', ') : setting.fileType}
+                                            Required: {setting.isRequired ? 'Yes' : 'No'} | Format: {Array.isArray(setting.fileType) ? (setting.fileType.includes('any') ? 'Any Format (*)' : setting.fileType.map(t => `.${t}`).join(', ')) : (setting.fileType === 'any' ? 'Any Format (*)' : setting.fileType)}
                                         </div>
                                     </div>
-                                    {upload && (
-                                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
-                                            upload.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                            upload.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                            upload.status === 'draft' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-yellow-100 text-yellow-800'
-                                        }`}>
-                                            {upload.status}
-                                        </span>
-                                    )}
+                                    {upload && getStatusBadge(upload.status)}
                                 </div>
 
                                 {upload && (
@@ -201,15 +214,15 @@ const FinalReport = () => {
                                         <div className="mb-1"><strong>File:</strong> {upload.fileName}</div>
                                         <div className="mb-1"><strong>Uploaded:</strong> {new Date(upload.createdAt).toLocaleString()}</div>
                                         
-                                        {upload.status === 'rejected' && upload.remarks && (
+                                        {isRejectedStatus(upload.status) && upload.remarks && (
                                             <div className="mt-2 text-red-700 bg-red-50 p-2 border border-red-200 rounded">
-                                                <strong>Rejection Remarks:</strong> {upload.remarks}
+                                                <strong>Rejection Remarks ({upload.status === 'guide_rejected' ? 'Guide' : 'Coordinator'}):</strong> {upload.remarks}
                                             </div>
                                         )}
                                     </div>
                                 )}
 
-                                {(!upload || upload.status === 'draft' || upload.status === 'rejected') && team.isLocked && (
+                                {(!upload || upload.status === 'draft' || isRejectedStatus(upload.status)) && team.isLocked && (
                                     <form onSubmit={(e) => onSubmit(setting._id, e)} className="mt-4 border-t pt-4">
                                         <div className="flex items-center space-x-4">
                                             <div className="flex-grow">
@@ -217,7 +230,7 @@ const FinalReport = () => {
                                                     type="file"
                                                     onChange={(e) => onFileChange(setting._id, e)}
                                                     className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                                    accept={Array.isArray(setting.fileType) ? setting.fileType.map(t => `.${t}`).join(',') : `.${setting.fileType}`}
+                                                    accept={Array.isArray(setting.fileType) && setting.fileType.includes('any') ? undefined : (Array.isArray(setting.fileType) ? setting.fileType.map(t => `.${t}`).join(',') : (setting.fileType === 'any' ? undefined : `.${setting.fileType}`))}
                                                 />
                                             </div>
                                             <button
@@ -232,13 +245,19 @@ const FinalReport = () => {
 
                                 {upload && upload.status === 'approved' && (
                                     <div className="text-green-600 text-sm italic border-t pt-3 mt-3">
-                                        This material has been approved and can no longer be modified.
+                                        This material has been approved by the coordinator and can no longer be modified.
                                     </div>
                                 )}
 
-                                {upload && (upload.status === 'uploaded' || upload.status === 'pending') && (
+                                {upload && upload.status === 'pending_coordinator' && (
+                                    <div className="text-indigo-600 text-sm italic border-t pt-3 mt-3">
+                                        Approved by guide. Awaiting coordinator final review.
+                                    </div>
+                                )}
+
+                                {upload && (upload.status === 'pending_guide' || upload.status === 'uploaded' || upload.status === 'pending') && (
                                     <div className="text-yellow-600 text-sm italic border-t pt-3 mt-3">
-                                        Submitted to coordinator. Awaiting review.
+                                        Submitted. Awaiting guide review.
                                     </div>
                                 )}
                             </div>
@@ -257,11 +276,11 @@ const FinalReport = () => {
                                 </h3>
                                 {missingRequiredFiles ? (
                                     <p className="text-sm text-red-700 font-medium">
-                                        Please re-upload a revision for any rejected file(s) and complete all required documents before final submission.
+                                        Please re-upload a revision for any rejected file(s) and complete all required documents before submitting.
                                     </p>
                                 ) : (
                                     <p className="text-sm text-indigo-700">
-                                        You have files saved as draft. Click submit to send them to the coordinator/guide.
+                                        You have files saved as draft. Click submit to send them for Guide & Coordinator review.
                                     </p>
                                 )}
                             </div>
@@ -275,7 +294,7 @@ const FinalReport = () => {
                                         : 'bg-indigo-600 hover:bg-indigo-700'
                                 }`}
                             >
-                                {submitting ? 'Submitting...' : 'Submit to Coordinator'}
+                                {submitting ? 'Submitting...' : 'Submit to Guide'}
                             </button>
                         </div>
                     )}

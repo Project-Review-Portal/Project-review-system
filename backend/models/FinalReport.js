@@ -26,12 +26,30 @@ const FinalReportSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['draft', 'pending', 'uploaded', 'approved', 'rejected'],
+    enum: ['draft', 'pending', 'uploaded', 'pending_guide', 'pending_coordinator', 'approved', 'rejected', 'guide_rejected', 'coordinator_rejected'],
     default: 'draft',
   },
   approvedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
+  },
+  guideApprovedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  guideApprovedAt: {
+    type: Date,
+  },
+  coordinatorApprovedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  coordinatorApprovedAt: {
+    type: Date,
+  },
+  rejectedByRole: {
+    type: String,
+    enum: ['guide', 'coordinator'],
   },
   remarks: {
     type: String,

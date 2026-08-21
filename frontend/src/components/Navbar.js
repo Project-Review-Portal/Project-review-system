@@ -77,7 +77,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     { label: 'Review Schedule', path: '/coordinator-dashboard/review-schedule' },
                     { label: 'Viva Schedule', path: '/coordinator-dashboard/viva-schedule' },
                     { label: 'Marking Scheme', path: '/coordinator-dashboard/marking-scheme' },
-                    { label: 'Materials', path: '/coordinator-dashboard/materials' },
+                    { label: 'Student Uploads', path: '/coordinator-dashboard/materials' },
                     { label: 'Letter Generation', path: '/coordinator-dashboard/letter-generation' },
                     { label: 'Broadcasts', path: '/coordinator-dashboard/instruction-template' },
                     { label: 'Guide Me', path: '/coordinator-dashboard/guide-me' }

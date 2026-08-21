@@ -5,6 +5,7 @@ const SERVER_API_KEY = process.env.REACT_APP_SERVER_API_KEY || "http://localhost
 
 // All supported file type options
 const FILE_TYPE_OPTIONS = [
+    { value: 'any',  label: 'Any file format (*)' },
     { value: 'pdf',  label: 'PDF (.pdf)' },
     { value: 'doc',  label: 'Word Document (.doc)' },
     { value: 'docx', label: 'Word Document (.docx)' },
@@ -16,6 +17,7 @@ const FILE_TYPE_OPTIONS = [
     { value: 'zip',  label: 'ZIP Archive (.zip)' },
     { value: 'jpg',  label: 'JPEG Image (.jpg)' },
     { value: 'png',  label: 'PNG Image (.png)' },
+    { value: 'csv',  label: 'CSV file (.csv)' },
 ];
 
 const MaterialSettings = () => {
@@ -268,7 +270,7 @@ const MaterialSettings = () => {
                                         <div className="flex flex-wrap gap-1">
                                             {(Array.isArray(setting.fileType) ? setting.fileType : [setting.fileType || 'pdf']).map(t => (
                                                 <span key={t} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full border border-indigo-100">
-                                                    .{t}
+                                                    {t === 'any' ? 'Any format (*)' : `.${t}`}
                                                 </span>
                                             ))}
                                         </div>

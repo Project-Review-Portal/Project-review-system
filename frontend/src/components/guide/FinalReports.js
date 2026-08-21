@@ -67,8 +67,32 @@ const UploadActionCard = ({ setting, upload, onAction, onDownload }) => {
         setIsRejectModalOpen(false);
     };
 
-    // Determine if the item is currently in a state that requires admin review
-    const needsAction = upload && (upload.status === 'pending' || upload.status === 'uploaded' || !upload.status);
+    // Determine if the item requires Guide action
+    const needsAction = upload && (upload.status === 'pending_guide' || upload.status === 'pending' || upload.status === 'uploaded' || !upload.status);
+
+    const getStatusText = (status) => {
+        switch (status) {
+            case 'approved': return 'Approved by Coordinator';
+            case 'pending_coordinator': return 'Approved by Guide (Pending Coordinator)';
+            case 'guide_rejected': return 'Rejected by Guide';
+            case 'coordinator_rejected': return 'Rejected by Coordinator';
+            case 'pending_guide':
+            case 'pending':
+            case 'uploaded':
+                return 'Awaiting Your Approval';
+            default: return status || 'Uploaded';
+        }
+    };
+
+    const getStatusStyle = (status) => {
+        switch (status) {
+            case 'approved': return 'bg-green-100 text-green-800';
+            case 'pending_coordinator': return 'bg-indigo-100 text-indigo-800';
+            case 'guide_rejected':
+            case 'coordinator_rejected': return 'bg-red-100 text-red-800';
+            default: return 'bg-yellow-100 text-yellow-800';
+        }
+    };
 
     return (
         <div className="bg-white border rounded p-4 shadow-sm flex flex-col justify-between min-h-[160px]">
@@ -78,14 +102,11 @@ const UploadActionCard = ({ setting, upload, onAction, onDownload }) => {
                     Required: {setting.isRequired ? 'Yes' : 'No'} | Types: {Array.isArray(setting.fileType) ? setting.fileType.map(t => `.${t}`).join(', ') : setting.fileType}
                 </div>
                 
-                {upload ? (
+                {upload && upload.status !== 'draft' ? (
                     <div>
                         <div className="text-xs font-semibold mb-3">
-                            Status: <span className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wide ${
-                                upload.status === 'approved' ? 'bg-green-100 text-green-800' : 
-                                upload.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                                {upload.status || 'uploaded'}
+                            Status: <span className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wide ${getStatusStyle(upload.status)}`}>
+                                {getStatusText(upload.status)}
                             </span>
                         </div>
                         
@@ -109,7 +130,6 @@ const UploadActionCard = ({ setting, upload, onAction, onDownload }) => {
                 )}
             </div>
 
-            {/* FIXED: Action panel now shows up for 'pending', 'uploaded', or undefined/empty status strings */}
             {needsAction && (
                 <div className="flex space-x-2 mt-2 pt-2 border-t border-gray-50">
                     <button 
@@ -127,15 +147,28 @@ const UploadActionCard = ({ setting, upload, onAction, onDownload }) => {
                 </div>
             )}
 
-            {upload && upload.status === 'approved' && (
-                <div className="text-[11px] text-green-600 bg-green-50 rounded p-1.5 text-center font-medium mt-2">
-                    ✓ Approved. No further actions needed.
+            {upload && upload.status === 'pending_coordinator' && (
+                <div className="text-[11px] text-indigo-700 bg-indigo-50 rounded p-1.5 text-center font-medium mt-2">
+                    ✓ Approved by you. Awaiting coordinator review.
                 </div>
             )}
 
-            {upload && upload.status === 'rejected' && (
+            {upload && upload.status === 'approved' && (
+                <div className="text-[11px] text-green-600 bg-green-50 rounded p-1.5 text-center font-medium mt-2">
+                    ✓ Fully approved by coordinator.
+                </div>
+            )}
+
+            {upload && (upload.status === 'guide_rejected' || upload.status === 'rejected') && (
                 <div className="text-[11px] text-red-600 bg-red-50 rounded p-1.5 text-center font-medium mt-2">
-                    ✕ Rejected. Awaiting re-submission.
+                    ✕ Rejected by you. Awaiting student re-submission.
+                    {upload.remarks && <div className="text-[10px] text-gray-500 font-normal mt-1 italic">Reason: "{upload.remarks}"</div>}
+                </div>
+            )}
+
+            {upload && upload.status === 'coordinator_rejected' && (
+                <div className="text-[11px] text-red-600 bg-red-50 rounded p-1.5 text-center font-medium mt-2">
+                    ✕ Rejected by coordinator. Awaiting student re-submission.
                     {upload.remarks && <div className="text-[10px] text-gray-500 font-normal mt-1 italic">Reason: "{upload.remarks}"</div>}
                 </div>
             )}

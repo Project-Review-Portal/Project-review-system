@@ -267,7 +267,7 @@ exports.uploadMaterial = async (req, res) => {
             .toLowerCase()
             .replace(/^\./, '');
 
-        if (allowedTypes.length > 0 && !allowedTypes.includes(uploadedExt)) {
+        if (allowedTypes.length > 0 && !allowedTypes.includes('any') && !allowedTypes.includes(uploadedExt)) {
             // Remove the already-saved file to avoid orphaned uploads
             try { fs.unlinkSync(req.file.path); } catch (_) {}
             return res.status(400).json({
@@ -360,9 +360,9 @@ exports.submitMaterials = async (req, res) => {
         // 3. Fetch existing uploads for this team
         const uploads = await FinalReport.find({ team: team._id });
 
-        // 4. Map settings that have a VALID upload (we explicitly ignore 'rejected' ones)
+        // 4. Map settings that have a VALID upload (we explicitly ignore 'rejected', 'guide_rejected', and 'coordinator_rejected' ones)
         const validUploadedSettingIds = uploads
-            .filter(u => u.status !== 'rejected')
+            .filter(u => u.status !== 'rejected' && u.status !== 'guide_rejected' && u.status !== 'coordinator_rejected')
             .map(u => (u.materialSetting ? u.materialSetting.toString() : null))
             .filter(Boolean);
 
@@ -378,10 +378,10 @@ exports.submitMaterials = async (req, res) => {
             });
         }
 
-        // 6. Promote all drafts to 'pending'
+        // 6. Promote all drafts to 'pending_guide' (starts Student -> Guide -> Coordinator workflow)
         const result = await FinalReport.updateMany(
             { team: team._id, status: 'draft' },
-            { $set: { status: 'pending' } }
+            { $set: { status: 'pending_guide' } }
         );
 
         // Fetch fresh list to return back to UI state
@@ -389,7 +389,7 @@ exports.submitMaterials = async (req, res) => {
             .populate('materialSetting', '_id name fileType isRequired');
 
         res.json({
-            message: `${result.modifiedCount} file(s) submitted successfully.`,
+            message: `${result.modifiedCount} file(s) submitted successfully for guide review.`,
             uploads: updatedUploads
         });
     } catch (error) {
@@ -519,38 +519,76 @@ exports.updateUploadStatus = async (req, res) => {
         const { uploadId } = req.params;
         const { status, remarks } = req.body;
         const userId = req.user.id;
+        const role = (req.headers['role'] || req.headers['x-selected-role'] || (req.user && req.user.role) || '').toLowerCase();
+
+        console.log(`[updateUploadStatus] Received request -> uploadId: ${uploadId}, requestedAction: ${status}, role: "${role}", userId: ${userId}`);
 
         if (!['approved', 'rejected'].includes(status)) {
+            console.warn(`[updateUploadStatus] Rejected invalid status: "${status}"`);
             return res.status(400).json({ message: 'Invalid status. Must be "approved" or "rejected".' });
         }
 
         const upload = await FinalReport.findById(uploadId);
         if (!upload) {
+            console.warn(`[updateUploadStatus] Upload not found: ${uploadId}`);
             return res.status(404).json({ message: 'Upload not found.' });
         }
 
-        upload.status = status;
-        if (status === 'approved') {
-            upload.approvedBy = userId;
-            upload.remarks = '';
-        } else if (status === 'rejected') {
-            upload.remarks = remarks || '';
-            upload.rejectedAt = new Date();
-            upload.rejections.push({
-                fileName: upload.fileName,
-                filePath: upload.filePath,
-                remarks: remarks || ''
-            });
+        console.log(`[updateUploadStatus] Existing upload state -> status: "${upload.status}", team: ${upload.team}`);
+
+        if (role === 'guide') {
+            if (status === 'approved') {
+                upload.status = 'pending_coordinator';
+                upload.guideApprovedBy = userId;
+                upload.guideApprovedAt = new Date();
+                upload.remarks = '';
+            } else if (status === 'rejected') {
+                upload.status = 'guide_rejected';
+                upload.remarks = remarks || '';
+                upload.rejectedByRole = 'guide';
+                upload.rejectedAt = new Date();
+                upload.rejections.push({
+                    fileName: upload.fileName,
+                    filePath: upload.filePath,
+                    remarks: remarks || ''
+                });
+            }
+        } else {
+            // Coordinator or Assistant Coordinator
+            // Enforce that guide must approve first!
+            if (upload.status !== 'pending_coordinator') {
+                console.warn(`[updateUploadStatus] Coordinator attempt blocked: Upload status is "${upload.status}", expected "pending_coordinator"`);
+                return res.status(400).json({ message: `Cannot review upload: Current status is "${upload.status}". Guide approval is required first.` });
+            }
+
+            if (status === 'approved') {
+                upload.status = 'approved';
+                upload.approvedBy = userId;
+                upload.coordinatorApprovedBy = userId;
+                upload.coordinatorApprovedAt = new Date();
+                upload.remarks = '';
+            } else if (status === 'rejected') {
+                upload.status = 'coordinator_rejected';
+                upload.remarks = remarks || '';
+                upload.rejectedByRole = 'coordinator';
+                upload.rejectedAt = new Date();
+                upload.rejections.push({
+                    fileName: upload.fileName,
+                    filePath: upload.filePath,
+                    remarks: remarks || ''
+                });
+            }
         }
 
         await upload.save();
+        console.log(`[updateUploadStatus] Successfully updated upload ${uploadId} -> new status: "${upload.status}"`);
 
         // Return with materialSetting populated
         await upload.populate('materialSetting', '_id name fileType isRequired');
         await upload.populate('team', 'teamName _id programme');
         res.json(upload);
     } catch (error) {
-        console.error('Error updating upload status:', error);
+        console.error('[updateUploadStatus] Server Error:', error);
         res.status(500).json({ message: 'Server Error' });
     }
 };
