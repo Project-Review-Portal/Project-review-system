@@ -410,6 +410,8 @@ exports.assignGuideToTeam = async (req, res) => {
         }
 
         // Check if the team is already locked, if not, lock it automatically
+        console.log('-------------')
+        console.log({team})
         if (!team.isLocked) {
             const acceptedMembers = team.memberStatus.filter(m => m.status === 'accepted');
             team.members = acceptedMembers.map(m => m.user);
@@ -2322,6 +2324,19 @@ exports.updateTeamAllocation = async (req, res) => {
                     } */
                 }
                 // ---------------------------------------------------------------------
+
+                // Check if the team is already locked, if not, lock it automatically
+                if (!team.isLocked) {
+                    const acceptedMembers = team.memberStatus.filter(m => m.status === 'accepted');
+                    team.members = acceptedMembers.map(m => m.user);
+                    team.isTeamComplete = true;
+                    team.isLocked = true;
+                    team.memberStatus.forEach(m => {
+                        if (m.status === 'accepted') {
+                            m.lockApproved = true;
+                        }
+                    });
+                }
 
                 team.guidePreference = guideId;
                 team.status = 'approved';
