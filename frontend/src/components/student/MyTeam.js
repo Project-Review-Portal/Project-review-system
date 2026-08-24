@@ -104,8 +104,10 @@ const MyTeam = () => {
         if (searchQuery.trim() === '') {
             setFilteredStudents(availableStudents);
         } else {
+            const query = searchQuery.toLowerCase();
             const filtered = availableStudents.filter(student =>
-                student.username.toLowerCase().includes(searchQuery.toLowerCase())
+                (student.username || '').toLowerCase().includes(query) ||
+                (student.name || '').toLowerCase().includes(query)
             );
             setFilteredStudents(filtered);
         }
@@ -364,30 +366,28 @@ const MyTeam = () => {
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search available students by username..."
+                            placeholder="Search available students by roll number or name..."
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm"
                         />
                     </div>
-                    {searchQuery && (
-                        <div className="border rounded-md p-2 max-h-40 overflow-y-auto bg-white shadow-inner">
-                            {filteredStudents.length === 0 ? (
-                                <p className="text-gray-500 text-center py-2 text-sm">No students found</p>
-                            ) : (
-                                filteredStudents.map(student => (
-                                    <div key={student._id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded text-sm">
-                                        <span className="text-gray-700">{student.name} ({student.username})</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleInviteMember(student._id)}
-                                            className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold"
-                                        >
-                                            Invite
-                                        </button>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    )}
+                    <div className="border rounded-md p-2 max-h-40 overflow-y-auto bg-white shadow-inner">
+                        {filteredStudents.length === 0 ? (
+                            <p className="text-gray-500 text-center py-2 text-sm">No students found</p>
+                        ) : (
+                            filteredStudents.map(student => (
+                                <div key={student._id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded text-sm">
+                                    <span className="text-gray-700">{student.name} ({student.username})</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleInviteMember(student._id)}
+                                        className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold"
+                                    >
+                                        Invite
+                                    </button>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
             )}
 

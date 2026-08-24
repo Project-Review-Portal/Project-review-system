@@ -16,7 +16,11 @@ const GuideRequestManagementForGuide = () => {
     const [capacity, setCapacity] = useState({
         designation: '',
         approvedCount: 0,
-        maxTeams: 0
+        maxTeams: 0,
+        ugApprovedCount: 0,
+        ugMaxTeams: 0,
+        pgApprovedCount: 0,
+        pgMaxTeams: 0
     });
 
     useEffect(() => {
@@ -56,7 +60,11 @@ const GuideRequestManagementForGuide = () => {
                 setCapacity({
                     designation: capacityRes.data.designation,
                     approvedCount: capacityRes.data.approvedCount,
-                    maxTeams: capacityRes.data.maxTeams
+                    maxTeams: capacityRes.data.maxTeams,
+                    ugApprovedCount: capacityRes.data.ugApprovedCount !== undefined ? capacityRes.data.ugApprovedCount : capacityRes.data.approvedCount,
+                    ugMaxTeams: capacityRes.data.ugMaxTeams !== undefined ? capacityRes.data.ugMaxTeams : capacityRes.data.maxTeams,
+                    pgApprovedCount: capacityRes.data.pgApprovedCount !== undefined ? capacityRes.data.pgApprovedCount : capacityRes.data.approvedCount,
+                    pgMaxTeams: capacityRes.data.pgMaxTeams !== undefined ? capacityRes.data.pgMaxTeams : capacityRes.data.maxTeams
                 });
             } catch (capErr) {
                 console.error('Error fetching backend capacity configuration:', capErr);
@@ -115,8 +123,16 @@ const GuideRequestManagementForGuide = () => {
     const hasNotStarted = guideSelectionDates.startDate && new Date() < new Date(guideSelectionDates.startDate);
     const hasEnded = guideSelectionDates.endDate && new Date() > new Date(guideSelectionDates.endDate);
 
-    // Derive remaining quota slots locally
-    const teamsLeft = Math.max(0, capacity.maxTeams - capacity.approvedCount);
+    // Determine B.E. vs M.E. program selection from storedUser
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const selectedProgramme = storedUser.programme || 'B.E. CSE';
+    const isBE = ['ug', 'b.e. cse', 'b.e computer science and engineering'].includes(selectedProgramme.toLowerCase().trim());
+
+    const activeApprovedCount = isBE ? capacity.ugApprovedCount : capacity.pgApprovedCount;
+    const activeMaxTeams = isBE ? capacity.ugMaxTeams : capacity.pgMaxTeams;
+
+    // Derive remaining quota slots locally based on active program type
+    const teamsLeft = Math.max(0, activeMaxTeams - activeApprovedCount);
 
     return (
         <div className="bg-white p-6 rounded-lg shadow space-y-6">
@@ -130,16 +146,16 @@ const GuideRequestManagementForGuide = () => {
                         <h3 className="text-sm font-bold text-blue-900 uppercase tracking-wider">Allocation Status</h3>
                         <p className="text-base font-medium text-gray-700 mt-1">
                             As a <span className="font-semibold text-blue-700">{capacity.designation || 'Unassigned Role'}</span>, 
-                            you can approve <span className="font-bold text-indigo-700">{teamsLeft}</span> more {teamsLeft === 1 ? 'team' : 'teams'} (Quota: {capacity.approvedCount}/{capacity.maxTeams}).
+                            you can approve <span className="font-bold text-indigo-700">{teamsLeft}</span> more {teamsLeft === 1 ? 'team' : 'teams'} (Quota: {activeApprovedCount}/{activeMaxTeams}).
                         </p>
                     </div>
-                    <div className={`${capacity.maxTeams === 0 ? 'bg-amber-600' : 'bg-blue-600'} text-white px-3 py-1.5 rounded-md text-sm font-bold shadow-sm whitespace-nowrap`}>
+                    <div className={`${activeMaxTeams === 0 ? 'bg-amber-600' : 'bg-blue-600'} text-white px-3 py-1.5 rounded-md text-sm font-bold shadow-sm whitespace-nowrap`}>
                         {teamsLeft} Slots Available
                     </div>
                 </div>
 
                 {/* 2. Error Message: Triggered when designation exists but quota returns 0 */}
-                {capacity.maxTeams === 0 && (
+                {activeMaxTeams === 0 && (
                     <div className="p-3.5 bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-md font-medium flex items-start gap-2">
                         <span className="text-base leading-none">⚠️</span> 
                         <div>
