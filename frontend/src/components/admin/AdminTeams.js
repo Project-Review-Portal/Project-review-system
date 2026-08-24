@@ -84,8 +84,8 @@ const AdminTeams = () => {
                             {teams.map(team => (
                                 <tr key={team._id}>
                                     <td className="px-3 py-2 border">{team.teamName}</td>
-                                    <td className="px-3 py-2 border">{team.teamLeader ? `${team.teamLeader.name} (${team.teamLeader.username})` : '—'}</td>
-                                    <td className="px-3 py-2 border">{(team.members || []).map(m => m.username).join(', ') || '—'}</td>
+                                    <td className="px-3 py-2 border">{team.teamLeader ? `${team.teamLeader.name || team.teamLeader.username || ''} (${team.teamLeader.username || ''})` : '—'}</td>
+                                    <td className="px-3 py-2 border">{(team.members || []).filter(Boolean).map(m => m.username || m.name || 'Unknown').join(', ') || '—'}</td>
                                     {
                                         console.log('team : ', team)
                                     }

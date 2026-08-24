@@ -190,15 +190,17 @@ const GuideRequestManagementForGuide = () => {
 
                                     <div className="mb-4">
                                         <h4 className="font-medium mb-2">Team Leader:</h4>
-                                        <p className="text-gray-700">{request.teamLeader.name} ({request.teamLeader.username})</p>
+                                        <p className="text-gray-700">
+                                            {request.teamLeader?.name || 'N/A'} {request.teamLeader?.username ? `(${request.teamLeader.username})` : ''}
+                                        </p>
                                     </div>
 
                                     <div className="mb-4">
                                         <h4 className="font-medium mb-2">Team Members:</h4>
                                         <ul className="space-y-1">
-                                            {request.members.map(member => (
-                                                <li key={member._id} className="text-gray-700">
-                                                    {member.name} ({member.username})
+                                            {(request.members || []).filter(Boolean).map((member, index) => (
+                                                <li key={member._id || index} className="text-gray-700">
+                                                    {member.name || 'Unknown User'} {member.username ? `(${member.username})` : ''}
                                                 </li>
                                             ))}
                                         </ul>

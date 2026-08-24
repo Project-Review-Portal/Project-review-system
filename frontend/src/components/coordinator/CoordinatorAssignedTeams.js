@@ -62,8 +62,8 @@ const CoordinatorAssignedTeams = () => {
                                 <p className="font-medium">Members:</p>
                                 {team.members && team.members.length > 0 ? (
                                     <ul className="list-disc list-inside ml-4 text-gray-700">
-                                        {team.members.map(member => (
-                                            <li key={member._id}>{member.name || member.username}</li>
+                                        {(team.members || []).filter(Boolean).map((member, idx) => (
+                                            <li key={member._id || idx}>{member.name || member.username || 'Unknown User'}</li>
                                         ))}
                                     </ul>
                                 ) : (

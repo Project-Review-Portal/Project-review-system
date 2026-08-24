@@ -218,16 +218,16 @@ const GuideAssignmentManagement = () => {
                                 <li key={team._id} className="p-4 border rounded-md bg-gray-50 space-y-2">
                                     <span className="font-medium">Team: {team.teamName}</span>
                                     <p className="text-sm text-gray-700">Leader: {team.teamLeader?.name} ({team.teamLeader?.username})</p>
-                                    {team.members.length > 0 && (
-                                        <div className="text-sm text-gray-700">
-                                            Members:
-                                            <ul className="list-disc list-inside ml-4">
-                                                {team.members.map(member => (
-                                                    <li key={member._id}>{member.name} ({member.username})</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
+                                    {team.members && team.members.length > 0 && (
+                                         <div className="text-sm text-gray-700">
+                                             Members:
+                                             <ul className="list-disc list-inside ml-4">
+                                                 {(team.members || []).filter(Boolean).map((member, idx) => (
+                                                     <li key={member._id || idx}>{member.name || member.username || 'Unknown User'} {member.username ? `(${member.username})` : ''}</li>
+                                                 ))}
+                                             </ul>
+                                         </div>
+                                     )}
                                     <p className="text-sm text-gray-700">Status: <span className="font-semibold">{team.status === 'pending' ? 'Pending Guide Request' : team.status === 'rejected' ? 'Guide Request Rejected' : 'No Guide Assigned'}</span></p>
                                 </li>
                             ))}

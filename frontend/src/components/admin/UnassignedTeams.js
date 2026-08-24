@@ -73,7 +73,7 @@ const UnassignedTeams = () => {
                             <div key={team._id} className="team-card">
                                 <h4>Team Name: {team.teamName}</h4>
                                 <p>Team Leader: {team.teamLeader?.username || 'N/A'}</p>
-                                <p>Members: {team.members.map(member => member.username).join(', ') || 'None'}</p>
+                                <p>Members: {(team.members || []).filter(Boolean).map(member => member.username || member.name || 'Unknown').join(', ') || 'None'}</p>
                                 <p>Status: {team.status}</p>
                                 <p>Guide Request Status: {team.guidePreference?.status || 'None'}</p>
                             </div>

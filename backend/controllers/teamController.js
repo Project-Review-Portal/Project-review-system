@@ -119,23 +119,13 @@ exports.createTeam = async (req, res) => {
             return res.status(400).json({ message: 'You have pending team invitations. You must decline all invitations before creating your own team.' });
         }
 
-        // Get max team size from config
-        const config = await Config.findOne();
-        // Always allow team formation - no restrictions
-        const maxTeamSize = config ? config.maxTeamSize : 4;
-
-        // Validate team size
-        if (members.length + 1 > maxTeamSize) {
-            return res.status(400).json({
-                message: `Team size cannot exceed ${maxTeamSize} members`
-            });
-        }
-
-        // Get the count of existing teams to generate the next sequential team name
-        // const maxTeamNumber = await Team.find({}, {teamName : 1});
-
         const leader = await User.findById(teamLeaderId);
         const leaderProgramme = leader ? (leader.programme || 'B.E. CSE') : 'B.E. CSE';
+
+        // Get max team size from config for this programme
+        const config = (await Config.findOne({ programme: leaderProgramme })) || (await Config.findOne());
+        // Always allow team formation - no restrictions
+        const maxTeamSize = config ? config.maxTeamSize : 4;
 
         // Retrieve all existing teams for this programme to generate the next sequential team name
         const existingTeams = await Team.find({ programme: leaderProgramme }, { teamName: 1 });
@@ -584,8 +574,8 @@ exports.inviteMember = async (req, res) => {
             return res.status(400).json({ message: 'This team is locked and cannot be modified.' });
         }
 
-        // Get max team size from config
-        const config = await Config.findOne();
+        // Get max team size from config for this programme
+        const config = (await Config.findOne({ programme: team.programme })) || (await Config.findOne());
         const maxTeamSize = config ? config.maxTeamSize : 4;
 
         // Check current number of invited/accepted members + leader (1) (EXCLUDING REJECTED MEMBERS!)

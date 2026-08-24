@@ -8,6 +8,18 @@ const Attendance = require('../models/Attendance');
 const Mark = require('../models/Mark');
 const { getReviewSettings } = require('../utils/reviewSettings');
 
+// Helper to build a MongoDB query condition for programme matching
+const getProgrammeFilter = (programme) => {
+    if (!programme) return null;
+    let clean = String(programme).trim();
+    if (clean.includes(',')) clean = clean.split(',')[0].trim();
+    if (clean.toLowerCase() === 'ug' || clean === 'B.E COMPUTER SCIENCE AND ENGINEERING' || clean === 'B.E. CSE') {
+        return { $in: ['B.E. CSE', 'UG', 'B.E COMPUTER SCIENCE AND ENGINEERING'] };
+    }
+    const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return { $regex: new RegExp(`^${escaped}$`, 'i') };
+};
+
 // Define daily review periods (9 periods of 40 minutes with 10 min break)
 const dailyPeriods = [
     { start: "03:30", end: "04:10" },
@@ -118,9 +130,11 @@ exports.setMaxTeamSize = async (req, res) => {
         let disbandedCount = 0;
         let unlockedCount = 0;
 
+        const progFilter = getProgrammeFilter(programme);
+
         if (newMax < oldMax) {
-            // ── DECREASE: disband oversized teams; unlock non-conflicting locked teams ──
-            const allTeams = await Team.find({});
+            // ── DECREASE: disband oversized teams; unlock non-conflicting locked teams for THIS PROGRAMME ──
+            const allTeams = await Team.find({ programme: progFilter });
 
             for (const team of allTeams) {
                 // Total size = members accepted + team leader
@@ -139,18 +153,18 @@ exports.setMaxTeamSize = async (req, res) => {
                 }
             }
         } else if (newMax > oldMax) {
-            // ── INCREASE: unlock all locked teams so they can optionally add more members ──
+            // ── INCREASE: unlock all locked teams for THIS PROGRAMME so they can optionally add more members ──
             const result = await Team.updateMany(
-                { isLocked: true },
+                { programme: progFilter, isLocked: true },
                 { $set: { isLocked: false, isTeamComplete: false } }
             );
             unlockedCount = result.modifiedCount || 0;
         }
 
-        // Special case: maxTeamSize === 1 → auto-generate solo teams for teamless students and rename existing
+        // Special case: maxTeamSize === 1 → auto-generate solo teams for teamless students in THIS PROGRAMME and rename existing
         if (newMax === 1) {
-            const students = await User.find({ role: 'student' });
-            const allTeams = await Team.find({}).populate('teamLeader');
+            const students = await User.find({ role: 'student', programme: progFilter });
+            const allTeams = await Team.find({ programme: progFilter }).populate('teamLeader');
 
             // 1. Rename existing solo teams to the registration number of the leader
             for (const t of allTeams) {
@@ -175,7 +189,7 @@ exports.setMaxTeamSize = async (req, res) => {
                     const team = new Team({
                         teamName: student.username,
                         teamLeader: student._id,
-                        programme: student.programme || 'B.E COMPUTER SCIENCE AND ENGINEERING',
+                        programme: student.programme || programme,
                         members: [],
                         memberStatus: [],
                         isTeamComplete: true,
@@ -281,6 +295,7 @@ exports.ensureTeamFormationOpen = async (req, res) => {
 // Get teams with no guide assigned
 exports.getUnassignedTeams = async (req, res) => {
     try {
+        const selectedProg = req.headers['x-selected-programme'] || req.query.programme;
         const query = {
             $or: [
                 { guidePreference: null },
@@ -288,7 +303,7 @@ exports.getUnassignedTeams = async (req, res) => {
                 { status: 'rejected' }
             ]
         };
-        if (req.query.programme) query.programme = req.query.programme;
+        if (selectedProg) query.programme = getProgrammeFilter(selectedProg);
         const unassignedTeams = await Team.find(query)
             .populate('teamLeader', 'username name')
             .populate('members', 'username name');
@@ -326,9 +341,9 @@ exports.getGuidesWithTeamCounts = async (req, res) => {
 
             const limitStatus = resolveGuideLimitStatus(guide, teamsAssigned.length, limitMap);
 
-            return { 
-                ...guide.toObject(), 
-                teamCount: teamsAssigned.length, 
+            return {
+                ...guide.toObject(),
+                teamCount: teamsAssigned.length,
                 assignedTeams: teamsAssigned, // Add assigned teams array
                 teamLimit: limitStatus.teamLimit,
                 limitReached: limitStatus.teamLimit !== null && teamsAssigned.length >= limitStatus.teamLimit
@@ -644,7 +659,10 @@ exports.deletePanel = async (req, res) => {
 // Get teams with no panel assigned
 exports.getUnassignedPanelTeams = async (req, res) => {
     try {
-        const teams = await Team.find({ panel: null, status: 'approved' })
+        const selectedProg = req.headers['x-selected-programme'] || req.query.programme;
+        const query = { panel: null, status: 'approved' };
+        if (selectedProg) query.programme = getProgrammeFilter(selectedProg);
+        const teams = await Team.find(query)
             .populate('teamLeader', 'username name')
             .populate('guidePreference', 'username name');
 
@@ -1010,48 +1028,48 @@ exports.deleteUser = async (req, res) => {
 
         if (hasFacultyRole) {
             // Handle faculty deletion with cascading deletes
-            
+
             // 1) Delete ALL teams where this faculty is the assigned guide
             const teamsGuided = await Team.find({ guidePreference: userObjectId }).select('_id');
             const teamIdsGuided = teamsGuided.map(t => t._id);
 
             if (teamIdsGuided.length > 0) {
                 // Cascade delete related data for these teams
-                try { await TimeTable.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) {}
-                try { await Mark.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) {}
-                try { await Attendance.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) {}
-                try { const FinalReport = require('../models/FinalReport'); await FinalReport.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) {}
-                try { const TeamPanelAssignment = require('../models/TeamPanelAssignment'); await TeamPanelAssignment.updateMany({}, { $pull: { teams: { $in: teamIdsGuided } } }); } catch (e) {}
+                try { await TimeTable.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) { }
+                try { await Mark.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) { }
+                try { await Attendance.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) { }
+                try { const FinalReport = require('../models/FinalReport'); await FinalReport.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) { }
+                try { const TeamPanelAssignment = require('../models/TeamPanelAssignment'); await TeamPanelAssignment.updateMany({}, { $pull: { teams: { $in: teamIdsGuided } } }); } catch (e) { }
                 await Team.deleteMany({ _id: { $in: teamIdsGuided } });
             }
 
             // 2) Remove this faculty from any panel memberships and coordinator positions
-            try { await Panel.updateMany({ members: userObjectId }, { $pull: { members: userObjectId } }); } catch (e) {}
+            try { await Panel.updateMany({ members: userObjectId }, { $pull: { members: userObjectId } }); } catch (e) { }
             // 7) Update time table entries to remove this faculty as slot assigner
-            try { await TimeTable.updateMany({ slotAssignedBy: userObjectId }, { $set: { slotAssignedBy: null } }); } catch (e) {}
+            try { await TimeTable.updateMany({ slotAssignedBy: userObjectId }, { $set: { slotAssignedBy: null } }); } catch (e) { }
 
         } else if (isStudent) {
             // Handle student deletion with cascading deletes
-            
+
             // 1) Remove this student from all teams (members and leader)
             await Team.updateMany({ members: userObjectId }, { $pull: { members: userObjectId } });
             await Team.updateMany({ teamLeader: userObjectId }, { $set: { teamLeader: null } });
 
             // 2) Find teams that are now empty (no leader and no members) and delete them with cascade
-            const orphanTeams = await Team.find({ $or: [ { members: { $size: 0 } }, { members: { $exists: false } } ], teamLeader: null }).select('_id');
+            const orphanTeams = await Team.find({ $or: [{ members: { $size: 0 } }, { members: { $exists: false } }], teamLeader: null }).select('_id');
             const orphanIds = orphanTeams.map(t => t._id);
             if (orphanIds.length > 0) {
-                try { await TimeTable.deleteMany({ team: { $in: orphanIds } }); } catch (e) {}
-                try { await Mark.deleteMany({ team: { $in: orphanIds } }); } catch (e) {}
-                try { await Attendance.deleteMany({ team: { $in: orphanIds } }); } catch (e) {}
-                try { const FinalReport = require('../models/FinalReport'); await FinalReport.deleteMany({ team: { $in: orphanIds } }); } catch (e) {}
-                try { const TeamPanelAssignment = require('../models/TeamPanelAssignment'); await TeamPanelAssignment.updateMany({}, { $pull: { teams: { $in: orphanIds } } }); } catch (e) {}
+                try { await TimeTable.deleteMany({ team: { $in: orphanIds } }); } catch (e) { }
+                try { await Mark.deleteMany({ team: { $in: orphanIds } }); } catch (e) { }
+                try { await Attendance.deleteMany({ team: { $in: orphanIds } }); } catch (e) { }
+                try { const FinalReport = require('../models/FinalReport'); await FinalReport.deleteMany({ team: { $in: orphanIds } }); } catch (e) { }
+                try { const TeamPanelAssignment = require('../models/TeamPanelAssignment'); await TeamPanelAssignment.updateMany({}, { $pull: { teams: { $in: orphanIds } } }); } catch (e) { }
                 await Team.deleteMany({ _id: { $in: orphanIds } });
             }
 
             // 3) Clean student-specific data
-            try { await Mark.deleteMany({ student: userObjectId }); } catch (e) {}
-            try { await Attendance.updateMany({}, { $pull: { 'studentAttendances': { student: userObjectId } } }); } catch (e) {}
+            try { await Mark.deleteMany({ student: userObjectId }); } catch (e) { }
+            try { await Attendance.updateMany({}, { $pull: { 'studentAttendances': { student: userObjectId } } }); } catch (e) { }
 
         }
 
@@ -1124,7 +1142,7 @@ exports.getDailyAttendanceRecords = async (req, res) => {
                             const matchingAssessment = studentAtt.assessments.find(
                                 asm => asm.name === slot
                             );
-                            
+
                             // If found and the student was marked present, increment the count
                             if (matchingAssessment && matchingAssessment.isPresent) {
                                 presentCount++;
@@ -1136,7 +1154,7 @@ exports.getDailyAttendanceRecords = async (req, res) => {
                 const attendancePercentage = ((presentCount / totalEvents) * 100).toFixed(2);
 
                 const marks = await Mark.find({ student: member._id, team: team._id });
-                
+
                 let totalPercentageSum = 0;
                 if (marks.length > 0) {
                     marks.forEach(mark => {
@@ -1169,8 +1187,9 @@ exports.getDailyAttendanceRecords = async (req, res) => {
 // Admin: Get all teams
 exports.getAllTeams = async (req, res) => {
     try {
+        const selectedProg = req.headers['x-selected-programme'] || req.query.programme;
         const filter = {};
-        if (req.query.programme) filter.programme = req.query.programme;
+        if (selectedProg) filter.programme = getProgrammeFilter(selectedProg);
         const teams = await Team.find(filter)
             .populate('teamLeader', 'username name')
             .populate('members', 'username name')
@@ -1284,7 +1303,7 @@ exports.generateSchedules = async (req, res) => {
             }
         }
 
-        res.json({ 
+        res.json({
             message: `Generated ${generatedSchedules.length} schedules successfully`,
             schedules: generatedSchedules
         });
@@ -1346,7 +1365,7 @@ exports.generateSlotForTeam = async (req, res) => {
                 });
 
                 await schedule.save();
-                return res.json({ 
+                return res.json({
                     message: 'Schedule generated successfully',
                     schedule
                 });
@@ -1365,7 +1384,7 @@ exports.generateSlotForTeam = async (req, res) => {
 exports.clearSchedules = async (req, res) => {
     try {
         // Only keep schedules that are linked to existing teams and panels
-        await TimeTable.deleteMany({ $or: [ { team: { $exists: false } }, { panel: { $exists: false } } ] });
+        await TimeTable.deleteMany({ $or: [{ team: { $exists: false } }, { panel: { $exists: false } }] });
         // Additionally, remove any schedules whose referenced team or panel no longer exists
         const all = await TimeTable.find({});
         const toDelete = [];
@@ -1387,12 +1406,15 @@ exports.clearSchedules = async (req, res) => {
 // Get all teams with their assigned guides
 exports.getAssignedTeamsSummary = async (req, res) => {
     try {
-        const assignedTeams = await Team.find({
+        const selectedProg = req.headers['x-selected-programme'] || req.query.programme;
+        const query = {
             status: 'approved',
             guidePreference: { $ne: null }
-        })
-        .populate('guidePreference', 'name')
-        .select('teamName guidePreference');
+        };
+        if (selectedProg) query.programme = getProgrammeFilter(selectedProg);
+        const assignedTeams = await Team.find(query)
+            .populate('guidePreference', 'name')
+            .select('teamName guidePreference');
 
         res.json(assignedTeams);
     } catch (error) {
@@ -1505,7 +1527,7 @@ exports.uploadStudents = async (req, res) => {
             return res.status(400).json({ message: 'Invalid payload: studentData must be an array' });
         }
 
-        const config = await Config.findOne();
+        const config = (await Config.findOne({ programme: getProgrammeFilter(targetProgramme) })) || (await Config.findOne({ programme: targetProgramme })) || (await Config.findOne());
         const isSoloMode = config && config.maxTeamSize === 1;
 
         for (const student of studentData) {
@@ -1702,7 +1724,7 @@ exports.deleteFaculty = async (req, res) => {
             const coordinatedPanelIds = coordinatedPanels.map(p => p._id);
             // Delete these panels completely (triggers Panel schema hooks)
             await Panel.deleteMany({ _id: { $in: coordinatedPanelIds } });
-            
+
             // Delete associated TimeTable schedules
             await TimeTable.deleteMany({ panel: { $in: coordinatedPanelIds } });
         }
@@ -1710,8 +1732,8 @@ exports.deleteFaculty = async (req, res) => {
         // Pull from members list or assistantCoordinators list in other panels
         await Panel.updateMany(
             { $or: [{ members: facultyObjectId }, { assistantCoordinators: facultyObjectId }] },
-            { 
-                $pull: { 
+            {
+                $pull: {
                     members: facultyObjectId,
                     assistantCoordinators: facultyObjectId
                 }
@@ -1761,8 +1783,8 @@ exports.deleteStudent = async (req, res) => {
                 // Remove student from members list & memberStatus, unlock team if it is locked
                 await Team.updateOne(
                     { _id: team._id },
-                    { 
-                        $pull: { 
+                    {
+                        $pull: {
                             members: studentId,
                             memberStatus: { user: studentId }
                         },
@@ -1780,8 +1802,8 @@ exports.deleteStudent = async (req, res) => {
         }
 
         // Clean student-specific data
-        try { await Mark.deleteMany({ student: studentId }); } catch (e) {}
-        try { await Attendance.updateMany({}, { $pull: { 'studentAttendances': { student: studentId } } }); } catch (e) {}
+        try { await Mark.deleteMany({ student: studentId }); } catch (e) { }
+        try { await Attendance.updateMany({}, { $pull: { 'studentAttendances': { student: studentId } } }); } catch (e) { }
 
         // Finally delete the user
         await User.deleteOne({ _id: studentId });
@@ -1870,7 +1892,7 @@ exports.checkFacultyDeletion = async (req, res) => {
         console.error('Error checking faculty deletion:', error);
         res.status(500).json({ message: 'Server error checking faculty deletion' });
     }
-}; 
+};
 
 // Get all faculty
 exports.getAllFaculty = async (req, res) => {
@@ -1894,24 +1916,24 @@ exports.getAllFaculty = async (req, res) => {
 exports.getUnassignedCoordinators = async (req, res) => {
     try {
         const Panel = require('../models/Panel');
-        
+
         // Get all coordinators
         const coordinators = await User.find({
             'roles.role': 'coordinator',
             'memberType': 'internal'
         }).select('username name _id');
-        
+
         // Get all panels with coordinators
         const panels = await Panel.find({ coordinator: { $ne: null } })
             .select('coordinator');
-        
+
         const assignedCoordinatorIds = panels.map(p => p.coordinator.toString());
-        
+
         // Filter out coordinators who already have panels
-        const unassignedCoordinators = coordinators.filter(coord => 
+        const unassignedCoordinators = coordinators.filter(coord =>
             !assignedCoordinatorIds.includes(coord._id.toString())
         );
-        
+
         res.json(unassignedCoordinators);
     } catch (error) {
         console.error('Error fetching unassigned coordinators:', error);
@@ -1937,10 +1959,10 @@ exports.getAllStudents = async (req, res) => {
 exports.deleteAllFaculty = async (req, res) => {
     try {
         // Find all faculty users
-        const faculty = await User.find({ 
-            'roles.role': { $in: ['guide', 'panel', 'coordinator'] } 
+        const faculty = await User.find({
+            'roles.role': { $in: ['guide', 'panel', 'coordinator'] }
         }).select('_id username');
-        
+
         if (!faculty || faculty.length === 0) {
             return res.json({ message: 'No faculty found', deleted: 0 });
         }
@@ -1950,14 +1972,14 @@ exports.deleteAllFaculty = async (req, res) => {
         // 1) Delete ALL teams (since all guides will be deleted)
         const allTeams = await Team.find({}).select('_id');
         const allTeamIds = allTeams.map(t => t._id);
-        
+
         if (allTeamIds.length > 0) {
             // Cascade delete all team-related data
-            try { await TimeTable.deleteMany({ team: { $in: allTeamIds } }); } catch (e) {}
-            try { await Mark.deleteMany({ team: { $in: allTeamIds } }); } catch (e) {}
-            try { await Attendance.deleteMany({ team: { $in: allTeamIds } }); } catch (e) {}
-            try { const FinalReport = require('../models/FinalReport'); await FinalReport.deleteMany({ team: { $in: allTeamIds } }); } catch (e) {}
-            try { const TeamPanelAssignment = require('../models/TeamPanelAssignment'); await TeamPanelAssignment.deleteMany({}); } catch (e) {}
+            try { await TimeTable.deleteMany({ team: { $in: allTeamIds } }); } catch (e) { }
+            try { await Mark.deleteMany({ team: { $in: allTeamIds } }); } catch (e) { }
+            try { await Attendance.deleteMany({ team: { $in: allTeamIds } }); } catch (e) { }
+            try { const FinalReport = require('../models/FinalReport'); await FinalReport.deleteMany({ team: { $in: allTeamIds } }); } catch (e) { }
+            try { const TeamPanelAssignment = require('../models/TeamPanelAssignment'); await TeamPanelAssignment.deleteMany({}); } catch (e) { }
             await Team.deleteMany({});
         }
 
@@ -1965,23 +1987,23 @@ exports.deleteAllFaculty = async (req, res) => {
         await Panel.deleteMany({});
 
         // 3) Clean up all faculty-related data
-        try { await Availability.deleteMany({ user: { $in: facultyIds } }); } catch (e) {}
-        try { await Mark.deleteMany({ markedBy: { $in: facultyIds } }); } catch (e) {}
-        try { const FinalReport = require('../models/FinalReport'); await FinalReport.updateMany({ approvedBy: { $in: facultyIds } }, { $set: { approvedBy: null } }); } catch (e) {}
-        try { await TimeTable.updateMany({ slotAssignedBy: { $in: facultyIds } }, { $set: { slotAssignedBy: null } }); } catch (e) {}
+        try { await Availability.deleteMany({ user: { $in: facultyIds } }); } catch (e) { }
+        try { await Mark.deleteMany({ markedBy: { $in: facultyIds } }); } catch (e) { }
+        try { const FinalReport = require('../models/FinalReport'); await FinalReport.updateMany({ approvedBy: { $in: facultyIds } }, { $set: { approvedBy: null } }); } catch (e) { }
+        try { await TimeTable.updateMany({ slotAssignedBy: { $in: facultyIds } }, { $set: { slotAssignedBy: null } }); } catch (e) { }
 
         // 4) Finally delete all faculty users
         const result = await User.deleteMany({ _id: { $in: facultyIds } });
 
-        res.json({ 
-            message: 'All faculty members and related data deleted successfully', 
-            deleted: result.deletedCount || facultyIds.length 
+        res.json({
+            message: 'All faculty members and related data deleted successfully',
+            deleted: result.deletedCount || facultyIds.length
         });
     } catch (error) {
         console.error('Error deleting all faculty:', error);
         res.status(500).json({ message: 'Error deleting all faculty members' });
     }
-}; 
+};
 
 // Admin: Delete all teams and related assignments/schedules
 exports.deleteAllTeams = async (req, res) => {
@@ -2005,7 +2027,7 @@ exports.deleteAllTeams = async (req, res) => {
         console.error('Error deleting all teams:', error);
         res.status(500).json({ message: 'Error deleting all teams' });
     }
-}; 
+};
 
 // Admin: Delete solo teams (teams with no members)
 exports.deleteSoloTeams = async (req, res) => {
@@ -2020,11 +2042,11 @@ exports.deleteSoloTeams = async (req, res) => {
         try {
             const TimeTable = require('../models/TimeTable');
             await TimeTable.deleteMany({ team: { $in: soloTeamIds } });
-        } catch (e) {}
+        } catch (e) { }
         try {
             const TeamPanelAssignment = require('../models/TeamPanelAssignment');
             await TeamPanelAssignment.updateMany({}, { $pull: { teams: { $in: soloTeamIds } } });
-        } catch (e) {}
+        } catch (e) { }
 
         const result = await Team.deleteMany({ _id: { $in: soloTeamIds } });
         res.json({ message: 'Solo teams deleted successfully', deleted: result.deletedCount || soloTeamIds.length });
@@ -2259,13 +2281,13 @@ exports.updateTeamAllocation = async (req, res) => {
 
                 if (limitStatus.teamLimit !== null) {
                     const guideName = guide.name || 'Unknown Guide';
-                    
+
                     if (currentApprovedCount > limitStatus.teamLimit) {
                         // The guide was already past their capacity before assigning this team
                         warnings.push(
                             `Warning: Guide ${guideName} has already exceeded their team limit (${currentApprovedCount}/${limitStatus.teamLimit}).`
                         );
-                    } 
+                    }
                     /* else if (currentApprovedCount === limitStatus.teamLimit) {
                         // The guide was exactly at capacity, and assigning this team pushes them over
                         warnings.push(
@@ -2340,12 +2362,12 @@ exports.updateTeamAllocation = async (req, res) => {
             await team.save();
         }
 
-        res.json({ 
-            message: 'Team allocation updated successfully!', 
+        res.json({
+            message: 'Team allocation updated successfully!',
             team,
-            warnings 
+            warnings
         });
-        
+
     } catch (error) {
         console.error('Error updating team allocation:', error);
         res.status(500).json({ message: 'Server error' });
@@ -2497,7 +2519,7 @@ exports.autoAssignGuidesFromAllocations = async (req, res) => {
         // Fetch all guides sorted by their current team count (ascending)
         const guidesByTeamCount = await exports.getGuidesWithTeamCounts(
             { ...req, originalUrl: '' }, // override originalUrl to trigger internal return
-            res, 
+            res,
             true
         );
 
@@ -2550,10 +2572,10 @@ exports.autoAssignGuidesFromAllocations = async (req, res) => {
             }
         }
 
-        res.json({ 
-            message: `Successfully assigned guides to ${assignedCount} teams.`, 
+        res.json({
+            message: `Successfully assigned guides to ${assignedCount} teams.`,
             assignedCount,
-            warnings 
+            warnings
         });
 
     } catch (error) {
