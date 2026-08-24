@@ -551,7 +551,14 @@ exports.debugAssignedData = async (req, res) => {
 // Get global review period dates for public view
 exports.getReviewPeriodDatesPublic = async (req, res) => {
     try {
-        const config = await Config.findOne();
+        const selectedProgramme = req.headers['x-selected-programme'] || req.query.programme || (req.user ? req.user.programme : null);
+        let cleanProg = String(selectedProgramme || 'B.E. CSE').trim();
+        if (cleanProg.includes(',')) cleanProg = cleanProg.split(',')[0].trim();
+
+        let config = await Config.findOne({ programme: cleanProg });
+        if (!config) {
+            config = await Config.findOne();
+        }
         if (!config) {
             return res.status(404).json({ message: 'Configuration not found' });
         }
@@ -616,10 +623,10 @@ exports.submitMarks = async (req, res) => {
         const MarkingScheme = require('../models/MarkingScheme');
         let percentage = null;
         if (team.panel) {
-            const scheme = await MarkingScheme.findOne({ panel: team.panel, slotType });
+            const scheme = await MarkingScheme.findOne({ panel: team.panel, slotType, evaluatorType: 'panel' });
             if (scheme && scheme.components.length > 0) {
                 const maxTotal = scheme.components.reduce((sum, c) => sum + c.maxMarks, 0);
-                if (maxTotal > 0) percentage = (totalMarks / maxTotal) * 100;
+                if (maxTotal > 0) percentage = (totalMarks / maxTotal) * 50;
             }
         }
 

@@ -461,7 +461,17 @@ exports.getGuidedTeamsForMarking = async (req, res) => {
 // Get review period dates
 exports.getReviewPeriodDatesPublic = async (req, res) => {
     try {
-        const config = await Config.findOne();
+        const selectedProgramme = req.headers['x-selected-programme'] || (req.user ? req.user.programme : null);
+        let cleanProg = String(selectedProgramme || 'B.E. CSE').trim();
+        if (cleanProg.includes(',')) cleanProg = cleanProg.split(',')[0].trim();
+        if (cleanProg.toLowerCase() === 'ug') {
+            cleanProg = 'B.E. CSE';
+        }
+
+        let config = await Config.findOne({ programme: cleanProg });
+        if (!config) {
+            config = await Config.findOne();
+        }
         if (!config) {
             return res.status(404).json({ message: 'Review period dates not set' });
         }
@@ -704,10 +714,10 @@ exports.submitMarks = async (req, res) => {
         let percentage = null;
         const panelId = team.panel;
         if (panelId) {
-            const scheme = await MarkingScheme.findOne({ panel: panelId, slotType });
+            const scheme = await MarkingScheme.findOne({ panel: panelId, slotType, evaluatorType: 'guide' });
             if (scheme && scheme.components.length > 0) {
                 const maxTotal = scheme.components.reduce((sum, c) => sum + c.maxMarks, 0);
-                if (maxTotal > 0) percentage = (totalMarks / maxTotal) * 100;
+                if (maxTotal > 0) percentage = (totalMarks / maxTotal) * 50;
             }
         }
 

@@ -57,6 +57,24 @@ async function run() {
   }
   console.log(`Checked Config docs for ${programmes.length} programmes.`);
 
+  // Migrate legacy MarkingScheme docs without evaluatorType -> set to 'panel'
+  const MarkingScheme = require('./backend/models/MarkingScheme');
+  const legacySchemes = await MarkingScheme.updateMany(
+    { evaluatorType: { $exists: false } },
+    { $set: { evaluatorType: 'panel' } }
+  );
+  console.log('Migrated legacy MarkingScheme docs:', legacySchemes);
+
+  // Drop legacy index panel_1_slotType_1 if it exists
+  try {
+    await mongoose.connection.collection('markingschemes').dropIndex('panel_1_slotType_1');
+    console.log('Dropped legacy index panel_1_slotType_1 successfully.');
+  } catch (err) {
+    if (err.codeName !== 'IndexNotFound' && err.code !== 27) {
+      console.log('Legacy index panel_1_slotType_1 drop result:', err.message);
+    }
+  }
+
   await mongoose.disconnect();
 }
 

@@ -75,7 +75,7 @@ const GuideMarking = () => {
         try {
             const token = localStorage.getItem('token');
             const res = await axios.get(
-                `${SERVER_API_KEY}/api/marking-scheme/for-panel?panelId=${panelId}&slotType=${slotType}`,
+                `${SERVER_API_KEY}/api/marking-scheme/for-panel?panelId=${panelId}&slotType=${slotType}&evaluatorType=guide`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             const schemeComponents = res.data?.components || [];
@@ -310,7 +310,7 @@ const GuideMarking = () => {
                                                     <tbody className="divide-y divide-gray-100">
                                                         {[
                                                             team.teamLeader && { ...team.teamLeader, isLeader: true },
-                                                            ...(team.members || []).map(m => ({ ...m, isLeader: false }))
+                                                            ...(team.members || []).filter(Boolean).map(m => ({ ...m, isLeader: false }))
                                                         ].filter(Boolean).map(stu => {
                                                             const studentId = stu._id;
                                                             const studentComps = ((marks[studentId] || {})[activeSlotType] || {}).components || [];

@@ -32,6 +32,12 @@ const markingSchemeSchema = new mongoose.Schema({
         type: [componentSchema],
         default: []
     },
+    evaluatorType: {
+        type: String,
+        enum: ['guide', 'panel'],
+        default: 'panel',
+        required: true
+    },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
@@ -42,8 +48,8 @@ const markingSchemeSchema = new mongoose.Schema({
     }
 });
 
-// Unique scheme per panel + slotType
-markingSchemeSchema.index({ panel: 1, slotType: 1 }, { unique: true });
+// Unique scheme per panel + slotType + evaluatorType
+markingSchemeSchema.index({ panel: 1, slotType: 1, evaluatorType: 1 }, { unique: true });
 
 markingSchemeSchema.pre('save', function (next) {
     this.updatedAt = Date.now();

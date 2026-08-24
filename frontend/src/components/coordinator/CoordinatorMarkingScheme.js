@@ -9,6 +9,7 @@ const CoordinatorMarkingScheme = () => {
     const [selectedPanelId, setSelectedPanelId] = useState('');
     const [slotTypes, setSlotTypes] = useState([]);
     const [activeSlot, setActiveSlot] = useState('');
+    const [evaluatorType, setEvaluatorType] = useState('panel'); // 'guide' | 'panel'
     const [components, setComponents] = useState([{ name: '', maxMarks: '' }]);
     const [loading, setLoading] = useState(true);
     const [schemeLoading, setSchemeLoading] = useState(false);
@@ -64,7 +65,7 @@ const CoordinatorMarkingScheme = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Fetch scheme whenever panel or slot changes
+    // Fetch scheme whenever panel, slot, or evaluatorType changes
     const fetchScheme = useCallback(async () => {
         if (!selectedPanelId || !activeSlot) return;
         setSchemeLoading(true);
@@ -72,7 +73,7 @@ const CoordinatorMarkingScheme = () => {
         setSuccess('');
         try {
             const res = await axios.get(
-                `${SERVER_API_KEY}/api/marking-scheme/coordinator?panelId=${selectedPanelId}&slotType=${activeSlot}`,
+                `${SERVER_API_KEY}/api/marking-scheme/coordinator?panelId=${selectedPanelId}&slotType=${activeSlot}&evaluatorType=${evaluatorType}`,
                 { headers }
             );
             const fetchedComponents = res.data?.components || [];
@@ -87,7 +88,7 @@ const CoordinatorMarkingScheme = () => {
             setSchemeLoading(false);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedPanelId, activeSlot]);
+    }, [selectedPanelId, activeSlot, evaluatorType]);
 
     useEffect(() => { fetchScheme(); }, [fetchScheme]);
 
@@ -116,6 +117,7 @@ const CoordinatorMarkingScheme = () => {
             await axios.post(`${SERVER_API_KEY}/api/marking-scheme/coordinator`, {
                 panelId: selectedPanelId,
                 slotType: activeSlot,
+                evaluatorType,
                 components: components.map(c => ({ name: c.name.trim(), maxMarks: Number(c.maxMarks) }))
             }, { headers });
             setSuccess('Marking scheme saved successfully!');
@@ -187,6 +189,39 @@ const CoordinatorMarkingScheme = () => {
                         </div>
                     </div>
 
+                    {/* Evaluator Type tabs */}
+                    <div className="px-5 pt-4 border-b border-gray-100 bg-white">
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Marking Scheme Target</label>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setEvaluatorType('panel')}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all border ${
+                                    evaluatorType === 'panel'
+                                        ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-sm'
+                                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                }`}
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                Panel & Coordinator Scheme (50%)
+                            </button>
+                            <button
+                                onClick={() => setEvaluatorType('guide')}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all border ${
+                                    evaluatorType === 'guide'
+                                        ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm'
+                                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                }`}
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                </svg>
+                                Guide Scheme (50%)
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Slot type tabs */}
                     <div className="px-5 pt-4 border-b border-gray-100">
                         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Review / Viva</label>
@@ -220,6 +255,13 @@ const CoordinatorMarkingScheme = () => {
                                     <div>
                                         <span className="text-sm font-semibold text-gray-700">Components for&nbsp;
                                             <span className="text-indigo-600">{formatSlotLabel(activeSlot)}</span>
+                                            <span className={`ml-2 px-2 py-0.5 text-xs rounded-md font-bold ${
+                                                evaluatorType === 'guide'
+                                                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                                    : 'bg-indigo-100 text-indigo-700 border border-indigo-200'
+                                            }`}>
+                                                {evaluatorType === 'guide' ? 'Guide Scheme (50%)' : 'Panel Scheme (50%)'}
+                                            </span>
                                         </span>
                                         {totalMaxMarks > 0 && (
                                             <span className="ml-2 text-xs text-gray-400">

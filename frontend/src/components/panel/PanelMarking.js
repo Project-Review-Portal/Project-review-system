@@ -67,7 +67,7 @@ const PanelMarking = () => {
         try {
             const token = localStorage.getItem('token');
             const res = await axios.get(
-                `${SERVER_API_KEY}/api/marking-scheme/for-panel?panelId=${panelId}&slotType=${slotType}`,
+                `${SERVER_API_KEY}/api/marking-scheme/for-panel?panelId=${panelId}&slotType=${slotType}&evaluatorType=panel`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             const schemeComponents = res.data?.components || [];

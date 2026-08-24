@@ -3,13 +3,14 @@ const MarkingScheme = require('../models/MarkingScheme');
 const { getReviewSettings } = require('../utils/reviewSettings');
 
 /**
- * GET /api/marking-scheme/coordinator?panelId=&slotType=
- * Fetch the marking scheme for a panel + slotType (coordinator / asst coord only).
+ * GET /api/marking-scheme/coordinator?panelId=&slotType=&evaluatorType=
+ * Fetch the marking scheme for a panel + slotType + evaluatorType (coordinator / asst coord only).
  */
 exports.getSchemeForCoordinator = async (req, res) => {
     try {
         const coordinatorId = req.user.id;
         const { panelId, slotType } = req.query;
+        const evaluatorType = req.query.evaluatorType === 'guide' ? 'guide' : 'panel';
 
         if (!panelId || !slotType) {
             return res.status(400).json({ message: 'panelId and slotType are required.' });
@@ -27,8 +28,8 @@ exports.getSchemeForCoordinator = async (req, res) => {
             return res.status(403).json({ message: 'You do not coordinate this panel.' });
         }
 
-        const scheme = await MarkingScheme.findOne({ panel: panelId, slotType });
-        res.json(scheme || { panel: panelId, slotType, components: [] });
+        const scheme = await MarkingScheme.findOne({ panel: panelId, slotType, evaluatorType });
+        res.json(scheme || { panel: panelId, slotType, evaluatorType, components: [] });
     } catch (err) {
         console.error('Error fetching marking scheme (coordinator):', err);
         res.status(500).json({ message: 'Server error fetching marking scheme.' });
@@ -37,13 +38,14 @@ exports.getSchemeForCoordinator = async (req, res) => {
 
 /**
  * POST /api/marking-scheme/coordinator
- * Create or update a marking scheme for a panel + slotType.
- * Body: { panelId, slotType, components: [{ name, maxMarks }] }
+ * Create or update a marking scheme for a panel + slotType + evaluatorType.
+ * Body: { panelId, slotType, evaluatorType, components: [{ name, maxMarks }] }
  */
 exports.saveSchemeForCoordinator = async (req, res) => {
     try {
         const coordinatorId = req.user.id;
         const { panelId, slotType, components } = req.body;
+        const evaluatorType = req.body.evaluatorType === 'guide' ? 'guide' : 'panel';
 
         if (!panelId || !slotType) {
             return res.status(400).json({ message: 'panelId and slotType are required.' });
@@ -88,10 +90,11 @@ exports.saveSchemeForCoordinator = async (req, res) => {
         }));
 
         const scheme = await MarkingScheme.findOneAndUpdate(
-            { panel: panelId, slotType },
+            { panel: panelId, slotType, evaluatorType },
             {
                 panel: panelId,
                 slotType,
+                evaluatorType,
                 programme: panel.programme,
                 components: cleanedComponents,
                 createdBy: coordinatorId,
@@ -103,24 +106,25 @@ exports.saveSchemeForCoordinator = async (req, res) => {
         res.json({ message: 'Marking scheme saved successfully.', scheme });
     } catch (err) {
         console.error('Error saving marking scheme:', err);
-        res.status(500).json({ message: 'Server error saving marking scheme.' });
+        res.status(500).json({ message: err.message || 'Server error saving marking scheme.' });
     }
 };
 
 /**
- * GET /api/marking-scheme/for-panel?panelId=&slotType=
+ * GET /api/marking-scheme/for-panel?panelId=&slotType=&evaluatorType=
  * Fetch a marking scheme for any authenticated user (guide/panel member) to read.
  */
 exports.getSchemePublic = async (req, res) => {
     try {
         const { panelId, slotType } = req.query;
+        const evaluatorType = req.query.evaluatorType === 'guide' ? 'guide' : 'panel';
 
         if (!panelId || !slotType) {
             return res.status(400).json({ message: 'panelId and slotType are required.' });
         }
 
-        const scheme = await MarkingScheme.findOne({ panel: panelId, slotType });
-        res.json(scheme || { panel: panelId, slotType, components: [] });
+        const scheme = await MarkingScheme.findOne({ panel: panelId, slotType, evaluatorType });
+        res.json(scheme || { panel: panelId, slotType, evaluatorType, components: [] });
     } catch (err) {
         console.error('Error fetching marking scheme (public):', err);
         res.status(500).json({ message: 'Server error fetching marking scheme.' });
