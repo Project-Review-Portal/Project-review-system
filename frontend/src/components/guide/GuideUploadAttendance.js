@@ -221,9 +221,6 @@ const GuideUploadAttendance = ({ programme }) => {
                                                 {/* Team name spans the first 3 fixed columns */}
                                                 <td colSpan={3} className="py-2 px-3">
                                                     <span className="text-xs font-extrabold text-indigo-700 uppercase tracking-widest">{team.teamName}</span>
-                                                    <span className="ml-2 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-indigo-100 text-indigo-600">
-                                                        {team.programme || 'UG'}
-                                                    </span>
                                                 </td>
                                                 {/* One date input per review column, aligned with the column */}
                                                 {reviewEvents.map(event => (
