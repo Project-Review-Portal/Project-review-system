@@ -8,15 +8,15 @@ npm install
 
 Write-Host "=============================================================="
 Write-Host "running npm install in backend..."
-cd backend
+Set-Location backend
 npm install
-cd ..
+Set-Location ..
 
 Write-Host "=============================================================="
 Write-Host "running npm install in frontend..."
-cd frontend
+Set-Location frontend
 npm install
-cd ..
+Set-Location ..
 
 Write-Host "=============================================================="
 Write-Host "Done!"
