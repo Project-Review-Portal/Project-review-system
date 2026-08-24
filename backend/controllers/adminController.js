@@ -409,6 +409,19 @@ exports.assignGuideToTeam = async (req, res) => {
             return res.status(400).json({ message: 'Invalid guide ID or guide not found.' });
         }
 
+        // Check if the team is already locked, if not, lock it automatically
+        if (!team.isLocked) {
+            const acceptedMembers = team.memberStatus.filter(m => m.status === 'accepted');
+            team.members = acceptedMembers.map(m => m.user);
+            team.isTeamComplete = true;
+            team.isLocked = true;
+            team.memberStatus.forEach(m => {
+                if (m.status === 'accepted') {
+                    m.lockApproved = true;
+                }
+            });
+        }
+
         // Assign the guide and update status
         team.guidePreference = guideId;
         team.status = 'approved'; // Mark as approved by admin assignment
@@ -501,10 +514,23 @@ exports.assignAllUnassignedGuides = async (req, res) => {
             });
 
             if (eligibleAndAvailableGuide) {
-                await Team.findByIdAndUpdate(team._id, {
-                    guidePreference: eligibleAndAvailableGuide._id,
-                    status: 'approved'
-                });
+                const fullTeam = await Team.findById(team._id);
+                if (fullTeam) {
+                    if (!fullTeam.isLocked) {
+                        const acceptedMembers = fullTeam.memberStatus.filter(m => m.status === 'accepted');
+                        fullTeam.members = acceptedMembers.map(m => m.user);
+                        fullTeam.isTeamComplete = true;
+                        fullTeam.isLocked = true;
+                        fullTeam.memberStatus.forEach(m => {
+                            if (m.status === 'accepted') {
+                                m.lockApproved = true;
+                            }
+                        });
+                    }
+                    fullTeam.guidePreference = eligibleAndAvailableGuide._id;
+                    fullTeam.status = 'approved';
+                    await fullTeam.save();
+                }
                 assignedCount++;
 
                 if (programmeType === 'UG') {
@@ -2555,10 +2581,23 @@ exports.autoAssignGuidesFromAllocations = async (req, res) => {
                 });
 
                 if (eligibleGuide) {
-                    await Team.findByIdAndUpdate(team._id, {
-                        guidePreference: eligibleGuide._id,
-                        status: 'approved'
-                    });
+                    const fullTeam = await Team.findById(team._id);
+                    if (fullTeam) {
+                        if (!fullTeam.isLocked) {
+                            const acceptedMembers = fullTeam.memberStatus.filter(m => m.status === 'accepted');
+                            fullTeam.members = acceptedMembers.map(m => m.user);
+                            fullTeam.isTeamComplete = true;
+                            fullTeam.isLocked = true;
+                            fullTeam.memberStatus.forEach(m => {
+                                if (m.status === 'accepted') {
+                                    m.lockApproved = true;
+                                }
+                            });
+                        }
+                        fullTeam.guidePreference = eligibleGuide._id;
+                        fullTeam.status = 'approved';
+                        await fullTeam.save();
+                    }
                     assignedCount++;
 
                     const updatedGuideIndex = guidesByTeamCount.findIndex(g => g._id.toString() === eligibleGuide._id.toString());
