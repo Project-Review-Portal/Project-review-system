@@ -26,6 +26,11 @@ const InstructionTemplateSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Panel', 
   }],
+  session: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Session',
+    index: true,
+  }
 }, { timestamps: true });
 
 module.exports = mongoose.model('InstructionTemplate', InstructionTemplateSchema);

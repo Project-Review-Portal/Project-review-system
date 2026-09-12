@@ -59,6 +59,11 @@ const FinalReportSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  session: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Session',
+    index: true,
+  },
   rejections: [{
     fileName: {
       type: String,
@@ -79,4 +84,4 @@ const FinalReportSchema = new mongoose.Schema({
   }],
 }, { timestamps: true });
 
-module.exports = mongoose.model('FinalReport', FinalReportSchema); 
+module.exports = mongoose.model('FinalReport', FinalReportSchema);

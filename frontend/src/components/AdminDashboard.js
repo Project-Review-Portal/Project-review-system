@@ -12,6 +12,7 @@ import GuideUploadAttendance from './guide/GuideUploadAttendance';
 import AdminHome from './admin/AdminHome';
 import GlobalManagement from './admin/GlobalManagement';
 import ProgrammeDashboard from './admin/ProgrammeDashboard';
+import AdminSessionProgrammes from './admin/AdminSessionProgrammes';
 
 const AdminDashboard = () => {
     const location = useLocation();
@@ -28,6 +29,8 @@ const AdminDashboard = () => {
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('selectedSessionId');
+        localStorage.removeItem('selectedSessionName');
         setUser(null);
         navigate('/');
     };
@@ -37,7 +40,7 @@ const AdminDashboard = () => {
     // Determine if we're inside a programme context for the key reset
     const contentKey = location.pathname;
 
-    const isHome = location.pathname === '/admin-dashboard' || location.pathname === '/admin-dashboard/';
+    const isHome = location.pathname === '/admin-dashboard' || location.pathname === '/admin-dashboard/' || location.pathname.startsWith('/admin-dashboard/session/');
     const showNavbar = !isHome;
 
     const programmeMatch = location.pathname.match(/\/programme\/([^/]+)/);
@@ -49,8 +52,11 @@ const AdminDashboard = () => {
             <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
                 <div key={contentKey} className="px-4 py-6 sm:px-0">
                     <Routes>
-                        {/* Default home — programme selection */}
+                        {/* Default home — session selection */}
                         <Route index element={<AdminHome />} />
+
+                        {/* Session programmes list */}
+                        <Route path="session/:sessionId" element={<AdminSessionProgrammes />} />
 
                         {/* Global management (faculty + designation limits + programmes) */}
                         <Route path="global-management" element={<GlobalManagement />} />

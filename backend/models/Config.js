@@ -42,13 +42,18 @@ const configSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    session: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Session',
+        index: true
+    },
     createdAt: {
         type: Date,
         default: Date.now
     }
 });
 
-// One config document per programme — no duplicates allowed
-configSchema.index({ programme: 1 }, { unique: true });
+// One config document per programme and session
+configSchema.index({ programme: 1, session: 1 }, { unique: true });
 
 module.exports = mongoose.model('Config', configSchema);

@@ -177,6 +177,10 @@ axios.interceptors.request.use(
         if (storedPanelId && !headersKeys.includes('x-selected-panel-id')) {
           config.headers['X-Selected-Panel-Id'] = storedPanelId;
         }
+        const storedSessionId = localStorage.getItem('selectedSessionId') || storedUser.session;
+        if (storedSessionId && !headersKeys.includes('x-selected-session')) {
+          config.headers['X-Selected-Session'] = storedSessionId;
+        }
       }
     } catch (e) {
       console.warn('Failed to parse user from localStorage for axios interceptor', e);

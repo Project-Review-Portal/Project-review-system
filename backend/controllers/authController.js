@@ -17,8 +17,8 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-// Function to get user's active roles based on team assignments
-const getUserActiveRoles = async (userId) => {
+// Function to get user's active roles based on team assignments and optional session
+const getUserActiveRoles = async (userId, sessionId = null) => {
     const activeRoles = [];
     
     try {
@@ -34,8 +34,10 @@ const getUserActiveRoles = async (userId) => {
             activeRoles.push({ role: 'guide', team: null, programme: progName });
         }
 
+        const sessionFilter = sessionId ? { session: sessionId } : {};
+
         // 2. Panel role: Check if user is a member of any panel/team dynamically
-        const userPanels = await Panel.find({ members: userId }).select('_id programme');
+        const userPanels = await Panel.find({ members: userId, ...sessionFilter }).select('_id programme');
         const panelProgrammes = new Set();
         for (const p of userPanels) {
             if (p.programme) panelProgrammes.add(p.programme);
@@ -43,7 +45,7 @@ const getUserActiveRoles = async (userId) => {
 
         if (userPanels.length > 0) {
             const panelIds = userPanels.map(p => p._id);
-            const teamsWithPanels = await Team.find({ panel: { $in: panelIds } }).select('_id programme');
+            const teamsWithPanels = await Team.find({ panel: { $in: panelIds }, ...sessionFilter }).select('_id programme');
             for (const t of teamsWithPanels) {
                 if (t.programme) panelProgrammes.add(t.programme);
             }
@@ -53,7 +55,7 @@ const getUserActiveRoles = async (userId) => {
         }
 
         // 3. Coordinator role: Check if user is coordinator dynamically
-        const coordinatorPanels = await Panel.find({ coordinator: userId }).select('_id programme');
+        const coordinatorPanels = await Panel.find({ coordinator: userId, ...sessionFilter }).select('_id programme');
         const coordinatorProgrammes = new Set();
         for (const p of coordinatorPanels) {
             if (p.programme) coordinatorProgrammes.add(p.programme);
@@ -61,7 +63,7 @@ const getUserActiveRoles = async (userId) => {
 
         if (coordinatorPanels.length > 0) {
             const panelIds = coordinatorPanels.map(p => p._id);
-            const teamsWithPanel = await Team.find({ panel: { $in: panelIds } }).select('_id programme');
+            const teamsWithPanel = await Team.find({ panel: { $in: panelIds }, ...sessionFilter }).select('_id programme');
             for (const t of teamsWithPanel) {
                 if (t.programme) coordinatorProgrammes.add(t.programme);
             }
@@ -71,7 +73,7 @@ const getUserActiveRoles = async (userId) => {
         }
 
         // 4. Assistant Coordinator role: Check if user is assistant coordinator dynamically
-        const asstCoordinatorPanels = await Panel.find({ assistantCoordinators: userId }).select('_id programme');
+        const asstCoordinatorPanels = await Panel.find({ assistantCoordinators: userId, ...sessionFilter }).select('_id programme');
         const asstCoordinatorProgrammes = new Set();
         for (const p of asstCoordinatorPanels) {
             if (p.programme) asstCoordinatorProgrammes.add(p.programme);
@@ -79,7 +81,7 @@ const getUserActiveRoles = async (userId) => {
 
         if (asstCoordinatorPanels.length > 0) {
             const panelIds = asstCoordinatorPanels.map(p => p._id);
-            const teamsWithPanel = await Team.find({ panel: { $in: panelIds } }).select('_id programme');
+            const teamsWithPanel = await Team.find({ panel: { $in: panelIds }, ...sessionFilter }).select('_id programme');
             for (const t of teamsWithPanel) {
                 if (t.programme) asstCoordinatorProgrammes.add(t.programme);
             }
@@ -179,7 +181,7 @@ exports.login = async (req, res) => {
         // For faculty users, include all faculty roles with team mapping (null if none)
         let activeRoles = [];
         if (['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(firstRole.role)) {
-            activeRoles = await getUserActiveRoles(user._id);
+            activeRoles = await getUserActiveRoles(user._id, req.sessionId);
         } else {
             // For non-faculty users, use their roles as is
             activeRoles = user.roles;
@@ -212,7 +214,8 @@ exports.login = async (req, res) => {
                 roles: activeRoles,     // Only active/assigned roles
                 programme: user.programme || null,
                 mustChangePassword: !!user.mustChangePassword
-            }
+            },
+            session: req.sessionDoc || null
         });
     } catch (error) {
         console.error('Login error:', error);

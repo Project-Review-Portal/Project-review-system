@@ -35,34 +35,40 @@ const Login = () => {
                 password: formData.password
             };
             const res = await axios.post(`${SERVER_API_KEY}/api/auth/login`, payload);
+            const user = res.data.user;
+            const session = res.data.session;
+
+            if (session) {
+                localStorage.setItem('selectedSessionId', session._id);
+                localStorage.setItem('selectedSessionName', session.name);
+            }
+
+            // If non-admin and the current session is paused, prevent direct access
+            if (user.role === 'student' && session && session.status === 'paused') {
+                setError('The portal is currently paused by the administrator for this session.');
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                setLoading(false);
+                return;
+            }
+
             localStorage.setItem('token', res.data.token);
             localStorage.setItem('user', JSON.stringify(res.data.user));
             
             // Navigate based on the user's primary role
-            const user = res.data.user;
             const primaryRole = user.role;
             if (user.mustChangePassword) {
                 navigate('/reset-password');
                 return;
             }
             
-            if (primaryRole === 'coordinator' || primaryRole === 'assistant coordinator') {
-                navigate('/coordinator-dashboard/review-schedule');
-            } else if (primaryRole === 'admin') {
+            if (primaryRole === 'admin') {
                 navigate('/admin-dashboard');
             } else if (primaryRole === 'student') {
                 navigate('/student-dashboard');
-            } else if (['guide', 'panel', 'assistant coordinator'].includes(primaryRole)) {
-                // Check if user has multiple roles - if yes, show role selection
-                const facultyRoles = user.roles?.filter(r => ['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(r.role));
-                if (facultyRoles && facultyRoles.length > 1) {
-                    navigate('/role-selection');
-                } else {
-                    navigate('/faculty-dashboard');
-                }
             } else {
-                // Default to faculty dashboard if role is not recognized
-                navigate('/faculty-dashboard');
+                // Faculty always goes through session/role selection
+                navigate('/role-selection');
             }
         } catch (error) {
             setError(error.response?.data?.message || 'Login failed. Please try again.');

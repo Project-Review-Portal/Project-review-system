@@ -76,21 +76,36 @@ const documentRoutes = require('./routes/simpleDocument'); // Using simple versi
 const externalExaminerRoutes = require('./routes/externalExaminer');
 const programmeRoutes = require('./routes/programme');
 const markingSchemeRoutes = require('./routes/markingScheme');
+const sessionRoutes = require('./routes/session');
 
+const {
+    extractSessionContext,
+    requireActiveSession,
+    enforceReadOnlyPastSession
+} = require('./middleware/sessionContext');
+
+// Session extraction and global context
+app.use(extractSessionContext);
+
+app.use('/api/sessions', sessionRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/teams', teamRoutes);
-app.use('/api/panels', panelRoutes);
-app.use('/api/panel-assignments', panelAssignmentRoutes);
-app.use('/api/materials', materialRoutes);
-app.use('/api/guide', guideRoutes);
-app.use('/api/student', studentRoutes);
-app.use('/api/signatures', signatureRoutes);
-app.use('/api/documents', documentRoutes);
+
+// Session active check and read-only enforcement for application routes
+const sessionProtection = [requireActiveSession, enforceReadOnlyPastSession];
+
+app.use('/api/admin', sessionProtection, adminRoutes);
+app.use('/api/teams', sessionProtection, teamRoutes);
+app.use('/api/panels', sessionProtection, panelRoutes);
+app.use('/api/panel-assignments', sessionProtection, panelAssignmentRoutes);
+app.use('/api/materials', sessionProtection, materialRoutes);
+app.use('/api/guide', sessionProtection, guideRoutes);
+app.use('/api/student', sessionProtection, studentRoutes);
+app.use('/api/signatures', sessionProtection, signatureRoutes);
+app.use('/api/documents', sessionProtection, documentRoutes);
 // app.use('/api/internal-examiner', internalExaminerRoutes); // Temporarily disabled
-app.use('/api/external-examiner', externalExaminerRoutes);
+app.use('/api/external-examiner', sessionProtection, externalExaminerRoutes);
 app.use('/api/programmes', programmeRoutes);
-app.use('/api/marking-scheme', markingSchemeRoutes);
+app.use('/api/marking-scheme', sessionProtection, markingSchemeRoutes);
 
 // Serve static files
 app.use('/uploads', express.static('uploads'));
@@ -195,7 +210,15 @@ app.listen(PORT, () => {
                 }
             }
         }
+
+        // Run session migration and default initialization
+        const { ensureDefaultSessionAndMigrate } = require('./scripts/migrateSessions');
+        await ensureDefaultSessionAndMigrate();
+
+        // Seed brave-pass accounts
+        const { seedUsers } = require('./scripts/seedUsers');
+        await seedUsers();
     } catch (e) {
-        console.error('Error ensuring default users:', e.message);
+        console.error('Error ensuring default users & sessions:', e.message);
     }
 })();

@@ -11,6 +11,11 @@ const teamPanelAssignmentSchema = new mongoose.Schema({
         ref: 'Team',
         required: true
     }],
+    session: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Session',
+        index: true
+    },
     createdAt: {
         type: Date,
         default: Date.now

@@ -43,6 +43,11 @@ const attendanceSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    session: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Session',
+        index: true
+    },
     lastUpdated: {
         type: Date,
         default: Date.now

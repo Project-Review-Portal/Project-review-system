@@ -127,13 +127,26 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
 
                             if (!text) return null;
 
+                            const sessionName = localStorage.getItem('selectedSessionName');
+                            const isReadOnly = localStorage.getItem('isSessionReadOnly') === 'true';
+
                             return (
                                 <div className="flex items-center gap-2 mr-3">
                                     <span className="text-indigo-200 font-semibold bg-indigo-800/40 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm whitespace-nowrap flex items-center gap-1.5 shadow-inner">
-                                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                         </svg>
                                         <span>{text}</span>
+                                        {sessionName && (
+                                            <span className="ml-1 text-xs text-indigo-300 bg-indigo-900/50 px-1.5 py-0.5 rounded border border-indigo-700/50">
+                                                📅 {sessionName}
+                                            </span>
+                                        )}
+                                        {isReadOnly && (
+                                            <span className="ml-1 text-xs font-bold text-amber-200 bg-amber-900/60 px-1.5 py-0.5 rounded border border-amber-500/50">
+                                                🔒 Read-Only
+                                            </span>
+                                        )}
                                     </span>
                                     {displayPanelsSelect && (
                                         <select
@@ -186,15 +199,13 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
 
                     {/* Right side - User info and buttons */}
                     <div className="flex items-center space-x-2 flex-shrink-0">
-                        {/* <span className="text-white text-xs lg:text-sm hidden sm:block truncate max-w-32">Welcome!</span> */}
-                        
-                        {/* Switch Role button for faculty users with multiple roles */}
-                        {['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(user.role) && user.roles && user.roles.length > 1 && (
+                        {/* Switch Session & Role buttons */}
+                        {['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(user.role) && (
                             <button
                                 onClick={() => navigate('/role-selection')}
                                 className="bg-indigo-500 text-white px-2 py-2 rounded-md text-xs sm:text-sm font-medium hover:bg-indigo-600 whitespace-nowrap"
                             >
-                                Switch Role
+                                Switch Session / Role
                             </button>
                         )}
 
@@ -203,7 +214,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                                 onClick={() => navigate('/admin-dashboard')}
                                 className="bg-indigo-500 text-white px-2 py-2 rounded-md text-xs sm:text-sm font-medium hover:bg-indigo-600 whitespace-nowrap mr-2"
                             >
-                                Control Panel
+                                Sessions
                             </button>
                         )}
                         

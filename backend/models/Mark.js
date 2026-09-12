@@ -44,6 +44,11 @@ const markSchema = new mongoose.Schema({
         min: 0,
         max: 100,
     },
+    session: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Session',
+        index: true
+    },
     createdAt: {
         type: Date,
         default: Date.now,
@@ -64,7 +69,7 @@ markSchema.pre('save', function (next) {
     next();
 });
 
-// Ensure uniqueness for a student by a specific marker for a given team and slotType
-markSchema.index({ student: 1, team: 1, markedBy: 1, slotType: 1 }, { unique: true });
+// Ensure uniqueness for a student by a specific marker for a given team, slotType and session
+markSchema.index({ student: 1, team: 1, markedBy: 1, slotType: 1, session: 1 }, { unique: true });
 
 module.exports = mongoose.model('Mark', markSchema);

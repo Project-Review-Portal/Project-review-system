@@ -42,14 +42,19 @@ const markingSchemeSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     },
+    session: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Session',
+        index: true
+    },
     updatedAt: {
         type: Date,
         default: Date.now
     }
 });
 
-// Unique scheme per panel + slotType + evaluatorType
-markingSchemeSchema.index({ panel: 1, slotType: 1, evaluatorType: 1 }, { unique: true });
+// Unique scheme per panel + slotType + evaluatorType + session
+markingSchemeSchema.index({ panel: 1, slotType: 1, evaluatorType: 1, session: 1 }, { unique: true });
 
 markingSchemeSchema.pre('save', function (next) {
     this.updatedAt = Date.now();

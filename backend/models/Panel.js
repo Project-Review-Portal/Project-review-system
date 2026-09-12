@@ -37,11 +37,16 @@ const panelSchema = new mongoose.Schema({
     programme: {
         type: String,
         default: 'B.E. CSE'
+    },
+    session: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Session',
+        index: true
     }
 });
 
-// Compound unique index: name must be unique within each panelType and programme
-panelSchema.index({ name: 1, panelType: 1, programme: 1 }, { unique: true });
+// Compound unique index: name must be unique within each panelType, programme, and session
+panelSchema.index({ name: 1, panelType: 1, programme: 1, session: 1 }, { unique: true });
 
 // Cascade deletion logic for Panel
 panelSchema.pre('findOneAndDelete', async function(next) {

@@ -70,11 +70,16 @@ const teamSchema = new mongoose.Schema({
     programme: {
         type: String,
         default: 'B.E. CSE'   // 'B.E. CSE', 'M.E. Big Data', etc.
+    },
+    session: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Session',
+        index: true
     }
 });
 
-// Ensure team names are unique per programme
-teamSchema.index({ teamName: 1, programme: 1 }, { unique: true });
+// Ensure team names are unique per programme and session
+teamSchema.index({ teamName: 1, programme: 1, session: 1 }, { unique: true });
 
 // Cascade deletion logic for Team
 teamSchema.pre('findOneAndDelete', async function(next) {

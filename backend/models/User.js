@@ -88,6 +88,11 @@ const userSchema = new mongoose.Schema({
     programme: {
         type: String,
         default: 'B.E. CSE'   // 'B.E. CSE', 'M.E. Big Data', etc.
+    },
+    session: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Session',
+        index: true
     }
 });
 

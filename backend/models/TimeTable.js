@@ -66,6 +66,11 @@ const timeTableSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    session: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Session',
+        index: true
+    },
     createdAt: {
         type: Date,
         default: Date.now
