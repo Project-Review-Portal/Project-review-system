@@ -47,10 +47,36 @@ const RoleSelection = () => {
 
     // Get user data from localStorage
     const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const [dynamicRoles, setDynamicRoles] = useState(user.roles || []);
+    const [loadingRoles, setLoadingRoles] = useState(false);
 
     useEffect(() => {
         fetchSessions();
     }, []);
+
+    const fetchUserRolesForSession = async (session) => {
+        if (!session || !session._id) return;
+        try {
+            setLoadingRoles(true);
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`${SERVER_API_KEY}/api/auth/roles`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'x-selected-session': session._id
+                }
+            });
+            const fetchedRoles = res.data.roles || [];
+            setDynamicRoles(fetchedRoles);
+            
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            storedUser.roles = fetchedRoles;
+            localStorage.setItem('user', JSON.stringify(storedUser));
+        } catch (err) {
+            console.error('Error fetching session active roles:', err);
+        } finally {
+            setLoadingRoles(false);
+        }
+    };
 
     const fetchSessions = async () => {
         try {
@@ -69,6 +95,7 @@ const RoleSelection = () => {
                 if (found && found.status !== 'paused') {
                     setSelectedSession(found);
                     setStep('role');
+                    fetchUserRolesForSession(found);
                 }
             }
         } catch (err) {
@@ -89,9 +116,10 @@ const RoleSelection = () => {
         localStorage.setItem('selectedSessionName', session.name);
         localStorage.setItem('isSessionReadOnly', session.isReadOnly ? 'true' : 'false');
         setStep('role');
+        fetchUserRolesForSession(session);
     };
 
-    const availableRoles = user.roles || [];
+    const availableRoles = dynamicRoles.length > 0 ? dynamicRoles : (user.roles || []);
     
     // Group by unique (role, programme) pairs
     const seenKeys = new Set();
@@ -356,15 +384,19 @@ const RoleSelection = () => {
                 </div>
 
                 <div className="space-y-3">
-                    {uniqueRoles.map((roleObj, index) => (
-                        <RoleRow
-                            key={index}
-                            roleObj={roleObj}
-                            loading={loading}
-                            getRoleDisplayName={getRoleDisplayName}
-                            handleRoleSelect={handleRoleSelect}
-                        />
-                    ))}
+                    {loadingRoles ? (
+                        <div className="text-center py-6 text-gray-400 text-sm animate-pulse">Loading roles for this session…</div>
+                    ) : (
+                        uniqueRoles.map((roleObj, index) => (
+                            <RoleRow
+                                key={index}
+                                roleObj={roleObj}
+                                loading={loading}
+                                getRoleDisplayName={getRoleDisplayName}
+                                handleRoleSelect={handleRoleSelect}
+                            />
+                        ))
+                    )}
                 </div>
 
                 {loading && (

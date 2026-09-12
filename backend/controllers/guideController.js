@@ -344,6 +344,7 @@ exports.requestTimeTable = async (req, res) => {
 // Get guide selection dates for public view
 exports.getGuideSelectionDatesPublic = async (req, res) => {
     try {
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
         const selectedProgramme = req.headers['x-selected-programme'] || (req.user ? req.user.programme : null);
         let cleanProg = String(selectedProgramme || 'B.E. CSE').trim();
         if (cleanProg.includes(',')) cleanProg = cleanProg.split(',')[0].trim();
@@ -351,16 +352,19 @@ exports.getGuideSelectionDatesPublic = async (req, res) => {
             cleanProg = 'B.E. CSE';
         }
 
-        let config = await Config.findOne({ programme: cleanProg });
+        let config = await Config.findOne({ programme: cleanProg, ...sessionFilter });
+        if (!config) {
+            config = await Config.findOne(sessionFilter);
+        }
+        if (!config) {
+            config = await Config.findOne({ programme: cleanProg });
+        }
         if (!config) {
             config = await Config.findOne();
         }
-        if (!config) {
-            return res.status(404).json({ message: 'Configuration not found' });
-        }
         res.json({
-            startDate: config.guideSelectionStartDate,
-            endDate: config.guideSelectionEndDate,
+            startDate: config ? config.guideSelectionStartDate : null,
+            endDate: config ? config.guideSelectionEndDate : null,
         });
     } catch (error) {
         console.error('Error fetching public guide selection dates:', error);

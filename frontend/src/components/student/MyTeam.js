@@ -2,14 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { toast } from '../../utils/toast';
 
-const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+const SERVER_API_KEY = process.env.REACT_APP_SERVER_API_KEY || "http://localhost:3626";
 
 const MyTeam = () => {
     const [team, setTeam] = useState(null);
     const [loading, setLoading] = useState(true);
     const [apiError, setApiError] = useState('');
     const [noTeamFound, setNoTeamFound] = useState(false);
-    
+
     // Member management states
     const [availableStudents, setAvailableStudents] = useState([]);
     const [filteredStudents, setFilteredStudents] = useState([]);
@@ -170,7 +170,7 @@ const MyTeam = () => {
     const handleRequestLock = async () => {
         setInviteError('');
         setInviteSuccess('');
-        
+
         const isSoloTeam = acceptedMembersOnly.length === 0;
         const confirmationMessage = isSoloTeam
             ? 'Are you sure you want to lock and finalize your solo team? You cannot add members after locking.'
@@ -250,7 +250,7 @@ const MyTeam = () => {
                     )}
                 </div>
             </div>
-            
+
             <div className="p-3 bg-blue-50 text-blue-700 rounded border border-blue-100">
                 <h3 className="font-semibold text-lg">Team Name: {team.teamName}</h3>
             </div>
@@ -277,8 +277,8 @@ const MyTeam = () => {
                 <div className="p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-800 rounded shadow-sm space-y-2">
                     <h4 className="font-bold">🔒 Finalize Team Setup</h4>
                     <p className="text-sm">
-                        {acceptedMembersOnly.length === 0 
-                            ? "You don't have any accepted team members. Locking now will instantly finalize this as a Solo Project." 
+                        {acceptedMembersOnly.length === 0
+                            ? "You don't have any accepted team members. Locking now will instantly finalize this as a Solo Project."
                             : "All invited members have accepted. You can lock and finalize this team setup. Once locked, no more members can be added or removed."
                         }
                     </p>
@@ -309,10 +309,9 @@ const MyTeam = () => {
                         <li key={m.user?._id} className="flex items-center justify-between p-2 rounded-md bg-white border border-gray-200">
                             <span className="text-sm text-gray-700">{m.user?.name} ({m.user?.username})</span>
                             <div className="flex items-center space-x-3">
-                                <span className={`text-xs px-2 py-1 rounded font-semibold ${
-                                    m.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                                    'bg-yellow-100 text-yellow-800 shadow-sm'
-                                }`}>
+                                <span className={`text-xs px-2 py-1 rounded font-semibold ${m.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                                        'bg-yellow-100 text-yellow-800 shadow-sm'
+                                    }`}>
                                     {m.status === 'pending' ? '⏳ Pending Response' : 'Accepted'}
                                 </span>
 

@@ -53,39 +53,41 @@ const GuideRequestManagement = () => {
             }
             const headers = { Authorization: `Bearer ${token}` };
 
-            // Fetch guide selection dates from the new public endpoint
+            // Fetch guide selection dates from the public endpoint
             const datesRes = await axios.get(`${SERVER_API_KEY}/api/guide/selection-dates`, { headers });
-            const { startDate, endDate } = datesRes.data;
+            const { startDate, endDate } = datesRes.data || {};
             setGuideSelectionDates({ startDate, endDate });
-            const now = new Date();
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-            const activePeriod = now >= start && now <= end;
+            
+            let activePeriod = true;
+            if (startDate && endDate) {
+                const now = new Date();
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                activePeriod = (now >= start && now <= end);
+            }
             setIsRequestPeriodActive(activePeriod);
 
             // Fetch user's team and existing request
             const teamRes = await axios.get(`${SERVER_API_KEY}/api/teams/my-team`, { headers });
             setMyTeam(teamRes.data);
-            console.log('--- fetchData Debug ---'); // Added debug separator
-            console.log('fetchData: myTeam after fetch:', teamRes.data); // Debug log
 
             // Set currentRequest to the guidePreference object if it exists
             if (teamRes.data && teamRes.data.guidePreference) {
                 setCurrentRequest(teamRes.data.guidePreference); 
-                console.log('fetchData: currentRequest set to:', teamRes.data.guidePreference); // Debug log
             } else {
-                setCurrentRequest(null); // Clear previous request if no guide preference
-                console.log('fetchData: currentRequest set to null.'); // Debug log
+                setCurrentRequest(null);
             }
-            console.log('--- End fetchData Debug ---'); // Added debug separator
             
             // Fetch available guides only if current user is a team leader and request period is active
-            // Ensure currentUser and its id are available before comparison
-            if (teamRes.data && teamRes.data.teamLeader && teamRes.data.teamLeader._id && currentUser?.id && teamRes.data.teamLeader._id === currentUser.id && activePeriod) { 
+            const currentUserId = String(currentUser?.id || currentUser?._id || user?.id || user?._id || '');
+            const teamLeaderId = String(teamRes.data?.teamLeader?._id || teamRes.data?.teamLeader?.id || teamRes.data?.teamLeader || '');
+            const isLeader = Boolean(currentUserId && teamLeaderId && currentUserId === teamLeaderId);
+
+            if (teamRes.data && isLeader && activePeriod) { 
                 // Only fetch guides if there's no current accepted/pending request, or if it's rejected
                 if (!teamRes.data.guidePreference || teamRes.data.status === 'rejected') {
                     const guidesRes = await axios.get(`${SERVER_API_KEY}/api/teams/guides`, { headers });
-                    setGuides(guidesRes.data);
+                    setGuides(guidesRes.data || []);
                 } else {
                     setGuides([]); // Clear guides if there's an active request
                 }
@@ -111,7 +113,11 @@ const GuideRequestManagement = () => {
             return;
         }
 
-        if (!myTeam || myTeam.teamLeader._id !== user?.id) {
+        const currentUserId = String(user?.id || user?._id || '');
+        const teamLeaderId = String(myTeam?.teamLeader?._id || myTeam?.teamLeader?.id || myTeam?.teamLeader || '');
+        const isLeader = Boolean(currentUserId && teamLeaderId && currentUserId === teamLeaderId);
+
+        if (!myTeam || !isLeader) {
             setError('Only team leaders can send guide requests.');
             console.log('Error: Not team leader or no team.'); // Debug log
             return;
@@ -190,7 +196,9 @@ const GuideRequestManagement = () => {
         );
     }
 
-    const isTeamLeader = myTeam.teamLeader._id === user?.id; // Use optional chaining for user.id
+    const currentUserId = String(user?.id || user?._id || '');
+    const teamLeaderId = String(myTeam?.teamLeader?._id || myTeam?.teamLeader?.id || myTeam?.teamLeader || '');
+    const isTeamLeader = Boolean(currentUserId && teamLeaderId && currentUserId === teamLeaderId);
 
     return (
         <div className="bg-white p-6 rounded-lg shadow space-y-6">

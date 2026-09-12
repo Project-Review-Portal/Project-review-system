@@ -323,7 +323,7 @@ exports.getGuidesWithTeamCounts = async (req, res) => {
         const programmeType = isBE ? 'UG' : 'PG';
         const guides = await User.find({
             'roles.role': 'guide',
-            memberType: 'internal'
+            memberType: { $ne: 'external' }
         }).select('username name designation');
         const { buildDesignationLimitMap, resolveGuideLimitStatus } = require('../utils/guideTeamLimit');
         const limitMap = await buildDesignationLimitMap(programmeType);
@@ -458,7 +458,7 @@ exports.assignAllUnassignedGuides = async (req, res) => {
 
         const guides = await User.find({
             'roles.role': 'guide',
-            memberType: 'internal'
+            memberType: { $ne: 'external' }
         }).select('username name designation');
 
         if (!guides || guides.length === 0) {
@@ -1954,7 +1954,7 @@ exports.getAllFaculty = async (req, res) => {
         const includeExternal = String(req.query.includeExternal || '').toLowerCase() === 'true';
         const match = { 'roles.role': { $in: ['guide', 'panel', 'coordinator'] } };
         if (!includeExternal) {
-            match.memberType = 'internal';
+            match.memberType = { $ne: 'external' };
         }
         if (req.sessionId) {
             match.session = req.sessionId;
@@ -1978,7 +1978,7 @@ exports.getUnassignedCoordinators = async (req, res) => {
         // Get all coordinators in this session
         const coordinators = await User.find({
             'roles.role': 'coordinator',
-            'memberType': 'internal',
+            'memberType': { $ne: 'external' },
             ...sessionFilter
         }).select('username name _id');
 

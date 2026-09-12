@@ -23,7 +23,15 @@ const getUserActiveRoles = async (userId, sessionId = null) => {
     
     try {
         const Programme = require('../models/Programme');
-        const allProgrammes = await Programme.find().sort({ name: 1 });
+        const sessionQuery = sessionId ? {
+            $or: [
+                { session: sessionId },
+                { session: null },
+                { session: { $exists: false } }
+            ]
+        } : {};
+
+        const allProgrammes = await Programme.find(sessionQuery).sort({ name: 1 });
         const programmeNames = allProgrammes.map(p => p.name);
         if (!programmeNames.some(name => name.toLowerCase() === 'b.e. cse')) {
             programmeNames.unshift('B.E. CSE');
@@ -34,10 +42,8 @@ const getUserActiveRoles = async (userId, sessionId = null) => {
             activeRoles.push({ role: 'guide', team: null, programme: progName });
         }
 
-        const sessionFilter = sessionId ? { session: sessionId } : {};
-
         // 2. Panel role: Check if user is a member of any panel/team dynamically
-        const userPanels = await Panel.find({ members: userId, ...sessionFilter }).select('_id programme');
+        const userPanels = await Panel.find({ members: userId, ...sessionQuery }).select('_id programme');
         const panelProgrammes = new Set();
         for (const p of userPanels) {
             if (p.programme) panelProgrammes.add(p.programme);
@@ -45,7 +51,7 @@ const getUserActiveRoles = async (userId, sessionId = null) => {
 
         if (userPanels.length > 0) {
             const panelIds = userPanels.map(p => p._id);
-            const teamsWithPanels = await Team.find({ panel: { $in: panelIds }, ...sessionFilter }).select('_id programme');
+            const teamsWithPanels = await Team.find({ panel: { $in: panelIds }, ...sessionQuery }).select('_id programme');
             for (const t of teamsWithPanels) {
                 if (t.programme) panelProgrammes.add(t.programme);
             }
@@ -54,8 +60,8 @@ const getUserActiveRoles = async (userId, sessionId = null) => {
             activeRoles.push({ role: 'panel', team: null, programme: prog });
         }
 
-        // 3. Coordinator role: Check if user is coordinator dynamically
-        const coordinatorPanels = await Panel.find({ coordinator: userId, ...sessionFilter }).select('_id programme');
+        // 3. Coordinator role: Check if user is coordinator dynamically via Panel or directly on Team
+        const coordinatorPanels = await Panel.find({ coordinator: userId, ...sessionQuery }).select('_id programme');
         const coordinatorProgrammes = new Set();
         for (const p of coordinatorPanels) {
             if (p.programme) coordinatorProgrammes.add(p.programme);
@@ -63,17 +69,23 @@ const getUserActiveRoles = async (userId, sessionId = null) => {
 
         if (coordinatorPanels.length > 0) {
             const panelIds = coordinatorPanels.map(p => p._id);
-            const teamsWithPanel = await Team.find({ panel: { $in: panelIds }, ...sessionFilter }).select('_id programme');
+            const teamsWithPanel = await Team.find({ panel: { $in: panelIds }, ...sessionQuery }).select('_id programme');
             for (const t of teamsWithPanel) {
                 if (t.programme) coordinatorProgrammes.add(t.programme);
             }
         }
+
+        const coordinatorTeams = await Team.find({ coordinator: userId, ...sessionQuery }).select('_id programme');
+        for (const t of coordinatorTeams) {
+            if (t.programme) coordinatorProgrammes.add(t.programme);
+        }
+
         for (const prog of coordinatorProgrammes) {
             activeRoles.push({ role: 'coordinator', team: null, programme: prog });
         }
 
         // 4. Assistant Coordinator role: Check if user is assistant coordinator dynamically
-        const asstCoordinatorPanels = await Panel.find({ assistantCoordinators: userId, ...sessionFilter }).select('_id programme');
+        const asstCoordinatorPanels = await Panel.find({ assistantCoordinators: userId, ...sessionQuery }).select('_id programme');
         const asstCoordinatorProgrammes = new Set();
         for (const p of asstCoordinatorPanels) {
             if (p.programme) asstCoordinatorProgrammes.add(p.programme);
@@ -81,7 +93,7 @@ const getUserActiveRoles = async (userId, sessionId = null) => {
 
         if (asstCoordinatorPanels.length > 0) {
             const panelIds = asstCoordinatorPanels.map(p => p._id);
-            const teamsWithPanel = await Team.find({ panel: { $in: panelIds }, ...sessionFilter }).select('_id programme');
+            const teamsWithPanel = await Team.find({ panel: { $in: panelIds }, ...sessionQuery }).select('_id programme');
             for (const t of teamsWithPanel) {
                 if (t.programme) asstCoordinatorProgrammes.add(t.programme);
             }
@@ -109,6 +121,18 @@ const getUserActiveRoles = async (userId, sessionId = null) => {
         // Fallback to user's potential roles if there's an error
         const user = await User.findById(userId);
         return user?.roles || [];
+    }
+};
+
+exports.getUserRoles = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const sessionId = req.sessionId || req.query.sessionId || null;
+        const activeRoles = await getUserActiveRoles(userId, sessionId);
+        res.json({ roles: activeRoles });
+    } catch (error) {
+        console.error('Error fetching user roles:', error);
+        res.status(500).json({ message: 'Error fetching roles' });
     }
 };
 

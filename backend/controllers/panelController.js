@@ -140,7 +140,7 @@ exports.createPanel = async (req, res) => {
         // Coordinator can now be in members. No longer restricted.
         // Validate that coordinator is internal faculty
         const coordinatorDetails = await User.findById(coordinator);
-        if (!coordinatorDetails || coordinatorDetails.memberType !== 'internal') {
+        if (!coordinatorDetails || coordinatorDetails.memberType === 'external') {
             return res.status(400).json({ message: 'Coordinator must be an internal faculty member.' });
         }
         // Generate panel name based on current count for this panelType and programme
@@ -178,7 +178,8 @@ exports.createPanel = async (req, res) => {
             members,
             coordinator,
             assistantCoordinators: assistantCoordinators || [],
-            programme: targetProgramme
+            programme: targetProgramme,
+            session: req.sessionId || null
         });
         await newPanel.save();
         res.status(201).json({ message: 'Panel created successfully!', panel: newPanel });
@@ -213,6 +214,12 @@ exports.updatePanel = async (req, res) => {
             panel.members = members;
         }
         if (coordinator !== undefined) {
+            if (coordinator) {
+                const coordinatorDetails = await User.findById(coordinator);
+                if (!coordinatorDetails || coordinatorDetails.memberType === 'external') {
+                    return res.status(400).json({ message: 'Coordinator must be an internal faculty member.' });
+                }
+            }
             panel.coordinator = coordinator;
         }
         if (assistantCoordinators !== undefined) {
@@ -1303,7 +1310,8 @@ exports.saveCoordinatorVivaPanel = async (req, res) => {
                 assistantCoordinators: reviewPanel.assistantCoordinators,
                 members,
                 programme: reviewPanel.programme,
-                parentPanel: reviewPanelId
+                parentPanel: reviewPanelId,
+                session: reviewPanel.session || req.sessionId || null
             });
         }
 

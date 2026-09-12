@@ -8,6 +8,7 @@ router.post('/login', authController.login);
 router.post('/register-panel', authController.registerPanel);
 router.post('/reset-password', auth, authController.resetPassword);
 router.get('/faculty', auth, authController.getFaculty);
+router.get('/roles', auth, authController.getUserRoles);
 router.get('/profile', auth, authController.getProfile);
 router.get('/review-settings', auth, authController.getReviewSettings);
 router.get('/users', auth, authorize(['admin']), authController.getAllUsers);

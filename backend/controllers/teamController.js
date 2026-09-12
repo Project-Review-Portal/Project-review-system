@@ -59,17 +59,38 @@ exports.getGuides = async (req, res) => {
             rejectedGuideIds = team.rejectedGuides;
         }
 
-        const guides = await User.find({
-            'roles.role': 'guide',
-            'memberType': 'internal', // Only show internal faculty as guides
-            _id: { $nin: rejectedGuideIds }
-        }).select('username name designation');
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : (team?.session ? { session: team.session } : {});
+
+        const queryConditions = [
+            {
+                $or: [
+                    { 'roles.role': 'guide' },
+                    { role: 'guide' },
+                    { role: 'faculty' }
+                ]
+            },
+            { role: { $nin: ['student', 'admin'] } },
+            { memberType: { $ne: 'external' } }, // Internal faculty only (excludes external examiners)
+            { _id: { $nin: rejectedGuideIds } }
+        ];
+
+        if (sessionFilter.session) {
+            queryConditions.push({
+                $or: [
+                    { session: sessionFilter.session },
+                    { session: null },
+                    { session: { $exists: false } }
+                ]
+            });
+        }
+
+        const guides = await User.find({ $and: queryConditions }).select('username name designation');
 
         const isPg = team && team.programme && team.programme !== 'UG' && team.programme !== 'B.E COMPUTER SCIENCE AND ENGINEERING' && team.programme !== 'B.E. CSE';
         const programmeType = isPg ? 'PG' : 'UG';
-        const limitMap = await buildDesignationLimitMap(programmeType);
+        const limitMap = await buildDesignationLimitMap(programmeType, sessionFilter.session);
         const guideIds = guides.map((guide) => guide._id);
-        const countMap = await getTeamCountsByGuideIds(guideIds, programmeType);
+        const countMap = await getTeamCountsByGuideIds(guideIds, programmeType, sessionFilter.session);
 
         const guidesWithStatus = guides.map((guide) => {
             const currentTeamCount = countMap.get(guide._id.toString()) || 0;
@@ -240,14 +261,14 @@ exports.requestGuide = async (req, res) => {
 
         // Validate guideId
         const guide = await User.findById(guideId);
-        if (!guide || !guide.roles.some(r => r.role === 'guide')) {
+        if (!guide || guide.role === 'student' || guide.role === 'admin' || (!guide.roles.some(r => r.role === 'guide') && guide.role !== 'guide' && guide.role !== 'faculty')) {
             return res.status(400).json({ message: 'Invalid guide selected.' });
         }
 
         const isPg = team && team.programme && team.programme !== 'UG' && team.programme !== 'B.E COMPUTER SCIENCE AND ENGINEERING' && team.programme !== 'B.E. CSE';
         const programmeType = isPg ? 'PG' : 'UG';
-        const limitMap = await buildDesignationLimitMap(programmeType);
-        const countMap = await getTeamCountsByGuideIds([guide._id], programmeType);
+        const limitMap = await buildDesignationLimitMap(programmeType, team.session);
+        const countMap = await getTeamCountsByGuideIds([guide._id], programmeType, team.session);
         const currentTeamCount = countMap.get(guide._id.toString()) || 0;
         const limitStatus = resolveGuideLimitStatus(guide, currentTeamCount, limitMap);
 
