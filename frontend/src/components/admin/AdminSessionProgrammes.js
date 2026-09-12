@@ -12,22 +12,31 @@ const AdminSessionProgrammes = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (sessionId) {
+            localStorage.setItem('selectedSessionId', sessionId);
+        }
         fetchSessionAndProgrammes();
     }, [sessionId]);
 
     const fetchSessionAndProgrammes = async () => {
         try {
             const token = localStorage.getItem('token');
-            const headers = { Authorization: `Bearer ${token}` };
+            const headers = {
+                Authorization: `Bearer ${token}`,
+                'X-Selected-Session': sessionId
+            };
 
             // Fetch session details
             const sessionRes = await axios.get(`${SERVER_API_KEY}/api/sessions`, { headers });
             const allSessions = sessionRes.data.sessions || [];
             const currentSession = allSessions.find(s => s._id === sessionId);
             setSession(currentSession);
+            if (currentSession) {
+                localStorage.setItem('selectedSessionName', currentSession.name);
+            }
 
-            // Fetch programmes
-            const progRes = await axios.get(`${SERVER_API_KEY}/api/programmes`, { headers });
+            // Fetch programmes for this session
+            const progRes = await axios.get(`${SERVER_API_KEY}/api/programmes?sessionId=${sessionId}`, { headers });
             setProgrammes(progRes.data || []);
         } catch (err) {
             console.error('Error fetching session programmes:', err);
@@ -99,6 +108,18 @@ const AdminSessionProgrammes = () => {
                     </p>
                 </div>
 
+                {/* Session Global Configuration */}
+                <div className="mb-8">
+                    <h2 className="text-sm font-semibold uppercase tracking-widest text-indigo-500 mb-3">Session Global Management</h2>
+                    <ListItem
+                        title="Global Management"
+                        subtitle="Faculty · Designation Limits · PG Programmes Master List"
+                        icon="🌐"
+                        color="bg-white border-gray-200 hover:border-indigo-300"
+                        onClick={() => navigate(`/admin-dashboard/session/${sessionId}/global-management`)}
+                    />
+                </div>
+
                 {/* Programmes List */}
                 <div>
                     <h2 className="text-sm font-semibold uppercase tracking-widest text-purple-500 mb-3">Available Programmes</h2>
@@ -114,17 +135,19 @@ const AdminSessionProgrammes = () => {
                                 color="bg-white border-gray-200 hover:border-emerald-300"
                                 onClick={() => handleSelectProgramme('B.E. CSE')}
                             />
-                            {programmes.map(pg => (
-                                <ListItem
-                                    key={pg._id}
-                                    title={pg.name}
-                                    subtitle="Postgraduate Programme"
-                                    icon="🎓"
-                                    color="bg-white border-gray-200 hover:border-purple-300"
-                                    onClick={() => handleSelectProgramme(pg.name)}
-                                />
-                            ))}
-                            {programmes.length === 0 && (
+                            {programmes
+                                .filter(pg => pg.name && pg.name.trim().toLowerCase() !== 'b.e. cse')
+                                .map(pg => (
+                                    <ListItem
+                                        key={pg._id}
+                                        title={pg.name}
+                                        subtitle="Postgraduate Programme"
+                                        icon="🎓"
+                                        color="bg-white border-gray-200 hover:border-purple-300"
+                                        onClick={() => handleSelectProgramme(pg.name)}
+                                    />
+                                ))}
+                            {programmes.filter(pg => pg.name && pg.name.trim().toLowerCase() !== 'b.e. cse').length === 0 && (
                                 <div className="text-gray-400 text-sm italic mt-2">
                                     No additional PG programmes added yet. You can manage global programmes from <strong>Global Management</strong>.
                                 </div>

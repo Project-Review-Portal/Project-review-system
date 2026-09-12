@@ -4,8 +4,12 @@ const programmeSchema = new mongoose.Schema({
     name: {
         type: String,
         required: true,
-        unique: true,
         trim: true
+    },
+    session: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Session',
+        index: true
     },
     createdAt: {
         type: Date,
@@ -13,4 +17,7 @@ const programmeSchema = new mongoose.Schema({
     }
 });
 
+programmeSchema.index({ name: 1, session: 1 }, { unique: true });
+
 module.exports = mongoose.model('Programme', programmeSchema);
+

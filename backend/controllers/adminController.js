@@ -1493,10 +1493,14 @@ exports.uploadFaculty = async (req, res) => {
                     normalizedMemberType = 'internal';
                 }
 
-                // Check if user already exists
-                const existingUser = await User.findOne({ $or: [{ username: emailId }, { email: emailId }] });
+                // Check if user already exists in THIS session
+                const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+                const existingUser = await User.findOne({
+                    $or: [{ username: emailId }, { email: emailId }],
+                    ...sessionFilter
+                });
                 if (existingUser) {
-                    continue; // Skip if user already exists
+                    continue; // Skip if user already exists in this session
                 }
 
                 // Hash password (default faculty password: local-part of email)
@@ -1525,7 +1529,8 @@ exports.uploadFaculty = async (req, res) => {
                     roles: [{ role: 'guide', team: null }],
                     memberType: normalizedMemberType,
                     mustChangePassword: true,
-                    seniority: parsedSeniority
+                    seniority: parsedSeniority,
+                    session: req.sessionId || null
                 });
 
                 await user.save();
@@ -1555,7 +1560,10 @@ exports.uploadStudents = async (req, res) => {
             return res.status(400).json({ message: 'Invalid payload: studentData must be an array' });
         }
 
-        const config = (await Config.findOne({ programme: getProgrammeFilter(targetProgramme) })) || (await Config.findOne({ programme: targetProgramme })) || (await Config.findOne());
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        const config = (await Config.findOne({ programme: getProgrammeFilter(targetProgramme), ...sessionFilter })) ||
+            (await Config.findOne({ programme: targetProgramme, ...sessionFilter })) ||
+            (await Config.findOne(sessionFilter));
         const isSoloMode = config && config.maxTeamSize === 1;
 
         for (const student of studentData) {
@@ -1568,8 +1576,8 @@ exports.uploadStudents = async (req, res) => {
                 continue;
             }
 
-            // Check if user already exists
-            const existingUser = await User.findOne({ username: regno });
+            // Check if user already exists in THIS session
+            const existingUser = await User.findOne({ username: regno, ...sessionFilter });
             if (existingUser) {
                 // Update programme if it changed
                 if (existingUser.programme !== targetProgramme) {
@@ -1592,6 +1600,7 @@ exports.uploadStudents = async (req, res) => {
                 role: 'student',
                 roles: [{ role: 'student', team: null }],
                 programme: targetProgramme,
+                session: req.sessionId || null,
                 mustChangePassword: true
             });
 
@@ -1604,6 +1613,7 @@ exports.uploadStudents = async (req, res) => {
                     teamName: user.username,
                     teamLeader: user._id,
                     programme: user.programme,
+                    session: req.sessionId || null,
                     members: [],
                     memberStatus: [],
                     isTeamComplete: true,
@@ -1629,7 +1639,11 @@ exports.updateFaculty = async (req, res) => {
 
         console.log('Updating faculty with identifier:', facultyId, 'and name:', name);
 
-        const user = await User.findOne({ $or: [{ username: facultyId }, { email: facultyId }] });
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        const user = await User.findOne({
+            $or: [{ username: facultyId }, { email: facultyId }, { _id: facultyId.match(/^[0-9a-fA-F]{24}$/) ? facultyId : null }],
+            ...sessionFilter
+        });
         if (!user) {
             console.log('Faculty not found with identifier:', facultyId);
             return res.status(404).json({ message: `Faculty member with identifier ${facultyId} not found` });
@@ -1696,7 +1710,8 @@ exports.updateStudent = async (req, res) => {
 
         console.log('Updating student with regno:', regno, 'and name:', name);
 
-        const user = await User.findOne({ username: regno });
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        const user = await User.findOne({ username: regno, ...sessionFilter });
         if (!user) {
             console.log('Student not found with regno:', regno);
             return res.status(404).json({ message: `Student with registration number ${regno} not found` });
@@ -1725,7 +1740,11 @@ exports.deleteFaculty = async (req, res) => {
     try {
         const { facultyId } = req.params; // can be email or username
 
-        const user = await User.findOne({ $or: [{ username: facultyId }, { email: facultyId }] });
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        const user = await User.findOne({
+            $or: [{ username: facultyId }, { email: facultyId }, { _id: facultyId.match(/^[0-9a-fA-F]{24}$/) ? facultyId : null }],
+            ...sessionFilter
+        });
         if (!user) {
             return res.status(404).json({ message: 'Faculty member not found' });
         }
@@ -1743,14 +1762,14 @@ exports.deleteFaculty = async (req, res) => {
 
         const facultyObjectId = user._id;
 
-        // 1) All teams that have this faculty as guide will now have no guide
-        await Team.updateMany({ guidePreference: facultyObjectId }, { $set: { guidePreference: null } });
+        // 1) All teams that have this faculty as guide in this session will now have no guide
+        await Team.updateMany({ guidePreference: facultyObjectId, ...sessionFilter }, { $set: { guidePreference: null } });
 
         // 2) If the faculty is in a panel and is coordinator, remove the panel completely.
-        const coordinatedPanels = await Panel.find({ coordinator: facultyObjectId });
+        const coordinatedPanels = await Panel.find({ coordinator: facultyObjectId, ...sessionFilter });
         if (coordinatedPanels.length > 0) {
             const coordinatedPanelIds = coordinatedPanels.map(p => p._id);
-            // Delete these panels completely (triggers Panel schema hooks)
+            // Delete these panels completely
             await Panel.deleteMany({ _id: { $in: coordinatedPanelIds } });
 
             // Delete associated TimeTable schedules
@@ -1759,7 +1778,7 @@ exports.deleteFaculty = async (req, res) => {
 
         // Pull from members list or assistantCoordinators list in other panels
         await Panel.updateMany(
-            { $or: [{ members: facultyObjectId }, { assistantCoordinators: facultyObjectId }] },
+            { $or: [{ members: facultyObjectId }, { assistantCoordinators: facultyObjectId }], ...sessionFilter },
             {
                 $pull: {
                     members: facultyObjectId,
@@ -1782,7 +1801,8 @@ exports.deleteStudent = async (req, res) => {
     try {
         const { regno } = req.params;
 
-        const user = await User.findOne({ username: regno });
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        const user = await User.findOne({ username: regno, ...sessionFilter });
         if (!user) {
             return res.status(404).json({ message: 'Student not found' });
         }
@@ -1795,12 +1815,12 @@ exports.deleteStudent = async (req, res) => {
 
         const studentId = user._id;
 
-        // Check if the student is in any team
-        const team = await Team.findOne({ $or: [{ teamLeader: studentId }, { members: studentId }] });
+        // Check if the student is in any team in this session
+        const team = await Team.findOne({ $or: [{ teamLeader: studentId }, { members: studentId }], ...sessionFilter });
         if (team) {
             const isLeader = team.teamLeader && team.teamLeader.toString() === studentId.toString();
             if (isLeader) {
-                // Disband the team! (triggers Team schema pre hooks which clean schedules, marks, assignments, etc.)
+                // Disband the team!
                 await Team.findOneAndDelete({ _id: team._id });
                 // Also update the users who were in that team to clear their team reference in roles array
                 await User.updateMany(
@@ -1821,7 +1841,7 @@ exports.deleteStudent = async (req, res) => {
                         }
                     }
                 );
-                // Reset lockApproved to false for all remaining members so they must re-approve locking
+                // Reset lockApproved to false for all remaining members
                 await Team.updateOne(
                     { _id: team._id },
                     { $set: { 'memberStatus.$[].lockApproved': false } }
@@ -1830,8 +1850,8 @@ exports.deleteStudent = async (req, res) => {
         }
 
         // Clean student-specific data
-        try { await Mark.deleteMany({ student: studentId }); } catch (e) { }
-        try { await Attendance.updateMany({}, { $pull: { 'studentAttendances': { student: studentId } } }); } catch (e) { }
+        try { await Mark.deleteMany({ student: studentId, ...sessionFilter }); } catch (e) { }
+        try { await Attendance.updateMany(sessionFilter, { $pull: { 'studentAttendances': { student: studentId } } }); } catch (e) { }
 
         // Finally delete the user
         await User.deleteOne({ _id: studentId });
@@ -1846,13 +1866,14 @@ exports.deleteStudent = async (req, res) => {
 exports.checkStudentDeletion = async (req, res) => {
     try {
         const { regno } = req.params;
-        const user = await User.findOne({ username: regno });
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        const user = await User.findOne({ username: regno, ...sessionFilter });
         if (!user) {
             return res.status(404).json({ message: 'Student not found' });
         }
 
         const studentId = user._id;
-        const team = await Team.findOne({ $or: [{ teamLeader: studentId }, { members: studentId }] });
+        const team = await Team.findOne({ $or: [{ teamLeader: studentId }, { members: studentId }], ...sessionFilter });
 
         if (team) {
             const isLeader = team.teamLeader && team.teamLeader.toString() === studentId.toString();
@@ -1880,7 +1901,11 @@ exports.checkStudentDeletion = async (req, res) => {
 exports.checkFacultyDeletion = async (req, res) => {
     try {
         const { facultyId } = req.params;
-        const user = await User.findOne({ $or: [{ username: facultyId }, { email: facultyId }] });
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        const user = await User.findOne({
+            $or: [{ username: facultyId }, { email: facultyId }, { _id: facultyId.match(/^[0-9a-fA-F]{24}$/) ? facultyId : null }],
+            ...sessionFilter
+        });
         if (!user) {
             return res.status(404).json({ message: 'Faculty member not found' });
         }
@@ -1893,10 +1918,10 @@ exports.checkFacultyDeletion = async (req, res) => {
         const facultyObjectId = user._id;
 
         // Count teams guided
-        const guidedTeamsCount = await Team.countDocuments({ guidePreference: facultyObjectId });
+        const guidedTeamsCount = await Team.countDocuments({ guidePreference: facultyObjectId, ...sessionFilter });
 
         // Find coordinated panels
-        const coordinatedPanels = await Panel.find({ coordinator: facultyObjectId }).select('name');
+        const coordinatedPanels = await Panel.find({ coordinator: facultyObjectId, ...sessionFilter }).select('name');
         const coordinatedPanelNames = coordinatedPanels.map(p => p.name);
 
         // Find other panel memberships
@@ -1904,7 +1929,8 @@ exports.checkFacultyDeletion = async (req, res) => {
             $and: [
                 { coordinator: { $ne: facultyObjectId } },
                 { $or: [{ members: facultyObjectId }, { assistantCoordinators: facultyObjectId }] }
-            ]
+            ],
+            ...sessionFilter
         }).select('name');
         const memberOrAssistPanelNames = memberOrAssistPanels.map(p => p.name);
 
@@ -1922,13 +1948,16 @@ exports.checkFacultyDeletion = async (req, res) => {
     }
 };
 
-// Get all faculty
+// Get all faculty for current session
 exports.getAllFaculty = async (req, res) => {
     try {
         const includeExternal = String(req.query.includeExternal || '').toLowerCase() === 'true';
         const match = { 'roles.role': { $in: ['guide', 'panel', 'coordinator'] } };
         if (!includeExternal) {
             match.memberType = 'internal';
+        }
+        if (req.sessionId) {
+            match.session = req.sessionId;
         }
         const faculty = await User.find(match)
             .select('username name roles memberType email designation affiliation contactNumber seniority')
@@ -1944,15 +1973,17 @@ exports.getAllFaculty = async (req, res) => {
 exports.getUnassignedCoordinators = async (req, res) => {
     try {
         const Panel = require('../models/Panel');
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
 
-        // Get all coordinators
+        // Get all coordinators in this session
         const coordinators = await User.find({
             'roles.role': 'coordinator',
-            'memberType': 'internal'
+            'memberType': 'internal',
+            ...sessionFilter
         }).select('username name _id');
 
-        // Get all panels with coordinators
-        const panels = await Panel.find({ coordinator: { $ne: null } })
+        // Get all panels with coordinators in this session
+        const panels = await Panel.find({ coordinator: { $ne: null }, ...sessionFilter })
             .select('coordinator');
 
         const assignedCoordinatorIds = panels.map(p => p.coordinator.toString());
@@ -1969,10 +2000,11 @@ exports.getUnassignedCoordinators = async (req, res) => {
     }
 };
 
-// Get all students
+// Get all students for current session
 exports.getAllStudents = async (req, res) => {
     try {
         const query = { 'roles.role': 'student' };
+        if (req.sessionId) query.session = req.sessionId;
         if (req.query.programme) query.programme = req.query.programme;
         // Ensure email is returned for students so frontend can show the registered email (if any)
         const students = await User.find(query, 'username name roles email programme');
@@ -1983,12 +2015,15 @@ exports.getAllStudents = async (req, res) => {
     }
 };
 
-// Admin: Delete all faculty members and clean all related data
+// Admin: Delete all faculty members and clean all related data in current session
 exports.deleteAllFaculty = async (req, res) => {
     try {
-        // Find all faculty users
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+
+        // Find all faculty users in this session
         const faculty = await User.find({
-            'roles.role': { $in: ['guide', 'panel', 'coordinator'] }
+            'roles.role': { $in: ['guide', 'panel', 'coordinator'] },
+            ...sessionFilter
         }).select('_id username');
 
         if (!faculty || faculty.length === 0) {
@@ -1997,30 +2032,29 @@ exports.deleteAllFaculty = async (req, res) => {
 
         const facultyIds = faculty.map(f => f._id);
 
-        // 1) Delete ALL teams (since all guides will be deleted)
-        const allTeams = await Team.find({}).select('_id');
+        // 1) Delete teams in this session
+        const allTeams = await Team.find(sessionFilter).select('_id');
         const allTeamIds = allTeams.map(t => t._id);
 
         if (allTeamIds.length > 0) {
-            // Cascade delete all team-related data
+            // Cascade delete team-related data in this session
             try { await TimeTable.deleteMany({ team: { $in: allTeamIds } }); } catch (e) { }
             try { await Mark.deleteMany({ team: { $in: allTeamIds } }); } catch (e) { }
             try { await Attendance.deleteMany({ team: { $in: allTeamIds } }); } catch (e) { }
             try { const FinalReport = require('../models/FinalReport'); await FinalReport.deleteMany({ team: { $in: allTeamIds } }); } catch (e) { }
-            try { const TeamPanelAssignment = require('../models/TeamPanelAssignment'); await TeamPanelAssignment.deleteMany({}); } catch (e) { }
-            await Team.deleteMany({});
+            try { const TeamPanelAssignment = require('../models/TeamPanelAssignment'); await TeamPanelAssignment.deleteMany(sessionFilter); } catch (e) { }
+            await Team.deleteMany(sessionFilter);
         }
 
-        // 2) Delete all panels (since all panel members will be deleted)
-        await Panel.deleteMany({});
+        // 2) Delete all panels in this session
+        await Panel.deleteMany(sessionFilter);
 
-        // 3) Clean up all faculty-related data
-        try { await Availability.deleteMany({ user: { $in: facultyIds } }); } catch (e) { }
+        // 3) Clean up faculty-related data in this session
         try { await Mark.deleteMany({ markedBy: { $in: facultyIds } }); } catch (e) { }
         try { const FinalReport = require('../models/FinalReport'); await FinalReport.updateMany({ approvedBy: { $in: facultyIds } }, { $set: { approvedBy: null } }); } catch (e) { }
         try { await TimeTable.updateMany({ slotAssignedBy: { $in: facultyIds } }, { $set: { slotAssignedBy: null } }); } catch (e) { }
 
-        // 4) Finally delete all faculty users
+        // 4) Finally delete all faculty users in this session
         const result = await User.deleteMany({ _id: { $in: facultyIds } });
 
         res.json({
@@ -2033,22 +2067,22 @@ exports.deleteAllFaculty = async (req, res) => {
     }
 };
 
-// Admin: Delete all teams and related assignments/schedules
+// Admin: Delete all teams and related assignments/schedules in current session
 exports.deleteAllTeams = async (req, res) => {
     try {
-        // Clear team references in schedules and delete schedules
-        await TimeTable.deleteMany({});
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
 
-        // Remove all panel assignments linking teams
+        // Clear team references in schedules and delete schedules for this session
+        await TimeTable.deleteMany(sessionFilter);
+
+        // Remove panel assignments linking teams
         try {
             const TeamPanelAssignment = require('../models/TeamPanelAssignment');
-            await TeamPanelAssignment.deleteMany({});
-        } catch (e) {
-            // If model not present, ignore
-        }
+            await TeamPanelAssignment.deleteMany(sessionFilter);
+        } catch (e) { }
 
-        // Finally delete teams
-        await Team.deleteMany({});
+        // Finally delete teams in this session
+        await Team.deleteMany(sessionFilter);
 
         res.json({ message: 'All teams and related assignments were deleted successfully' });
     } catch (error) {
@@ -2057,10 +2091,14 @@ exports.deleteAllTeams = async (req, res) => {
     }
 };
 
-// Admin: Delete solo teams (teams with no members)
+// Admin: Delete solo teams (teams with no members) in current session
 exports.deleteSoloTeams = async (req, res) => {
     try {
-        const soloTeams = await Team.find({ $or: [{ members: { $size: 0 } }, { members: { $exists: false } }] });
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        const soloTeams = await Team.find({
+            $or: [{ members: { $size: 0 } }, { members: { $exists: false } }],
+            ...sessionFilter
+        });
         const soloTeamIds = soloTeams.map(t => t._id);
         if (soloTeamIds.length === 0) {
             return res.json({ message: 'No solo teams found', deleted: 0 });
@@ -2073,7 +2111,7 @@ exports.deleteSoloTeams = async (req, res) => {
         } catch (e) { }
         try {
             const TeamPanelAssignment = require('../models/TeamPanelAssignment');
-            await TeamPanelAssignment.updateMany({}, { $pull: { teams: { $in: soloTeamIds } } });
+            await TeamPanelAssignment.updateMany(sessionFilter, { $pull: { teams: { $in: soloTeamIds } } });
         } catch (e) { }
 
         const result = await Team.deleteMany({ _id: { $in: soloTeamIds } });
@@ -2084,27 +2122,29 @@ exports.deleteSoloTeams = async (req, res) => {
     }
 };
 
-// Admin: Delete all students and clean team references
+// Admin: Delete all students and clean team references in current session
 exports.deleteAllStudents = async (req, res) => {
     try {
-        // Find all student users
-        const students = await User.find({ 'roles.role': 'student' }).select('_id username');
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+
+        // Find all student users in this session
+        const students = await User.find({ 'roles.role': 'student', ...sessionFilter }).select('_id username');
         if (!students || students.length === 0) {
             return res.json({ message: 'No students found', deleted: 0 });
         }
 
         const studentIds = students.map(s => s._id);
 
-        // Remove students from teams (members) and clear teamLeader if a student
+        // Remove students from teams (members) and clear teamLeader if a student in this session
         await Team.updateMany(
-            {},
+            sessionFilter,
             {
                 $pull: { members: { $in: studentIds } },
             }
         );
 
         await Team.updateMany(
-            { teamLeader: { $in: studentIds } },
+            { teamLeader: { $in: studentIds }, ...sessionFilter },
             { $set: { teamLeader: null } }
         );
 
@@ -2124,7 +2164,8 @@ function escapeRegex(value) {
 
 exports.getDesignationTeamLimits = async (req, res) => {
     try {
-        const limits = await DesignationTeamLimit.find({}).sort({ designation: 1 });
+        const query = req.sessionId ? { session: req.sessionId } : {};
+        const limits = await DesignationTeamLimit.find(query).sort({ designation: 1 });
         res.json(limits);
     } catch (error) {
         console.error('Error fetching designation team limits:', error);
@@ -2164,11 +2205,17 @@ exports.saveDesignationTeamLimits = async (req, res) => {
             }
 
             // Use lowercase key so duplicate designations (any casing) overwrite each other
-            deduped.set(designation.toLowerCase(), { designation, ugLimit, pgLimit });
+            deduped.set(designation.toLowerCase(), {
+                designation,
+                ugLimit,
+                pgLimit,
+                session: req.sessionId || null
+            });
         }
 
-        // Clear existing limits and insert the clean, deduplicated set
-        await DesignationTeamLimit.deleteMany({});
+        // Clear existing limits for THIS session and insert the clean, deduplicated set
+        const sessionDeleteQuery = req.sessionId ? { session: req.sessionId } : {};
+        await DesignationTeamLimit.deleteMany(sessionDeleteQuery);
 
         const toInsert = Array.from(deduped.values());
         let saved = [];
@@ -2194,9 +2241,12 @@ exports.deleteDesignationTeamLimit = async (req, res) => {
             return res.status(400).json({ message: 'Designation is required' });
         }
 
-        const deleted = await DesignationTeamLimit.findOneAndDelete({
-            designation: { $regex: new RegExp(`^${escapeRegex(designation)}$`, 'i') }
-        });
+        const deleteQuery = {
+            designation: { $regex: new RegExp(`^${escapeRegex(designation)}$`, 'i') },
+            ...(req.sessionId ? { session: req.sessionId } : {})
+        };
+
+        const deleted = await DesignationTeamLimit.findOneAndDelete(deleteQuery);
 
         if (!deleted) {
             return res.status(404).json({ message: 'Designation team limit not found' });
@@ -2211,7 +2261,8 @@ exports.deleteDesignationTeamLimit = async (req, res) => {
 
 exports.deleteAllDesignationTeamLimits = async (req, res) => {
     try {
-        const result = await DesignationTeamLimit.deleteMany({});
+        const sessionDeleteQuery = req.sessionId ? { session: req.sessionId } : {};
+        const result = await DesignationTeamLimit.deleteMany(sessionDeleteQuery);
         res.json({
             message: `All designation team limits deleted successfully (${result.deletedCount} removed)`,
             deleted: result.deletedCount

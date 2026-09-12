@@ -57,8 +57,9 @@ const AdminDashboard = () => {
 
                         {/* Session programmes list */}
                         <Route path="session/:sessionId" element={<AdminSessionProgrammes />} />
+                        <Route path="session/:sessionId/global-management" element={<GlobalManagement />} />
 
-                        {/* Global management (faculty + designation limits + programmes) */}
+                        {/* Global management fallback */}
                         <Route path="global-management" element={<GlobalManagement />} />
 
                         {/* Legacy Registration route for backward compat */}

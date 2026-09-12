@@ -144,6 +144,12 @@ app.listen(PORT, () => {
         try {
             await mongoose.connection.db.collection('designationteamlimits').dropIndex('designation_1_programmeType_1');
         } catch (e) {}
+        try {
+            await mongoose.connection.db.collection('programmes').dropIndex('name_1');
+        } catch (e) {}
+        try {
+            await mongoose.connection.db.collection('users').dropIndex('username_1');
+        } catch (e) {}
 
         const User = require('./models/User');
         const bcrypt = require('bcryptjs');

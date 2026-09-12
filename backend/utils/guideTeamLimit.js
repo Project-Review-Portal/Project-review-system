@@ -1,9 +1,12 @@
 const Team = require('../models/Team');
 const DesignationTeamLimit = require('../models/DesignationTeamLimit');
 
-async function buildDesignationLimitMap(programmeType) {
+const mongoose = require('mongoose');
+
+async function buildDesignationLimitMap(programmeType, sessionId = null) {
     const progType = programmeType || 'B.E. CSE';
-    const limits = await DesignationTeamLimit.find({});
+    const query = sessionId ? { session: sessionId } : {};
+    const limits = await DesignationTeamLimit.find(query);
     const map = new Map();
     for (const entry of limits) {
         const isBE = progType === 'UG' || progType === 'B.E COMPUTER SCIENCE AND ENGINEERING' || progType === 'B.E. CSE';
@@ -13,7 +16,7 @@ async function buildDesignationLimitMap(programmeType) {
     return map;
 }
 
-async function getTeamCountsByGuideIds(guideIds, programmeType) {
+async function getTeamCountsByGuideIds(guideIds, programmeType, sessionId = null) {
     if (!guideIds.length) {
         return new Map();
     }
@@ -24,12 +27,15 @@ async function getTeamCountsByGuideIds(guideIds, programmeType) {
         ? { programme: 'B.E. CSE' } 
         : { programme: { $ne: 'B.E. CSE' } };
 
+    const sessionMatch = sessionId ? { session: new mongoose.Types.ObjectId(sessionId) } : {};
+
     const counts = await Team.aggregate([
         {
             $match: {
                 guidePreference: { $in: guideIds },
                 status: 'approved', // Only accepted teams count toward the limit
-                ...programmeQuery
+                ...programmeQuery,
+                ...sessionMatch
             }
         },
         {

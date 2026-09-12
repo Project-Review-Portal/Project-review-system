@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import UserManagement from './UserManagement';
 import ProgrammeManagement from './ProgrammeManagement';
 
@@ -10,13 +10,41 @@ const TABS = [
 
 const GlobalManagement = () => {
     const [activeTab, setActiveTab] = useState('faculty');
+    const { sessionId } = useParams();
     const navigate = useNavigate();
 
+    const storedSessionId = sessionId || localStorage.getItem('selectedSessionId');
+    const storedSessionName = localStorage.getItem('selectedSessionName');
+
+    const handleBack = () => {
+        if (storedSessionId) {
+            navigate(`/admin-dashboard/session/${storedSessionId}`);
+        } else {
+            navigate('/admin-dashboard');
+        }
+    };
+
     return (
-        <div>
+        <div className="max-w-6xl mx-auto py-6 px-4">
+            <div className="mb-6 flex items-center justify-between">
+                <button
+                    onClick={handleBack}
+                    className="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-white px-3 py-1.5 rounded-md border shadow-sm transition"
+                >
+                    ← Back to Session Programmes
+                </button>
+                {storedSessionName && (
+                    <span className="px-3 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                        🗓️ {storedSessionName}
+                    </span>
+                )}
+            </div>
+
             <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-800 mb-1">Global Management</h2>
-                <p className="text-gray-500 text-sm">Manage shared resources across all programmes.</p>
+                <h2 className="text-2xl font-bold text-gray-800 mb-1">
+                    Global Management {storedSessionName ? `(${storedSessionName})` : ''}
+                </h2>
+                <p className="text-gray-500 text-sm">Manage faculty lists, designation limits, and PG programmes for this session.</p>
             </div>
 
             {/* Tab Bar */}

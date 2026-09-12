@@ -242,18 +242,6 @@ const AdminHome = () => {
                     </button>
                 </div>
 
-                {/* Global Management - Unchanged as requested */}
-                <div className="mb-8">
-                    <h2 className="text-sm font-semibold uppercase tracking-widest text-indigo-500 mb-3">Global Management</h2>
-                    <ListItem
-                        title="Global Management"
-                        subtitle="Faculty · Designation Limits · PG Programmes Master List"
-                        icon="🌐"
-                        color="bg-white border-gray-200 hover:border-indigo-300"
-                        onClick={() => navigate('/admin-dashboard/global-management')}
-                    />
-                </div>
-
                 {/* Sessions Section - Replaces PG programmes */}
                 <div>
                     <div className="flex justify-between items-center mb-4">

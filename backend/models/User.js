@@ -3,8 +3,7 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema({
     username: {
         type: String,
-        required: true,
-        unique: true
+        required: true
     },
     name: {
         type: String,
@@ -98,5 +97,6 @@ const userSchema = new mongoose.Schema({
 
 // Drop the unique index on email if it exists
 userSchema.index({ email: 1 }, { unique: false });
+userSchema.index({ username: 1, session: 1 }, { unique: true });
 
 module.exports = mongoose.model('User', userSchema);

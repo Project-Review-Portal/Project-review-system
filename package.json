@@ -1,4 +1,6 @@
 {
+  "name": "project-review-system",
+  "version": "1.0.0",
   "dependencies": {
     "axios": "^1.10.0",
     "docx": "^9.5.1",
@@ -9,6 +11,8 @@
     "fe": "cd frontend && npm start",
     "be": "cd backend && npm run dev",
     "update": "node updateDB.cjs",
+    "seed:clean": "node backend/scripts/resetAndSeedCleanData.js",
+    "test:sessions": "playwright test tests/e2e/session_lifecycle_flow.spec.js --headed",
     "test:e2e": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui"
   },
