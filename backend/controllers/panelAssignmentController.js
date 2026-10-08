@@ -1,11 +1,13 @@
 const TeamPanelAssignment = require('../models/TeamPanelAssignment');
 const Panel = require('../models/Panel');
 const Team = require('../models/Team');
+const mongoose = require('mongoose');
 
 // Get all panel assignments
 exports.getAllAssignments = async (req, res) => {
     try {
-        const assignments = await TeamPanelAssignment.find()
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        const assignments = await TeamPanelAssignment.find(sessionFilter)
             .populate('panel', 'name members')
             .populate({
                 path: 'teams',
@@ -24,24 +26,25 @@ exports.getAllAssignments = async (req, res) => {
 // Auto-assign panels to all unassigned approved teams
 exports.autoAssignPanels = async (req, res) => {
     try {
-        // Get all approved teams with no panel assigned
-        const teams = await Team.find({ panel: null, status: 'approved' })
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+
+        // Get all approved teams with no panel assigned in current session
+        const teams = await Team.find({ panel: null, status: 'approved', ...sessionFilter })
             .populate('guidePreference', 'username name _id');
-        console.log('----------------')
-        console.log(teams)
 
         if (!teams || teams.length === 0) {
             return res.json({ message: 'No unassigned approved teams found', assignedCount: 0, skipped: [] });
         }
 
-        // Get all panels with members and coordinator
-        const panels = await Panel.find()
+        // Get all panels with members and coordinator in current session
+        const panels = await Panel.find(sessionFilter)
             .populate('members', 'username name _id')
             .populate('coordinator', 'username name _id');
 
-        // Build current team counts per panel using aggregation
+        // Build current team counts per panel using aggregation scoped to session
+        const sessionMatch = req.sessionId ? { session: new mongoose.Types.ObjectId(req.sessionId) } : {};
         const countsAgg = await Team.aggregate([
-            { $match: { panel: { $ne: null } } },
+            { $match: { panel: { $ne: null }, ...sessionMatch } },
             { $group: { _id: '$panel', count: { $sum: 1 } } }
         ]);
         const panelCountMap = new Map(countsAgg.map(c => [String(c._id), c.count]));
@@ -79,7 +82,7 @@ exports.autoAssignPanels = async (req, res) => {
             await team.save();
 
             // Update TeamPanelAssignment mapping
-            let assignment = await TeamPanelAssignment.findOne({ panel: chosen._id });
+            let assignment = await TeamPanelAssignment.findOne({ panel: chosen._id, ...sessionFilter });
             if (assignment) {
                 const exists = assignment.teams.some(tid => String(tid) === String(team._id));
                 if (!exists) {
@@ -87,7 +90,11 @@ exports.autoAssignPanels = async (req, res) => {
                     await assignment.save();
                 }
             } else {
-                assignment = new TeamPanelAssignment({ panel: chosen._id, teams: [team._id] });
+                assignment = new TeamPanelAssignment({ 
+                    panel: chosen._id, 
+                    teams: [team._id],
+                    session: req.sessionId || team.session || null
+                });
                 await assignment.save();
             }
 
@@ -113,9 +120,11 @@ exports.autoAssignPanels = async (req, res) => {
 // Get all panels and teams for assignment
 exports.getPanelsAndTeams = async (req, res) => {
     try {
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+
         // Populate members to get username, name, and memberType for display
-        const panels = await Panel.find().populate('members', 'username name memberType');
-        let teams = await Team.find()
+        const panels = await Panel.find(sessionFilter).populate('members', 'username name memberType');
+        let teams = await Team.find(sessionFilter)
             .populate('members', 'username name')
             .populate('teamLeader', 'username name')
             .populate('guidePreference', 'username name');
@@ -123,8 +132,6 @@ exports.getPanelsAndTeams = async (req, res) => {
         // Only include formed teams: must have a leader and at least one member
         teams = teams.filter(team => team.teamLeader && Array.isArray(team.members) && team.members.length > 0);
 
-        console.log('Fetched and filtered teams:', teams); // Debug log
-        
         res.json({ panels, teams });
     } catch (error) {
         console.error('Error fetching panels and teams:', error);
@@ -136,19 +143,21 @@ exports.getPanelsAndTeams = async (req, res) => {
 exports.createAssignments = async (req, res) => {
     try {
         const { assignments } = req.body; // Array of { panelId, teamIds }
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
         
-        // Clear existing assignments
-        await TeamPanelAssignment.deleteMany({});
+        // Clear existing assignments for THIS session only
+        await TeamPanelAssignment.deleteMany(sessionFilter);
 
-        // Clear panel assignments from all teams first
-        await Team.updateMany({}, { $unset: { panel: 1 } });
+        // Clear panel assignments from teams for THIS session only
+        await Team.updateMany(sessionFilter, { $unset: { panel: 1 } });
         
         // Create new assignments and update teams
         const newAssignments = await Promise.all(
             assignments.map(async ({ panelId, teamIds }) => {
                 const assignment = new TeamPanelAssignment({
                     panel: panelId,
-                    teams: teamIds
+                    teams: teamIds,
+                    session: req.sessionId || null
                 });
                 await assignment.save();
 
@@ -158,7 +167,7 @@ exports.createAssignments = async (req, res) => {
                 // Update each team with the assigned panel and coordinator
                 await Team.updateMany(
                     { _id: { $in: teamIds } },
-                    { $set: { panel: panelId, coordinator: panel.coordinator } }
+                    { $set: { panel: panelId, coordinator: panel ? panel.coordinator : null } }
                 );
 
                 return assignment;
@@ -178,9 +187,11 @@ exports.createAssignments = async (req, res) => {
 // Get teams without panels for manual assignment
 exports.getUnassignedTeams = async (req, res) => {
     try {
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
         const teams = await Team.find({ 
             panel: null,
-            status: 'approved' // Only show approved teams
+            status: 'approved',
+            ...sessionFilter
         })
         .populate('teamLeader', 'username name')
         .populate('members', 'username name')
@@ -206,13 +217,15 @@ exports.getAvailablePanelsForTeam = async (req, res) => {
             return res.status(404).json({ message: 'Team not found' });
         }
         
-        // Get all panels
-        const allPanels = await Panel.find()
+        // Get all panels within the same session
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : (team?.session ? { session: team.session } : {});
+        const allPanels = await Panel.find(sessionFilter)
             .populate('members', 'username name _id')
             .populate('coordinator', 'username name _id');
         
         // Filter panels to exclude those with conflicts
         const availablePanels = allPanels.filter(panel => {
+            if (!team.guidePreference) return true;
             // Check if team's guide is in the panel
             const guideInPanel = panel.members.some(member => 
                 member._id.toString() === team.guidePreference._id.toString()
@@ -241,20 +254,16 @@ exports.assignPanelToTeam = async (req, res) => {
         // Validate team exists
         const team = await Team.findById(teamId)
             .populate('guidePreference', 'username name _id');
-        
-        console.log('-----team----')
-        console.log(team)
 
         if (!team) {
             return res.status(404).json({ message: 'Team not found' });
         }
         
         // Check whether the team has already assigned a panel
-        const isSamePanel = team.panel && team.panel.toString() === panelId
+        const isSamePanel = team.panel && team.panel.toString() === panelId;
         if(isSamePanel){
-            return res.status(404).json({ message: 'Assingning the same panel '})
+            return res.status(404).json({ message: 'Assigning the same panel' });
         }
-        // console.log({teampanel : team.panel, type : typeof(team.panel), panelId, isSamePanel})
 
         // Validate panel exists
         const panel = await Panel.findById(panelId)
@@ -266,40 +275,33 @@ exports.assignPanelToTeam = async (req, res) => {
         }
         
         // Check for conflicts
-        const guideInPanel = panel.members.some(member => 
-            member._id.toString() === team.guidePreference._id.toString()
-        );
-        
-        const guideIsCoordinator = panel.coordinator && 
-            panel.coordinator._id.toString() === team.guidePreference._id.toString();
-        
-        if (guideInPanel || guideIsCoordinator) {
-            return res.status(400).json({ 
-                message: 'Cannot assign panel: Team guide is already a member or coordinator of this panel' 
-            });
+        if (team.guidePreference) {
+            const guideInPanel = panel.members.some(member => 
+                member._id.toString() === team.guidePreference._id.toString()
+            );
+            
+            const guideIsCoordinator = panel.coordinator && 
+                panel.coordinator._id.toString() === team.guidePreference._id.toString();
+            
+            if (guideInPanel || guideIsCoordinator) {
+                return res.status(400).json({ 
+                    message: 'Cannot assign panel: Team guide is already a member or coordinator of this panel' 
+                });
+            }
         }
 
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : (team?.session ? { session: team.session } : {});
 
-        // Allowing teams to change panel even if it assigned one! 
-        
-        /* // Check if team already has a panel
-        if (team.panel) {
-            console.log('team panel err') // displays in terminal - if a team has a panel already assigned, this err wil throw
-            return res.status(400).json({ message: 'Team already has a panel assigned' });
-        }
-         */
-        
-
-        // Pull the team from any existing panel assignments first
-        await TeamPanelAssignment.updateMany({}, { $pull: { teams: teamId } });
+        // Pull the team from any existing panel assignments for this session first
+        await TeamPanelAssignment.updateMany(sessionFilter, { $pull: { teams: teamId } });
 
         // Assign panel and coordinator to team
         team.panel = panelId;
-        team.coordinator = panel.coordinator; // Assign the panel's coordinator to the team
+        team.coordinator = panel.coordinator;
         await team.save();
         
-        // Check if there's an existing assignment for this panel
-        let assignment = await TeamPanelAssignment.findOne({ panel: panelId });
+        // Check if there's an existing assignment for this panel in this session
+        let assignment = await TeamPanelAssignment.findOne({ panel: panelId, ...sessionFilter });
         
         if (assignment) {
             // Add team to existing assignment
@@ -311,7 +313,8 @@ exports.assignPanelToTeam = async (req, res) => {
             // Create new assignment
             assignment = new TeamPanelAssignment({
                 panel: panelId,
-                teams: [teamId]
+                teams: [teamId],
+                session: req.sessionId || team.session || null
             });
             await assignment.save();
         }
@@ -341,13 +344,17 @@ exports.removePanelFromTeam = async (req, res) => {
             return res.status(400).json({ message: 'Team has no panel assigned' });
         }
         
+        const oldPanelId = team.panel;
+
         // Remove panel and coordinator from team
         team.panel = null;
         team.coordinator = null;
         await team.save();
         
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : (team?.session ? { session: team.session } : {});
+
         // Update or remove assignment
-        const assignment = await TeamPanelAssignment.findOne({ panel: team.panel });
+        const assignment = await TeamPanelAssignment.findOne({ panel: oldPanelId, ...sessionFilter });
         if (assignment) {
             assignment.teams = assignment.teams.filter(id => id.toString() !== teamId);
             if (assignment.teams.length === 0) {

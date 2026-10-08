@@ -313,7 +313,11 @@ exports.getProfile = async (req, res) => {
 // Admin: Get all users
 exports.getAllUsers = async (req, res) => {
     try {
-        const users = await User.find().select('-password'); // Exclude password
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        let users = await User.find(sessionFilter).select('-password'); // Exclude password
+        if (users.length === 0 && req.sessionId) {
+            users = await User.find({ session: { $in: [null, undefined] } }).select('-password');
+        }
         res.json(users);
     } catch (error) {
         console.error('Error fetching users:', error);
@@ -411,7 +415,7 @@ exports.getReviewSettings = async (req, res) => {
     try {
         const { getReviewSettings } = require('../utils/reviewSettings');
         const programme = req.headers['x-selected-programme'] || (req.user ? req.user.programme : null);
-        const settings = await getReviewSettings(programme);
+        const settings = await getReviewSettings(programme, req.sessionId);
         return res.json(settings);
     } catch (error) {
         console.error('Error fetching review settings:', error);

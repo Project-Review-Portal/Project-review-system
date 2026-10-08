@@ -17,12 +17,24 @@ const buildTeamQuery = async (req) => {
     const mongoose = require('mongoose');
 
     let query = { status: 'approved' };
+    if (req.sessionId) {
+        query.session = req.sessionId;
+    }
 
     if (role === 'coordinator' || role === 'assistant coordinator') {
         const selectedPanelId = req.headers['x-selected-panel-id'];
         let panel;
         if (selectedPanelId && mongoose.Types.ObjectId.isValid(selectedPanelId)) {
-            panel = await Panel.findOne({
+            const panelQuery = {
+                _id: selectedPanelId,
+                panelType: 'review',
+                $or: [
+                    { coordinator: userId },
+                    { assistantCoordinators: userId }
+                ]
+            };
+            if (req.sessionId) panelQuery.session = req.sessionId;
+            panel = await Panel.findOne(panelQuery) || await Panel.findOne({
                 _id: selectedPanelId,
                 panelType: 'review',
                 $or: [
@@ -38,7 +50,16 @@ const buildTeamQuery = async (req) => {
             if (cleanProg.toLowerCase() === 'ug' || cleanProg === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
                 cleanProg = 'B.E. CSE';
             }
-            panel = await Panel.findOne({
+            const panelQuery = {
+                panelType: 'review',
+                $or: [
+                    { coordinator: userId },
+                    { assistantCoordinators: userId }
+                ],
+                programme: cleanProg
+            };
+            if (req.sessionId) panelQuery.session = req.sessionId;
+            panel = await Panel.findOne(panelQuery) || await Panel.findOne({
                 panelType: 'review',
                 $or: [
                     { coordinator: userId },
@@ -61,7 +82,12 @@ const buildTeamQuery = async (req) => {
         if (cleanProg.toLowerCase() === 'ug' || cleanProg === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
             cleanProg = 'B.E. CSE';
         }
-        const panels = await Panel.find({ members: userId, programme: cleanProg });
+        const panelQuery = { members: userId, programme: cleanProg };
+        if (req.sessionId) panelQuery.session = req.sessionId;
+        let panels = await Panel.find(panelQuery);
+        if (panels.length === 0 && req.sessionId) {
+            panels = await Panel.find({ members: userId, programme: cleanProg });
+        }
         if (panels.length === 0) {
             query._id = null;
         } else {
@@ -97,10 +123,13 @@ exports.getGuideRequests = async (req, res) => {
         const guide = await User.findById(guideId);
         console.log('Guide found in database:', guide ? 'Yes' : 'No');
 
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+
         // Get all teams with this guide as preference (both pending and approved)
         const requests = await Team.find({
             guidePreference: guideId,
-            status: { $in: ['pending', 'approved'] }
+            status: { $in: ['pending', 'approved'] },
+            ...sessionFilter
         })
         .populate({
             path: 'teamLeader',
@@ -232,13 +261,14 @@ exports.rejectRequest = async (req, res) => {
 exports.getMyTeams = async (req, res) => {
     try {
         const guideId = req.user.id;
-        console.log('=== My Teams Debug ===');
-        console.log('Guide ID from token:', guideId);
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        console.log('=== My Teams Debug ===', 'guideId:', guideId, 'session:', req.sessionId);
 
         // Get all teams where this guide is the assigned guide
-        const teams = await Team.find({
+        let teams = await Team.find({
             guidePreference: guideId,
-            status: 'approved'
+            status: 'approved',
+            ...sessionFilter
         })
         .populate({
             path: 'teamLeader',
@@ -251,8 +281,24 @@ exports.getMyTeams = async (req, res) => {
             model: 'User'
         });
 
+        if ((!teams || teams.length === 0) && req.sessionId) {
+            teams = await Team.find({
+                guidePreference: guideId,
+                status: 'approved'
+            })
+            .populate({
+                path: 'teamLeader',
+                select: 'username name',
+                model: 'User'
+            })
+            .populate({
+                path: 'members',
+                select: 'username name',
+                model: 'User'
+            });
+        }
+
         console.log('Teams found:', teams.length);
-        console.log('Teams data:', JSON.stringify(teams, null, 2));
         console.log('=== End My Teams Debug ===');
 
         res.json(teams);
@@ -265,11 +311,13 @@ exports.getMyTeams = async (req, res) => {
 // Get approved teams with their panel assignments
 exports.getApprovedTeams = async (req, res) => {
     try {
-        console.log('Fetching approved teams for guide:', req.user.id);
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        console.log('Fetching approved teams for guide:', req.user.id, 'session:', req.sessionId);
         
-        const teams = await Team.find({
+        let teams = await Team.find({
             guidePreference: req.user.id,
-            status: 'approved'
+            status: 'approved',
+            ...sessionFilter
         })
         .populate({
             path: 'teamLeader',
@@ -292,7 +340,34 @@ exports.getApprovedTeams = async (req, res) => {
             model: 'Panel'
         });
 
-        console.log('Found teams:', teams.length);
+        if ((!teams || teams.length === 0) && req.sessionId) {
+            teams = await Team.find({
+                guidePreference: req.user.id,
+                status: 'approved'
+            })
+            .populate({
+                path: 'teamLeader',
+                select: 'username name',
+                model: 'User'
+            })
+            .populate({
+                path: 'members',
+                select: 'username name',
+                model: 'User'
+            })
+            .populate({
+                path: 'panel',
+                select: 'name members',
+                model: 'Panel'
+            })
+            .populate({
+                path: 'vivaPanel',
+                select: 'name members',
+                model: 'Panel'
+            });
+        }
+
+        console.log('Found teams:', teams ? teams.length : 0);
         
         if (!teams || teams.length === 0) {
             return res.json([]); // Return empty array if no teams found
@@ -323,15 +398,6 @@ exports.requestTimeTable = async (req, res) => {
         // You might want to save this request to a TimeTable model or similar
         // For now, let's just log it or return a success message
         console.log(`Guide ${guideId} requested time table from ${startTime} to ${endTime}`);
-        
-        // Example: Save to TimeTable model (assuming a structure)
-        // const newTimeTableRequest = new TimeTable({
-        //     user: guideId,
-        //     startTime,
-        //     endTime,
-        //     type: 'guide-request'
-        // });
-        // await newTimeTableRequest.save();
 
         res.json({ message: 'Time table request submitted successfully!' });
 
@@ -376,10 +442,19 @@ exports.getGuideSelectionDatesPublic = async (req, res) => {
 exports.getGuideReviewSchedules = async (req, res) => {
     try {
         const guideId = req.user.id;
-        const teams = await Team.find({
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        let teams = await Team.find({
             guidePreference: guideId,
-            status: 'approved'
+            status: 'approved',
+            ...sessionFilter
         }).select('_id'); 
+
+        if (teams.length === 0 && req.sessionId) {
+            teams = await Team.find({
+                guidePreference: guideId,
+                status: 'approved'
+            }).select('_id');
+        }
 
         if (teams.length === 0) {
             return res.json([]); 
@@ -426,7 +501,13 @@ exports.getAssignedTeams = async (req, res) => {
             .populate('members', 'name username');
 
         const teamIds = teams.map(t => t._id);
-        const attendances = await Attendance.find({ team: { $in: teamIds } });
+        const attQuery = { team: { $in: teamIds } };
+        if (req.sessionId) attQuery.session = req.sessionId;
+        let attendances = await Attendance.find(attQuery);
+        if (req.sessionId && attendances.length === 0) {
+            delete attQuery.session;
+            attendances = await Attendance.find(attQuery);
+        }
         const attendanceMap = {};
         attendances.forEach(att => {
             attendanceMap[att.team.toString()] = att.isLocked;
@@ -449,11 +530,18 @@ exports.getAssignedTeams = async (req, res) => {
 exports.getGuidedTeamsForMarking = async (req, res) => {
     try {
         const guideId = req.user.id;
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
 
         // Query strictly for teams where this guide is assigned and status is approved
-        const teams = await Team.find({ guidePreference: guideId, status: 'approved' })
+        let teams = await Team.find({ guidePreference: guideId, status: 'approved', ...sessionFilter })
             .populate('teamLeader', 'name username rollNumber')
             .populate('members', 'name username rollNumber');
+
+        if ((!teams || teams.length === 0) && req.sessionId) {
+            teams = await Team.find({ guidePreference: guideId, status: 'approved' })
+                .populate('teamLeader', 'name username rollNumber')
+                .populate('members', 'name username rollNumber');
+        }
 
         res.json(teams);
     } catch (error) {
@@ -472,9 +560,13 @@ exports.getReviewPeriodDatesPublic = async (req, res) => {
             cleanProg = 'B.E. CSE';
         }
 
-        let config = await Config.findOne({ programme: cleanProg });
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        let config = await Config.findOne({ programme: cleanProg, ...sessionFilter });
+        if (!config && req.sessionId) {
+            config = await Config.findOne({ programme: cleanProg });
+        }
         if (!config) {
-            config = await Config.findOne();
+            config = await Config.findOne(sessionFilter) || await Config.findOne();
         }
         if (!config) {
             return res.status(404).json({ message: 'Review period dates not set' });
@@ -500,11 +592,17 @@ exports.getDailyAttendance = async (req, res) => {
         }
         const teamIds = teams.map(t => t._id);
 
-        const attendanceRecords = await Attendance.find({ team: { $in: teamIds } });
+        const attQuery = { team: { $in: teamIds } };
+        if (req.sessionId) attQuery.session = req.sessionId;
+        let attendanceRecords = await Attendance.find(attQuery);
+        if (req.sessionId && attendanceRecords.length === 0) {
+            delete attQuery.session;
+            attendanceRecords = await Attendance.find(attQuery);
+        }
 
         // Build the list of review keys dynamically from config
         const programme = req.headers['x-selected-programme'] || (req.user ? req.user.programme : null);
-        const { validSlotTypes } = await getReviewSettings(programme);
+        const { validSlotTypes } = await getReviewSettings(programme, req.sessionId);
 
         const formattedAttendance = {};
         for (const record of attendanceRecords) {
@@ -577,13 +675,15 @@ exports.uploadAttendance = async (req, res) => {
             return res.status(404).json({ message: 'Team not found or not approved.' });
         }
         
+        const attendanceSession = req.sessionId || team.session || null;
         await Attendance.findOneAndUpdate(
             { team: teamId },
             {
                 $set: {
                     studentAttendances: studentAttendances, 
                     reviewDates: reviewDates || [],
-                    guide: userId
+                    guide: userId,
+                    ...(attendanceSession ? { session: attendanceSession } : {})
                 }
             },
             { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -618,11 +718,13 @@ exports.lockAttendance = async (req, res) => {
             return res.status(404).json({ message: 'Team not found.' });
         }
 
+        const attendanceSession = req.sessionId || team.session || null;
         await Attendance.findOneAndUpdate(
             { team: teamId },
             {
                 $set: {
                     isLocked: true,
+                    ...(attendanceSession ? { session: attendanceSession } : {})
                 },
                 $setOnInsert: {
                     guide: userId,
@@ -660,11 +762,13 @@ exports.unlockAttendance = async (req, res) => {
             return res.status(404).json({ message: 'Team not found.' });
         }
 
+        const attendanceSession = req.sessionId || team.session || null;
         await Attendance.findOneAndUpdate(
             { team: teamId },
             {
                 $set: {
                     isLocked: false,
+                    ...(attendanceSession ? { session: attendanceSession } : {})
                 },
                 $setOnInsert: {
                     guide: userId,
@@ -687,7 +791,7 @@ exports.submitMarks = async (req, res) => {
         const { teamId, studentId, components, slotType } = req.body;
 
         const programme = req.headers['x-selected-programme'] || (req.user ? req.user.programme : null);
-        const { validSlotTypes } = await getReviewSettings(programme);
+        const { validSlotTypes } = await getReviewSettings(programme, req.sessionId);
         if (!slotType || !validSlotTypes.includes(slotType)) {
             return res.status(400).json({ message: `Invalid or missing slotType. Expected one of: ${validSlotTypes.join(', ')}.` });
         }
@@ -715,10 +819,15 @@ exports.submitMarks = async (req, res) => {
 
         // Fetch the marking scheme to compute percentage
         const MarkingScheme = require('../models/MarkingScheme');
+        const targetSession = req.sessionId || team.session;
+        const sessionFilter = targetSession ? { session: targetSession } : {};
         let percentage = null;
         const panelId = team.panel;
         if (panelId) {
-            const scheme = await MarkingScheme.findOne({ panel: panelId, slotType, evaluatorType: 'guide' });
+            let scheme = await MarkingScheme.findOne({ panel: panelId, slotType, evaluatorType: 'guide', ...sessionFilter });
+            if (!scheme && targetSession) {
+                scheme = await MarkingScheme.findOne({ panel: panelId, slotType, evaluatorType: 'guide' });
+            }
             if (scheme && scheme.components.length > 0) {
                 const maxTotal = scheme.components.reduce((sum, c) => sum + c.maxMarks, 0);
                 if (maxTotal > 0) percentage = (totalMarks / maxTotal) * 50;
@@ -726,13 +835,20 @@ exports.submitMarks = async (req, res) => {
         }
 
         const mark = await Mark.findOneAndUpdate(
-            { student: studentId, team: teamId, markedBy: guideId, slotType },
+            { 
+                student: studentId, 
+                team: teamId, 
+                markedBy: guideId, 
+                slotType,
+                ...(targetSession ? { session: targetSession } : {})
+            },
             {
                 components: components.map(c => ({ name: c.name, value: Number(c.value) })),
                 totalMarks,
                 percentage,
                 role: 'guide',
                 slotType,
+                ...(targetSession ? { session: targetSession } : {}),
                 updatedAt: Date.now()
             },
             { upsert: true, new: true, setDefaultsOnInsert: true, overwrite: false }
@@ -749,11 +865,15 @@ exports.submitMarks = async (req, res) => {
 exports.getMarks = async (req, res) => {
     try {
         const guideId = req.user.id;
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
 
-        const teams = await Team.find({ guidePreference: guideId, status: 'approved' }).select('_id');
+        let teams = await Team.find({ guidePreference: guideId, status: 'approved', ...sessionFilter }).select('_id');
+        if (teams.length === 0 && req.sessionId) {
+            teams = await Team.find({ guidePreference: guideId, status: 'approved' }).select('_id');
+        }
         const teamIds = teams.map(team => team._id);
 
-        const marks = await Mark.find({ team: { $in: teamIds }, markedBy: guideId });
+        const marks = await Mark.find({ team: { $in: teamIds }, markedBy: guideId, ...sessionFilter });
 
         const formattedMarks = {};
         marks.forEach(mark => {
@@ -779,18 +899,35 @@ exports.getMarks = async (req, res) => {
 exports.getReportsForGuide = async (req, res) => {
     try {
         const guideId = req.user.id;
-        const teams = await Team.find({ guidePreference: guideId, status: 'approved' }).select('_id');
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        let teams = await Team.find({ guidePreference: guideId, status: 'approved', ...sessionFilter }).select('_id');
+        if (teams.length === 0 && req.sessionId) {
+            teams = await Team.find({ guidePreference: guideId, status: 'approved' }).select('_id');
+        }
         const teamIds = teams.map(team => team._id);
 
-        const reports = await FinalReport.find({ team: { $in: teamIds } }).populate({
+        const reportFilter = { team: { $in: teamIds } };
+        if (req.sessionId) reportFilter.session = req.sessionId;
+
+        let reports = await FinalReport.find(reportFilter).populate({
             path: 'team',
-            // Added 'programme' 
-            select: 'teamName teamLeader members programme', 
+            select: 'teamName teamLeader members programme session', 
             populate: {
                 path: 'teamLeader members',
                 select: 'name username'
             }
         });
+
+        if ((!reports || reports.length === 0) && req.sessionId) {
+            reports = await FinalReport.find({ team: { $in: teamIds } }).populate({
+                path: 'team',
+                select: 'teamName teamLeader members programme session', 
+                populate: {
+                    path: 'teamLeader members',
+                    select: 'name username'
+                }
+            });
+        }
         
         res.json(reports);
     } catch (error) {
@@ -905,14 +1042,15 @@ exports.getGuideCapacity = async (req, res) => {
         }
         const designation = guide.designation || null;
 
-        // 2. Compute limits for UG and PG separately
-        const limitMapUG = await buildDesignationLimitMap('UG');
-        const countMapUG = await getTeamCountsByGuideIds([guide._id], 'UG');
+        // 2. Compute limits for UG and PG separately using session
+        const targetSession = req.sessionId || null;
+        const limitMapUG = await buildDesignationLimitMap('UG', targetSession);
+        const countMapUG = await getTeamCountsByGuideIds([guide._id], 'UG', targetSession);
         const currentApprovedUG = countMapUG.get(guide._id.toString()) || 0;
         const limitStatusUG = resolveGuideLimitStatus(guide, currentApprovedUG, limitMapUG);
 
-        const limitMapPG = await buildDesignationLimitMap('PG');
-        const countMapPG = await getTeamCountsByGuideIds([guide._id], 'PG');
+        const limitMapPG = await buildDesignationLimitMap('PG', targetSession);
+        const countMapPG = await getTeamCountsByGuideIds([guide._id], 'PG', targetSession);
         const currentApprovedPG = countMapPG.get(guide._id.toString()) || 0;
         const limitStatusPG = resolveGuideLimitStatus(guide, currentApprovedPG, limitMapPG);
 
@@ -937,7 +1075,11 @@ exports.getGuideCapacity = async (req, res) => {
 exports.getGuideAssignedPanels = async (req, res) => {
     try {
         const guideId = req.user.id;
-        const teams = await Team.find({ guidePreference: guideId }).select('panel vivaPanel');
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        let teams = await Team.find({ guidePreference: guideId, ...sessionFilter }).select('panel vivaPanel');
+        if (teams.length === 0 && req.sessionId) {
+            teams = await Team.find({ guidePreference: guideId }).select('panel vivaPanel');
+        }
         
         const panelIds = new Set();
         teams.forEach(t => {
@@ -946,7 +1088,7 @@ exports.getGuideAssignedPanels = async (req, res) => {
         });
         
         const panels = await Panel.find({ _id: { $in: Array.from(panelIds) } })
-            .select('name panelType coordinator members programme')
+            .select('name panelType coordinator members programme session')
             .populate('coordinator', 'name username')
             .populate('members', 'name username');
             
@@ -962,8 +1104,9 @@ exports.getPanelSlotsForGuide = async (req, res) => {
     try {
         const { panelId } = req.params;
         const guideId = req.user.id;
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
         
-        const slots = await TimeTable.find({ panel: panelId })
+        let slots = await TimeTable.find({ panel: panelId, ...sessionFilter })
             .populate({
                 path: 'team',
                 select: 'teamName guidePreference',
@@ -973,11 +1116,32 @@ exports.getPanelSlotsForGuide = async (req, res) => {
                 }
             })
             .sort({ date: 1, startTime: 1 });
+
+        if ((!slots || slots.length === 0) && req.sessionId) {
+            slots = await TimeTable.find({ panel: panelId })
+                .populate({
+                    path: 'team',
+                    select: 'teamName guidePreference',
+                    populate: {
+                        path: 'guidePreference',
+                        select: 'name'
+                    }
+                })
+                .sort({ date: 1, startTime: 1 });
+        }
             
-        const myTeams = await Team.find({ 
+        let myTeams = await Team.find({ 
             guidePreference: guideId,
+            ...sessionFilter,
             $or: [{ panel: panelId }, { vivaPanel: panelId }]
-        }).select('teamName programme');
+        }).select('teamName programme session');
+
+        if ((!myTeams || myTeams.length === 0) && req.sessionId) {
+            myTeams = await Team.find({ 
+                guidePreference: guideId,
+                $or: [{ panel: panelId }, { vivaPanel: panelId }]
+            }).select('teamName programme session');
+        }
         
         res.json({ slots, myTeams });
     } catch (error) {

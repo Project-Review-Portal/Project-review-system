@@ -24,6 +24,7 @@ const normalizeProgramme = (prog) => {
 const getCoordinatorPanel = async (req, programme) => {
     const coordinatorId = req.user.id;
     const selectedPanelId = req.headers['x-selected-panel-id'];
+    const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
     const mongoose = require('mongoose');
     
     let panel;
@@ -31,6 +32,7 @@ const getCoordinatorPanel = async (req, programme) => {
         panel = await Panel.findOne({
             _id: selectedPanelId,
             panelType: 'review',
+            ...sessionFilter,
             $or: [
                 { coordinator: coordinatorId },
                 { assistantCoordinators: coordinatorId }
@@ -40,6 +42,7 @@ const getCoordinatorPanel = async (req, programme) => {
     if (!panel) {
         panel = await Panel.findOne({
             panelType: 'review',
+            ...sessionFilter,
             $or: [
                 { coordinator: coordinatorId },
                 { assistantCoordinators: coordinatorId }
@@ -58,6 +61,9 @@ exports.getAllPanels = async (req, res) => {
         }
         if (req.query.programme) {
             filter.programme = req.query.programme;
+        }
+        if (req.sessionId) {
+            filter.session = req.sessionId;
         }
 
         // 1. Fetch panels and fully populate relational documents
@@ -146,7 +152,8 @@ exports.createPanel = async (req, res) => {
         // Generate panel name based on current count for this panelType and programme
         const namePrefix = resolvedPanelType === 'viva' ? `${targetProgramme} Viva Panel` : `${targetProgramme} Panel`;
         
-        const existingPanelNames = await Panel.find({ panelType: resolvedPanelType, programme: targetProgramme }, { _id: 0, name: 1 });
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        const existingPanelNames = await Panel.find({ panelType: resolvedPanelType, programme: targetProgramme, ...sessionFilter }, { _id: 0, name: 1 });
         
         // Helper function to escape regex special characters in the programme name
         const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -628,9 +635,14 @@ exports.submitMarks = async (req, res) => {
 
         // Compute percentage from marking scheme
         const MarkingScheme = require('../models/MarkingScheme');
+        const targetSession = req.sessionId || team.session;
+        const sessionFilter = targetSession ? { session: targetSession } : {};
         let percentage = null;
         if (team.panel) {
-            const scheme = await MarkingScheme.findOne({ panel: team.panel, slotType, evaluatorType: 'panel' });
+            let scheme = await MarkingScheme.findOne({ panel: team.panel, slotType, evaluatorType: 'panel', ...sessionFilter });
+            if (!scheme && targetSession) {
+                scheme = await MarkingScheme.findOne({ panel: team.panel, slotType, evaluatorType: 'panel' });
+            }
             if (scheme && scheme.components.length > 0) {
                 const maxTotal = scheme.components.reduce((sum, c) => sum + c.maxMarks, 0);
                 if (maxTotal > 0) percentage = (totalMarks / maxTotal) * 50;
@@ -638,13 +650,20 @@ exports.submitMarks = async (req, res) => {
         }
 
         const mark = await Mark.findOneAndUpdate(
-            { student: studentId, team: teamId, markedBy: panelMemberId, slotType },
+            { 
+                student: studentId, 
+                team: teamId, 
+                markedBy: panelMemberId, 
+                slotType,
+                ...(targetSession ? { session: targetSession } : {})
+            },
             {
                 components: components.map(c => ({ name: c.name, value: Number(c.value) })),
                 totalMarks,
                 percentage,
                 role: 'panel',
                 slotType,
+                ...(targetSession ? { session: targetSession } : {}),
                 updatedAt: Date.now()
             },
             { upsert: true, new: true, setDefaultsOnInsert: true, overwrite: false }
@@ -661,17 +680,18 @@ exports.submitMarks = async (req, res) => {
 exports.getMarks = async (req, res) => {
     try {
         const panelMemberId = req.user.id;
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
 
-        const panels = await Panel.find({ members: panelMemberId });
+        const panels = await Panel.find({ members: panelMemberId, ...sessionFilter });
         if (panels.length === 0) {
             return res.json({});
         }
         const panelIds = panels.map(p => p._id);
 
-        const assignedTeams = await Team.find({ panel: { $in: panelIds } }).select('_id');
+        const assignedTeams = await Team.find({ panel: { $in: panelIds }, ...sessionFilter }).select('_id');
         const teamIds = assignedTeams.map(team => team._id);
 
-        const marks = await Mark.find({ team: { $in: teamIds }, markedBy: panelMemberId });
+        const marks = await Mark.find({ team: { $in: teamIds }, markedBy: panelMemberId, ...sessionFilter });
 
         const formattedMarks = {};
         marks.forEach(mark => {
@@ -879,6 +899,7 @@ exports.saveFreeSlotsForCoordinator = async (req, res) => {
                 description: `${slotType} free slot created by coordinator`,
                 panel: panel._id,
                 team: null,
+                session: req.sessionId || panel.session || null,
                 date: dateOnly,
                 period,
                 startTime: slot.start,
@@ -894,7 +915,10 @@ exports.saveFreeSlotsForCoordinator = async (req, res) => {
         // ── Build / reset the seniority queue for this panel + slotType ──────────────────
         try {
             // 1. Collect all teams assigned to this panel (via TeamPanelAssignment or Team.panel)
-            const teamPanelAssignment = await TeamPanelAssignment.findOne({ panel: panel._id });
+            const teamPanelAssignment = await TeamPanelAssignment.findOne({
+                panel: panel._id,
+                ...(panel.session ? { session: panel.session } : (req.sessionId ? { session: req.sessionId } : {}))
+            }) || await TeamPanelAssignment.findOne({ panel: panel._id });
             const teamIds = teamPanelAssignment ? teamPanelAssignment.teams : [];
             const teams = await Team.find({ _id: { $in: teamIds } }).select('guidePreference');
 
@@ -1056,6 +1080,7 @@ exports.assignSlotsForCoordinator = async (req, res) => {
                 description: `${slotType} scheduled by coordinator`,
                 panel: panel._id,
                 team: assign.teamId,
+                session: req.sessionId || panel.session || null,
                 date: dateOnly,
                 period,
                 startTime: assign.slot.start,
@@ -1092,10 +1117,20 @@ exports.getAllottedSchedulesForCoordinator = async (req, res) => {
         if (selectedPanelId && mongoose.Types.ObjectId.isValid(selectedPanelId)) {
             query._id = selectedPanelId;
         }
-        const panels = await Panel.find(query);
+        if (req.sessionId) {
+            query.session = req.sessionId;
+        }
+        let panels = await Panel.find(query);
+        if (panels.length === 0 && req.sessionId) {
+            delete query.session;
+            panels = await Panel.find(query);
+        }
         const panelIds = panels.map(p => p._id);
 
-        const schedules = await TimeTable.find({ panel: { $in: panelIds } })
+        const scheduleFilter = { panel: { $in: panelIds } };
+        if (req.sessionId) scheduleFilter.session = req.sessionId;
+
+        let schedules = await TimeTable.find(scheduleFilter)
             .populate({
                 path: 'team',
                 select: 'teamName guidePreference programme',
@@ -1112,6 +1147,28 @@ exports.getAllottedSchedulesForCoordinator = async (req, res) => {
                     select: 'username name memberType'
                 }
             });
+
+        if ((!schedules || schedules.length === 0) && req.sessionId) {
+            delete scheduleFilter.session;
+            schedules = await TimeTable.find(scheduleFilter)
+                .populate({
+                    path: 'team',
+                    select: 'teamName guidePreference programme',
+                    populate: {
+                        path: 'guidePreference',
+                        select: 'name'
+                    }
+                })
+                .populate({
+                    path: 'panel',
+                    select: 'name members programme',
+                    populate: {
+                        path: 'members',
+                        select: 'username name memberType'
+                    }
+                });
+        }
+
         res.json(schedules);
     } catch (error) {
         console.error('Error fetching allotted schedules for coordinator:', error);
@@ -1187,13 +1244,21 @@ exports.createInstructionTemplate = async (req, res) => {
     if (selectedPanelId && mongoose.Types.ObjectId.isValid(selectedPanelId)) {
         query._id = selectedPanelId;
     }
-    const coordinatorPanelIds = await Panel.find(query).distinct('_id');
+    if (req.sessionId) {
+        query.session = req.sessionId;
+    }
+    let coordinatorPanelIds = await Panel.find(query).distinct('_id');
+    if (coordinatorPanelIds.length === 0 && req.sessionId) {
+        delete query.session;
+        coordinatorPanelIds = await Panel.find(query).distinct('_id');
+    }
 
     // 5. Structure the payload with the gathered data strings and panel arrays
     const newTemplatePayload = {
       reviewInstructions: reviewInstructions.trim(),
       uploadedBy: coordinatorId,
-      panels: coordinatorPanelIds // Automatically binds all matching panels found in Step 4
+      panels: coordinatorPanelIds, // Automatically binds all matching panels found in Step 4
+      session: req.sessionId || null
     };
 
     // 6. Conditionally append file parameters if assets were uploaded
@@ -1365,11 +1430,19 @@ exports.getCoordinatorVivaTeams = async (req, res) => {
             return res.status(400).json({ message: 'reviewPanelId query parameter is required.' });
         }
 
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
         const Team = require('../models/Team');
-        const teams = await Team.find({ panel: reviewPanelId })
+        let teams = await Team.find({ panel: reviewPanelId, ...sessionFilter })
             .populate('teamLeader', 'username name')
             .populate('members', 'username name')
             .populate('vivaPanel', 'name');
+
+        if ((!teams || teams.length === 0) && req.sessionId) {
+            teams = await Team.find({ panel: reviewPanelId })
+                .populate('teamLeader', 'username name')
+                .populate('members', 'username name')
+                .populate('vivaPanel', 'name');
+        }
 
         res.json(teams);
     } catch (error) {
@@ -1459,7 +1532,16 @@ exports.getCoordinatedTeams = async (req, res) => {
         const mongoose = require('mongoose');
         let panel;
         if (selectedPanelId && mongoose.Types.ObjectId.isValid(selectedPanelId)) {
-            panel = await Panel.findOne({
+            const panelQuery = {
+                _id: selectedPanelId,
+                panelType: 'review',
+                $or: [
+                    { coordinator: coordinatorId },
+                    { assistantCoordinators: coordinatorId }
+                ]
+            };
+            if (req.sessionId) panelQuery.session = req.sessionId;
+            panel = await Panel.findOne(panelQuery) || await Panel.findOne({
                 _id: selectedPanelId,
                 panelType: 'review',
                 $or: [
@@ -1469,7 +1551,16 @@ exports.getCoordinatedTeams = async (req, res) => {
             });
         }
         if (!panel) {
-            panel = await Panel.findOne({ 
+            const panelQuery = { 
+                panelType: 'review',
+                $or: [
+                    { coordinator: coordinatorId },
+                    { assistantCoordinators: coordinatorId }
+                ],
+                programme: { $in: regexFilters } 
+            };
+            if (req.sessionId) panelQuery.session = req.sessionId;
+            panel = await Panel.findOne(panelQuery) || await Panel.findOne({ 
                 panelType: 'review',
                 $or: [
                     { coordinator: coordinatorId },
@@ -1486,11 +1577,23 @@ exports.getCoordinatedTeams = async (req, res) => {
         }
 
         // 5. Find all teams assigned to this specific panel ID
-        const coordinatedTeams = await Team.find({ panel: panel._id })
+        const teamFilter = { panel: panel._id };
+        if (req.sessionId) teamFilter.session = req.sessionId;
+        else if (panel.session) teamFilter.session = panel.session;
+
+        let coordinatedTeams = await Team.find(teamFilter)
             .populate('teamLeader', 'username name')
             .populate('members', 'username name')
             .populate('guidePreference', 'username name')
             .populate('vivaPanel', 'name');
+
+        if ((!coordinatedTeams || coordinatedTeams.length === 0) && (req.sessionId || panel.session)) {
+            coordinatedTeams = await Team.find({ panel: panel._id })
+                .populate('teamLeader', 'username name')
+                .populate('members', 'username name')
+                .populate('guidePreference', 'username name')
+                .populate('vivaPanel', 'name');
+        }
 
         // 6. Inject the panel name context for frontend convenience
         const formattedTeams = coordinatedTeams.map(team => ({
@@ -1671,11 +1774,22 @@ exports.getCoordinatorInstructionTemplates = async (req, res) => {
         if (selectedPanelId && mongoose.Types.ObjectId.isValid(selectedPanelId)) {
             query.panels = selectedPanelId;
         }
+        if (req.sessionId) {
+            query.session = req.sessionId;
+        }
 
-        const templates = await InstructionTemplate.find(query)
+        let templates = await InstructionTemplate.find(query)
             .populate('uploadedBy', 'name')
-            .select('reviewInstructions filePath fileName attachments uploadedBy createdAt')
+            .select('reviewInstructions filePath fileName attachments uploadedBy createdAt session')
             .sort({ createdAt: -1 });
+
+        if ((!templates || templates.length === 0) && req.sessionId) {
+            delete query.session;
+            templates = await InstructionTemplate.find(query)
+                .populate('uploadedBy', 'name')
+                .select('reviewInstructions filePath fileName attachments uploadedBy createdAt session')
+                .sort({ createdAt: -1 });
+        }
 
         res.json({ success: true, data: templates });
     } catch (error) {
@@ -1693,21 +1807,41 @@ exports.getPanelInstructions = async (req, res) => {
             return res.status(400).json({ message: 'Invalid or missing panel ID.' });
         }
 
-        const templates = await InstructionTemplate.find({ panels: panelId })
+        const templateFilter = { panels: panelId };
+        if (req.sessionId) templateFilter.session = req.sessionId;
+
+        let templates = await InstructionTemplate.find(templateFilter)
             .populate('uploadedBy', 'name')
-            .select('reviewInstructions filePath fileName attachments uploadedBy createdAt')
+            .select('reviewInstructions filePath fileName attachments uploadedBy createdAt session')
             .sort({ createdAt: -1 });
+
+        if ((!templates || templates.length === 0) && req.sessionId) {
+            templates = await InstructionTemplate.find({ panels: panelId })
+                .populate('uploadedBy', 'name')
+                .select('reviewInstructions filePath fileName attachments uploadedBy createdAt session')
+                .sort({ createdAt: -1 });
+        }
 
         let myTeams = [];
         if (req.user && req.user.role === 'guide') {
             const Team = require('../models/Team');
-            myTeams = await Team.find({
+            const teamQuery = {
                 guidePreference: req.user.id,
                 $or: [{ panel: panelId }, { vivaPanel: panelId }]
-            })
-            .populate('teamLeader', 'name')
-            .populate('members', 'name')
-            .select('teamName teamLeader members');
+            };
+            if (req.sessionId) teamQuery.session = req.sessionId;
+            myTeams = await Team.find(teamQuery)
+                .populate('teamLeader', 'name')
+                .populate('members', 'name')
+                .select('teamName teamLeader members');
+
+            if ((!myTeams || myTeams.length === 0) && req.sessionId) {
+                delete teamQuery.session;
+                myTeams = await Team.find(teamQuery)
+                    .populate('teamLeader', 'name')
+                    .populate('members', 'name')
+                    .select('teamName teamLeader members');
+            }
         }
 
         res.json({ success: true, data: templates, myTeams });

@@ -11,7 +11,12 @@ exports.checkAttendanceForTeams = async (req, res) => {
       return res.status(400).json({ message: 'teamIds (array) and reviewType are required.' });
     }
     
-    const attendanceRecords = await Attendance.find({ team: { $in: teamIds } });
+    const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+    let attendanceRecords = await Attendance.find({ team: { $in: teamIds }, ...sessionFilter });
+    if ((!attendanceRecords || attendanceRecords.length === 0) && req.sessionId) {
+      attendanceRecords = await Attendance.find({ team: { $in: teamIds } });
+    }
+
     const result = {};
     
     for (const teamId of teamIds) {
@@ -51,7 +56,7 @@ exports.checkPreviousScheduleExists = async (req, res) => {
 
     // Get dynamic settings to determine prerequisite chain
     const programme = req.headers['x-selected-programme'];
-    const { numReviews } = await getReviewSettings(programme);
+    const { numReviews } = await getReviewSettings(programme, req.sessionId);
 
     // 1. Determine what prerequisite slotTypes are required globally for this reviewType
     let requiredTypes = [];
@@ -76,11 +81,21 @@ exports.checkPreviousScheduleExists = async (req, res) => {
 
     // 2. Fetch active schedules for ALL requested teams in a single database query
     // Added a status filter to ensure we don't count 'cancelled' slots as valid prerequisites
-    const allSchedules = await TimeTable.find({ 
+    const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+    let allSchedules = await TimeTable.find({ 
       team: { $in: teamIds }, 
       slotType: { $in: requiredTypes },
-      status: { $in: ['scheduled', 'completed'] } 
+      status: { $in: ['scheduled', 'completed'] },
+      ...sessionFilter
     });
+
+    if ((!allSchedules || allSchedules.length === 0) && req.sessionId) {
+      allSchedules = await TimeTable.find({ 
+        team: { $in: teamIds }, 
+        slotType: { $in: requiredTypes },
+        status: { $in: ['scheduled', 'completed'] }
+      });
+    }
 
     // 3. Evaluate prerequisites for each team in memory
     for (const teamId of teamIds) {

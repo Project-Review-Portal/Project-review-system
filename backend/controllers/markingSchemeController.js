@@ -16,19 +16,25 @@ exports.getSchemeForCoordinator = async (req, res) => {
             return res.status(400).json({ message: 'panelId and slotType are required.' });
         }
 
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+
         // Verify caller coordinates this panel
         const panel = await Panel.findOne({
             _id: panelId,
             $or: [
                 { coordinator: coordinatorId },
                 { assistantCoordinators: coordinatorId }
-            ]
+            ],
+            ...sessionFilter
         });
         if (!panel) {
             return res.status(403).json({ message: 'You do not coordinate this panel.' });
         }
 
-        const scheme = await MarkingScheme.findOne({ panel: panelId, slotType, evaluatorType });
+        let scheme = await MarkingScheme.findOne({ panel: panelId, slotType, evaluatorType, ...sessionFilter });
+        if (!scheme && req.sessionId) {
+            scheme = await MarkingScheme.findOne({ panel: panelId, slotType, evaluatorType });
+        }
         res.json(scheme || { panel: panelId, slotType, evaluatorType, components: [] });
     } catch (err) {
         console.error('Error fetching marking scheme (coordinator):', err);
@@ -72,13 +78,16 @@ exports.saveSchemeForCoordinator = async (req, res) => {
             return res.status(400).json({ message: `Invalid slotType "${slotType}".` });
         }
 
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+
         // Verify coordinator owns this panel
         const panel = await Panel.findOne({
             _id: panelId,
             $or: [
                 { coordinator: coordinatorId },
                 { assistantCoordinators: coordinatorId }
-            ]
+            ],
+            ...sessionFilter
         });
         if (!panel) {
             return res.status(403).json({ message: 'You do not coordinate this panel.' });
@@ -89,8 +98,15 @@ exports.saveSchemeForCoordinator = async (req, res) => {
             maxMarks: Number(c.maxMarks)
         }));
 
+        const targetSession = req.sessionId || panel.session;
+
         const scheme = await MarkingScheme.findOneAndUpdate(
-            { panel: panelId, slotType, evaluatorType },
+            { 
+                panel: panelId, 
+                slotType, 
+                evaluatorType,
+                ...(targetSession ? { session: targetSession } : {})
+            },
             {
                 panel: panelId,
                 slotType,
@@ -98,6 +114,7 @@ exports.saveSchemeForCoordinator = async (req, res) => {
                 programme: panel.programme,
                 components: cleanedComponents,
                 createdBy: coordinatorId,
+                ...(targetSession ? { session: targetSession } : {}),
                 updatedAt: Date.now()
             },
             { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -123,7 +140,11 @@ exports.getSchemePublic = async (req, res) => {
             return res.status(400).json({ message: 'panelId and slotType are required.' });
         }
 
-        const scheme = await MarkingScheme.findOne({ panel: panelId, slotType, evaluatorType });
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        let scheme = await MarkingScheme.findOne({ panel: panelId, slotType, evaluatorType, ...sessionFilter });
+        if (!scheme && req.sessionId) {
+            scheme = await MarkingScheme.findOne({ panel: panelId, slotType, evaluatorType });
+        }
         res.json(scheme || { panel: panelId, slotType, evaluatorType, components: [] });
     } catch (err) {
         console.error('Error fetching marking scheme (public):', err);
@@ -133,7 +154,7 @@ exports.getSchemePublic = async (req, res) => {
 
 /**
  * GET /api/marking-scheme/coordinator/my-panels
- * Returns panels filtered by X-Selected-Role and X-Selected-Programme headers
+ * Returns panels filtered by X-Selected-Role, X-Selected-Programme, and Session
  */
 exports.getMyPanels = async (req, res) => {
     try {
@@ -151,11 +172,15 @@ exports.getMyPanels = async (req, res) => {
             ? { programme: { $regex: new RegExp(`^${selectedProgramme.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
             : {};
 
-        const finalQuery = selectedProgramme
-            ? { $and: [roleMatch, progFilter] }
-            : roleMatch;
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
 
-        const panels = await Panel.find(finalQuery).select('_id name panelType programme');
+        const finalQuery = {
+            ...roleMatch,
+            ...progFilter,
+            ...sessionFilter
+        };
+
+        const panels = await Panel.find(finalQuery).select('_id name panelType programme session');
         res.json(panels);
     } catch (err) {
         console.error('Error fetching coordinator panels:', err);

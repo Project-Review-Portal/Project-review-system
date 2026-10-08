@@ -6,9 +6,17 @@ const Config = require('../models/Config');
  *      if numReviews=2 and vivaRequired=false => ['review1','review2']
  * @param {string|null} programme - The programme name to scope the config lookup.
  */
-const getReviewSettings = async (programme = null) => {
+const getReviewSettings = async (programme = null, sessionId = null) => {
     const filter = programme ? { programme } : {};
-    const config = await Config.findOne(filter);
+    let config = null;
+
+    if (sessionId) {
+        config = await Config.findOne({ ...filter, session: sessionId });
+    }
+    if (!config) {
+        config = await Config.findOne(filter);
+    }
+
     const numReviews = (config && config.numReviews) ? config.numReviews : 3;
     const vivaRequired = config ? config.vivaRequired : true;
 

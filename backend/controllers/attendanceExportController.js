@@ -27,12 +27,21 @@ exports.exportZerothReviewAttendance = async (req, res) => {
             }
         }
 
-        // Fetch all teams for the given programme
-        const teams = await Team.find({ programme: programme })
+        // Fetch all teams for the given programme and session
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        let teams = await Team.find({ programme: programme, ...sessionFilter })
             .populate('teamLeader', 'name username')
             .populate('members', 'name username')
             .populate('guidePreference', 'name')
             .sort({ teamName: 1 });
+
+        if ((!teams || teams.length === 0) && req.sessionId) {
+            teams = await Team.find({ programme: programme })
+                .populate('teamLeader', 'name username')
+                .populate('members', 'name username')
+                .populate('guidePreference', 'name')
+                .sort({ teamName: 1 });
+        }
 
         const workbook = new exceljs.Workbook();
         const worksheet = workbook.addWorksheet(`${reviewLabel} Attendance`);
@@ -74,7 +83,17 @@ exports.exportZerothReviewAttendance = async (req, res) => {
         // 4. Session Heading
         worksheet.mergeCells('A4:F4');
         const cellA4 = worksheet.getCell('A4');
-        cellA4.value = 'Session: June 2026 - April 2027';
+        let sessionName = 'Session: June 2026 - April 2027';
+        if (req.sessionId) {
+            try {
+                const Session = require('../models/Session');
+                const sess = await Session.findById(req.sessionId);
+                if (sess) {
+                    sessionName = `Session: ${sess.academicYear}${sess.name ? ` (${sess.name})` : ''}`;
+                }
+            } catch (e) { }
+        }
+        cellA4.value = sessionName;
         cellA4.font = { name: 'Times New Roman', size: 12, bold: true };
         cellA4.alignment = { vertical: 'middle', horizontal: 'center' };
         worksheet.getRow(4).height = 20;

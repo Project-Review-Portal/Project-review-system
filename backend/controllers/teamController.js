@@ -13,9 +13,10 @@ const FinalReport = require('../models/FinalReport');
 exports.getAvailableStudents = async (req, res) => {
     try {
         const currentUserId = req.user.id; // Get the ID of the logged-in user
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
 
-        // Get all teams and extract both team leaders and accepted members
-        const teams = await Team.find();
+        // Get all teams and extract both team leaders and accepted members in this session
+        const teams = await Team.find(sessionFilter);
         let teamMemberIds = teams.flatMap(team => [
             team.teamLeader,
             ...(team.members || [])
@@ -28,12 +29,21 @@ exports.getAvailableStudents = async (req, res) => {
         const currentUser = await User.findById(currentUserId);
         const userProgramme = currentUser ? (currentUser.programme || 'B.E. CSE') : 'B.E. CSE';
 
-        // Find students who are not in any team (neither as leader nor member) and not the current user, and are in the SAME programme
-        const availableStudents = await User.find({
+        // Find students who are not in any team and not the current user, in the SAME programme and session
+        const studentQuery = {
             'roles.role': 'student',
             programme: userProgramme,
             _id: { $nin: teamMemberIds }
-        }).select('username _id name programme');
+        };
+        if (req.sessionId) {
+            studentQuery.$or = [
+                { session: req.sessionId },
+                { session: null },
+                { session: { $exists: false } }
+            ];
+        }
+
+        const availableStudents = await User.find(studentQuery).select('username _id name programme');
 
         console.log('Available students found:', availableStudents.length); // Debug log
         res.json(availableStudents);
@@ -114,9 +124,11 @@ exports.createTeam = async (req, res) => {
     try {
         const { members } = req.body;
         const teamLeaderId = req.user.id;
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
 
-        // Check if user is already in a team
+        // Check if user is already in a team in this session
         const existingTeam = await Team.findOne({
+            ...sessionFilter,
             $or: [
                 { teamLeader: teamLeaderId },
                 { members: teamLeaderId }
@@ -124,11 +136,12 @@ exports.createTeam = async (req, res) => {
         });
 
         if (existingTeam) {
-            return res.status(400).json({ message: 'You are already part of a team' });
+            return res.status(400).json({ message: 'You are already part of a team in this session' });
         }
 
-        // Check if user has any pending invitations from other teams
+        // Check if user has any pending invitations from other teams in this session
         const pendingInvitations = await Team.findOne({
+            ...sessionFilter,
             memberStatus: {
                 $elemMatch: {
                     user: teamLeaderId,
@@ -143,13 +156,15 @@ exports.createTeam = async (req, res) => {
         const leader = await User.findById(teamLeaderId);
         const leaderProgramme = leader ? (leader.programme || 'B.E. CSE') : 'B.E. CSE';
 
-        // Get max team size from config for this programme
-        const config = (await Config.findOne({ programme: leaderProgramme })) || (await Config.findOne());
+        // Get max team size from config for this programme and session
+        const config = (await Config.findOne({ programme: leaderProgramme, ...sessionFilter }))
+            || (await Config.findOne({ programme: leaderProgramme }))
+            || (await Config.findOne());
         // Always allow team formation - no restrictions
         const maxTeamSize = config ? config.maxTeamSize : 4;
 
-        // Retrieve all existing teams for this programme to generate the next sequential team name
-        const existingTeams = await Team.find({ programme: leaderProgramme }, { teamName: 1 });
+        // Retrieve all existing teams for this programme and session to generate the next sequential team name
+        const existingTeams = await Team.find({ programme: leaderProgramme, ...sessionFilter }, { teamName: 1 });
 
         // Helper function to escape regex special characters in the programme name
         const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -181,6 +196,7 @@ exports.createTeam = async (req, res) => {
             teamName: newTeamName, // Automatically generated team name
             teamLeader: teamLeaderId,
             programme: leaderProgramme,
+            session: req.sessionId || null,
             members: [], // Keep empty until invitations are accepted
             memberStatus: members.map((m) => {
                 return {
@@ -204,25 +220,35 @@ exports.createTeam = async (req, res) => {
 exports.getUserTeam = async (req, res) => {
     try {
         const userId = req.user.id;
-        console.log('getUserTeam: Attempting to find team for userId:', userId);
-        const team = await Team.findOne({
-            $or: [
-                { teamLeader: userId },
-                { members: userId }
-            ]
-        }).populate('teamLeader members', 'username name')
-            .populate({
-                path: 'memberStatus.user',
-                select: 'username name'
-            })
-            .populate({
-                path: 'guidePreference',
-                select: 'username name'
-            })
-            .populate({ // Populate rejectedGuides to display names
-                path: 'rejectedGuides',
-                select: 'username name'
-            });
+        console.log('getUserTeam: Attempting to find team for userId:', userId, 'session:', req.sessionId);
+
+        const populateOptions = [
+            { path: 'teamLeader members', select: 'username name' },
+            { path: 'memberStatus.user', select: 'username name' },
+            { path: 'guidePreference', select: 'username name' },
+            { path: 'rejectedGuides', select: 'username name' }
+        ];
+
+        let team = null;
+        if (req.sessionId) {
+            team = await Team.findOne({
+                session: req.sessionId,
+                $or: [
+                    { teamLeader: userId },
+                    { members: userId }
+                ]
+            }).populate(populateOptions);
+        }
+
+        // Fallback to finding without session if not found or session not passed
+        if (!team) {
+            team = await Team.findOne({
+                $or: [
+                    { teamLeader: userId },
+                    { members: userId }
+                ]
+            }).populate(populateOptions);
+        }
 
         if (!team) {
             console.log('getUserTeam: No team found for userId:', userId); // Detailed log
@@ -244,7 +270,8 @@ exports.requestGuide = async (req, res) => {
         const { guideId } = req.body;
 
         // Find the team where the current user is the team leader
-        const team = await Team.findOne({ teamLeader: teamLeaderId });
+        const team = (req.sessionId ? await Team.findOne({ teamLeader: teamLeaderId, session: req.sessionId }) : null)
+            || await Team.findOne({ teamLeader: teamLeaderId });
 
         if (!team) {
             return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
@@ -296,7 +323,13 @@ exports.getAssignedPanel = async (req, res) => {
         console.log('Fetching assigned panel for studentId:', studentId); // Debug log
 
         // Find the team the student belongs to (either as a leader or a member)
-        const team = await Team.findOne({
+        const team = (req.sessionId ? await Team.findOne({
+            session: req.sessionId,
+            $or: [
+                { teamLeader: studentId },
+                { members: studentId }
+            ]
+        }) : null) || await Team.findOne({
             $or: [
                 { teamLeader: studentId },
                 { members: studentId }
@@ -310,7 +343,14 @@ exports.getAssignedPanel = async (req, res) => {
         }
 
         // Find the panel assignment for this team
-        const assignment = await TeamPanelAssignment.findOne({ teams: team._id })
+        const assignmentQuery = { teams: team._id };
+        if (team.session) {
+            assignmentQuery.session = team.session;
+        } else if (req.sessionId) {
+            assignmentQuery.session = req.sessionId;
+        }
+
+        let assignment = await TeamPanelAssignment.findOne(assignmentQuery)
             .populate({
                 path: 'panel',
                 select: 'name members coordinator',
@@ -319,6 +359,18 @@ exports.getAssignedPanel = async (req, res) => {
                     { path: 'coordinator', select: 'username name' }
                 ]
             });
+
+        if (!assignment) {
+            assignment = await TeamPanelAssignment.findOne({ teams: team._id })
+                .populate({
+                    path: 'panel',
+                    select: 'name members coordinator',
+                    populate: [
+                        { path: 'members', select: 'username name memberType' },
+                        { path: 'coordinator', select: 'username name' }
+                    ]
+                });
+        }
         console.log('Found assignment for team:', assignment); // Debug log
 
         if (!assignment) {
@@ -342,14 +394,21 @@ exports.getAssignedPanel = async (req, res) => {
 exports.getMaxTeamSizePublic = async (req, res) => {
     try {
         const programme = req.headers['x-selected-programme'] || req.headers['x-selected-program'] || req.query.programme;
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
         let config = null;
         if (programme) {
             config = await Config.findOne({
-                programme: { $regex: new RegExp(`^${programme.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+                programme: { $regex: new RegExp(`^${programme.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+                ...sessionFilter
             });
+            if (!config) {
+                config = await Config.findOne({
+                    programme: { $regex: new RegExp(`^${programme.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+                });
+            }
         }
         if (!config) {
-            config = await Config.findOne();
+            config = await Config.findOne(sessionFilter) || await Config.findOne();
         }
         if (!config) {
             return res.status(404).json({ message: 'Configuration not found' });
@@ -367,7 +426,7 @@ exports.getTeamsByIds = async (req, res) => {
         const idsParam = req.query.ids;
         if (!idsParam) return res.status(400).json({ message: 'ids query parameter required' });
         const ids = idsParam.split(',').map(id => id.trim()).filter(Boolean);
-        const teams = await Team.find({ _id: { $in: ids } }).select('_id teamName programme');
+        const teams = await Team.find({ _id: { $in: ids } }).select('_id teamName programme session');
         res.json(teams);
     } catch (error) {
         console.error('Error in getTeamsByIds:', error);
@@ -378,7 +437,8 @@ exports.getTeamsByIds = async (req, res) => {
 exports.uploadReport = async (req, res) => {
     try {
         const userId = req.user.id;
-        const team = await Team.findOne({ $or: [{ teamLeader: userId }, { members: userId }] });
+        const team = (req.sessionId ? await Team.findOne({ session: req.sessionId, $or: [{ teamLeader: userId }, { members: userId }] }) : null)
+            || await Team.findOne({ $or: [{ teamLeader: userId }, { members: userId }] });
 
         if (!team) {
             return res.status(404).json({ message: 'Team not found' });
@@ -392,7 +452,8 @@ exports.uploadReport = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const existingReport = await FinalReport.findOne({ team: team._id });
+        const reportSession = team.session || req.sessionId || null;
+        const existingReport = await FinalReport.findOne({ team: team._id, ...(reportSession ? { session: reportSession } : {}) });
         if (existingReport) {
             if (existingReport.status !== 'rejected') {
                 return res.status(400).json({ message: 'Report already uploaded' });
@@ -410,6 +471,7 @@ exports.uploadReport = async (req, res) => {
                 existingReport.filePath = req.file.path;
                 existingReport.fileName = req.file.originalname;
                 existingReport.uploadedBy = userId;
+                if (reportSession && !existingReport.session) existingReport.session = reportSession;
                 existingReport.status = 'uploaded';
                 existingReport.remarks = '';
                 existingReport.rejectedAt = null;
@@ -424,6 +486,7 @@ exports.uploadReport = async (req, res) => {
             filePath: req.file.path,
             fileName: req.file.originalname,
             uploadedBy: userId,
+            session: reportSession
         });
 
         await newReport.save();
@@ -437,13 +500,15 @@ exports.uploadReport = async (req, res) => {
 exports.getReportStatus = async (req, res) => {
     try {
         const userId = req.user.id;
-        const team = await Team.findOne({ $or: [{ teamLeader: userId }, { members: userId }] });
+        const team = (req.sessionId ? await Team.findOne({ session: req.sessionId, $or: [{ teamLeader: userId }, { members: userId }] }) : null)
+            || await Team.findOne({ $or: [{ teamLeader: userId }, { members: userId }] });
 
         if (!team) {
             return res.status(404).json({ message: 'Team not found' });
         }
 
-        const report = await FinalReport.findOne({ team: team._id });
+        const report = await FinalReport.findOne({ team: team._id, ...(team.session ? { session: team.session } : (req.sessionId ? { session: req.sessionId } : {})) })
+            || await FinalReport.findOne({ team: team._id });
 
         if (!report) {
             return res.status(404).json({ message: 'Report not uploaded yet' });
@@ -462,7 +527,8 @@ exports.deleteMyTeam = async (req, res) => {
         const userId = req.user.id;
 
         // Only a leader can delete their team
-        const team = await Team.findOne({ teamLeader: userId });
+        const team = (req.sessionId ? await Team.findOne({ teamLeader: userId, session: req.sessionId }) : null)
+            || await Team.findOne({ teamLeader: userId });
         if (!team) {
             return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
         }
@@ -493,7 +559,9 @@ exports.deleteMyTeam = async (req, res) => {
 exports.getTeamInvitations = async (req, res) => {
     try {
         const userId = req.user.id;
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
         const invitations = await Team.find({
+            ...sessionFilter,
             memberStatus: {
                 $elemMatch: {
                     user: userId,
@@ -542,17 +610,22 @@ exports.respondToInvitation = async (req, res) => {
 
             await team.save();
 
-            // Set pending status in all other teams to rejected
-            await Team.updateMany(
-                {
-                    _id: { $ne: teamId },
-                    memberStatus: {
-                        $elemMatch: {
-                            user: userId,
-                            status: 'pending'
-                        }
+            // Set pending status in all other teams in this session to rejected
+            const otherTeamFilter = {
+                _id: { $ne: teamId },
+                memberStatus: {
+                    $elemMatch: {
+                        user: userId,
+                        status: 'pending'
                     }
-                },
+                }
+            };
+            if (team.session) {
+                otherTeamFilter.session = team.session;
+            }
+
+            await Team.updateMany(
+                otherTeamFilter,
                 {
                     $set: { 'memberStatus.$[elem].status': 'rejected' }
                 },
@@ -586,7 +659,8 @@ exports.inviteMember = async (req, res) => {
         const userId = req.user.id;
         const { studentId } = req.body;
 
-        const team = await Team.findOne({ teamLeader: userId });
+        const team = (req.sessionId ? await Team.findOne({ teamLeader: userId, session: req.sessionId }) : null)
+            || await Team.findOne({ teamLeader: userId });
         if (!team) {
             return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
         }
@@ -595,8 +669,11 @@ exports.inviteMember = async (req, res) => {
             return res.status(400).json({ message: 'This team is locked and cannot be modified.' });
         }
 
-        // Get max team size from config for this programme
-        const config = (await Config.findOne({ programme: team.programme })) || (await Config.findOne());
+        // Get max team size from config for this programme and session
+        const sessionFilter = team.session ? { session: team.session } : (req.sessionId ? { session: req.sessionId } : {});
+        const config = (await Config.findOne({ programme: team.programme, ...sessionFilter }))
+            || (await Config.findOne({ programme: team.programme }))
+            || (await Config.findOne());
         const maxTeamSize = config ? config.maxTeamSize : 4;
 
         // Check current number of invited/accepted members + leader (1) (EXCLUDING REJECTED MEMBERS!)
@@ -619,8 +696,9 @@ exports.inviteMember = async (req, res) => {
             return res.status(400).json({ message: 'Student is already invited or a member.' });
         }
 
-        // Check if student is already a team leader or member of a complete team
+        // Check if student is already a team leader or member of a complete team in this session
         const otherTeam = await Team.findOne({
+            ...sessionFilter,
             $or: [
                 { teamLeader: studentId },
                 { members: studentId }
@@ -648,7 +726,8 @@ exports.removeMember = async (req, res) => {
         const userId = req.user.id;
         const { studentId } = req.body;
 
-        const team = await Team.findOne({ teamLeader: userId });
+        const team = (req.sessionId ? await Team.findOne({ teamLeader: userId, session: req.sessionId }) : null)
+            || await Team.findOne({ teamLeader: userId });
         if (!team) {
             return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
         }
@@ -679,7 +758,8 @@ exports.removeMember = async (req, res) => {
 exports.requestLock = async (req, res) => {
     try {
         const userId = req.user.id;
-        const team = await Team.findOne({ teamLeader: userId });
+        const team = (req.sessionId ? await Team.findOne({ teamLeader: userId, session: req.sessionId }) : null)
+            || await Team.findOne({ teamLeader: userId });
 
         if (!team) {
             return res.status(404).json({ message: 'Team not found or you are not the team leader.' });
@@ -737,7 +817,8 @@ exports.cancelGuideRequest = async (req, res) => {
         const teamLeaderId = req.user.id;
 
         // Find the team where the current user is the team leader
-        const team = await Team.findOne({ teamLeader: teamLeaderId });
+        const team = (req.sessionId ? await Team.findOne({ teamLeader: teamLeaderId, session: req.sessionId }) : null)
+            || await Team.findOne({ teamLeader: teamLeaderId });
 
         if (!team) {
             return res.status(404).json({ message: 'Team not found or you are not the team leader.' });

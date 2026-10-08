@@ -7,6 +7,7 @@ const TimeTable = require('../models/TimeTable');
 const Attendance = require('../models/Attendance');
 const Mark = require('../models/Mark');
 const { getReviewSettings } = require('../utils/reviewSettings');
+const bcrypt = require('bcryptjs');
 
 // Helper to build a MongoDB query condition for programme matching
 const getProgrammeFilter = (programme) => {
@@ -117,12 +118,14 @@ exports.setMaxTeamSize = async (req, res) => {
         }
 
         // Capture old max BEFORE saving so we can determine direction of change
-        const existing = await Config.findOne({ programme });
+        const configFilter = { programme };
+        if (req.sessionId) configFilter.session = req.sessionId;
+        const existing = (await Config.findOne(configFilter)) || (req.sessionId ? await Config.findOne({ programme }) : null);
         const oldMax = existing ? Number(existing.maxTeamSize) : newMax;
 
         const config = await Config.findOneAndUpdate(
-            { programme },
-            { $set: { maxTeamSize: newMax } },
+            configFilter,
+            { $set: { maxTeamSize: newMax, ...(req.sessionId ? { session: req.sessionId } : {}) } },
             { new: true, upsert: true, setDefaultsOnInsert: true }
         );
         await config.save();
@@ -134,7 +137,13 @@ exports.setMaxTeamSize = async (req, res) => {
 
         if (newMax < oldMax) {
             // ── DECREASE: disband oversized teams; unlock non-conflicting locked teams for THIS PROGRAMME ──
-            const allTeams = await Team.find({ programme: progFilter });
+            const teamQuery = { programme: progFilter };
+            if (req.sessionId) teamQuery.session = req.sessionId;
+            let allTeams = await Team.find(teamQuery);
+            if (req.sessionId && allTeams.length === 0) {
+                delete teamQuery.session;
+                allTeams = await Team.find(teamQuery);
+            }
 
             for (const team of allTeams) {
                 // Total size = members accepted + team leader
@@ -154,8 +163,10 @@ exports.setMaxTeamSize = async (req, res) => {
             }
         } else if (newMax > oldMax) {
             // ── INCREASE: unlock all locked teams for THIS PROGRAMME so they can optionally add more members ──
+            const updateFilter = { programme: progFilter, isLocked: true };
+            if (req.sessionId) updateFilter.session = req.sessionId;
             const result = await Team.updateMany(
-                { programme: progFilter, isLocked: true },
+                updateFilter,
                 { $set: { isLocked: false, isTeamComplete: false } }
             );
             unlockedCount = result.modifiedCount || 0;
@@ -163,8 +174,21 @@ exports.setMaxTeamSize = async (req, res) => {
 
         // Special case: maxTeamSize === 1 → auto-generate solo teams for teamless students in THIS PROGRAMME and rename existing
         if (newMax === 1) {
-            const students = await User.find({ role: 'student', programme: progFilter });
-            const allTeams = await Team.find({ programme: progFilter }).populate('teamLeader');
+            const studentQuery = { role: 'student', programme: progFilter };
+            if (req.sessionId) studentQuery.session = req.sessionId;
+            let students = await User.find(studentQuery);
+            if (req.sessionId && students.length === 0) {
+                delete studentQuery.session;
+                students = await User.find(studentQuery);
+            }
+
+            const soloTeamQuery = { programme: progFilter };
+            if (req.sessionId) soloTeamQuery.session = req.sessionId;
+            let allTeams = await Team.find(soloTeamQuery).populate('teamLeader');
+            if (req.sessionId && allTeams.length === 0) {
+                delete soloTeamQuery.session;
+                allTeams = await Team.find(soloTeamQuery).populate('teamLeader');
+            }
 
             // 1. Rename existing solo teams to the registration number of the leader
             for (const t of allTeams) {
@@ -194,7 +218,8 @@ exports.setMaxTeamSize = async (req, res) => {
                         memberStatus: [],
                         isTeamComplete: true,
                         isLocked: true,
-                        status: 'pending'
+                        status: 'pending',
+                        session: req.sessionId || student.session || null
                     });
                     await team.save();
                 }
@@ -217,7 +242,12 @@ exports.getMaxTeamSize = async (req, res) => {
     try {
         const programme = req.headers['x-selected-programme'];
         if (!programme) return res.status(400).json({ message: 'Programme header (x-selected-programme) is required.' });
-        const config = await Config.findOne({ programme });
+        const configFilter = { programme };
+        if (req.sessionId) configFilter.session = req.sessionId;
+        let config = await Config.findOne(configFilter);
+        if (!config && req.sessionId) {
+            config = await Config.findOne({ programme });
+        }
         res.json({ maxTeamSize: config ? config.maxTeamSize : 4 });
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
@@ -247,9 +277,11 @@ exports.setGuideSelectionDates = async (req, res) => {
             return res.status(400).json({ message: 'End date must be after start date' });
         }
 
+        const configFilter = { programme };
+        if (req.sessionId) configFilter.session = req.sessionId;
         const config = await Config.findOneAndUpdate(
-            { programme },
-            { $set: { guideSelectionStartDate: start, guideSelectionEndDate: end, teamFormationOpen: true } },
+            configFilter,
+            { $set: { guideSelectionStartDate: start, guideSelectionEndDate: end, teamFormationOpen: true, ...(req.sessionId ? { session: req.sessionId } : {}) } },
             { new: true, upsert: true, setDefaultsOnInsert: true }
         );
 
@@ -264,7 +296,12 @@ exports.getGuideSelectionDates = async (req, res) => {
     try {
         const programme = req.headers['x-selected-programme'];
         if (!programme) return res.status(400).json({ message: 'Programme header (x-selected-programme) is required.' });
-        const config = await Config.findOne({ programme });
+        const configFilter = { programme };
+        if (req.sessionId) configFilter.session = req.sessionId;
+        let config = await Config.findOne(configFilter);
+        if (!config && req.sessionId) {
+            config = await Config.findOne({ programme });
+        }
         res.json({
             startDate: config ? config.guideSelectionStartDate : null,
             endDate: config ? config.guideSelectionEndDate : null,
@@ -280,9 +317,11 @@ exports.ensureTeamFormationOpen = async (req, res) => {
     try {
         const programme = req.headers['x-selected-programme'];
         if (!programme) return res.status(400).json({ message: 'Programme header (x-selected-programme) is required.' });
+        const configFilter = { programme };
+        if (req.sessionId) configFilter.session = req.sessionId;
         const config = await Config.findOneAndUpdate(
-            { programme },
-            { $set: { teamFormationOpen: true } },
+            configFilter,
+            { $set: { teamFormationOpen: true, ...(req.sessionId ? { session: req.sessionId } : {}) } },
             { new: true, upsert: true, setDefaultsOnInsert: true }
         );
         res.json({ message: 'Team formation is now open', config });
@@ -304,9 +343,18 @@ exports.getUnassignedTeams = async (req, res) => {
             ]
         };
         if (selectedProg) query.programme = getProgrammeFilter(selectedProg);
-        const unassignedTeams = await Team.find(query)
+        if (req.sessionId) query.session = req.sessionId;
+
+        let unassignedTeams = await Team.find(query)
             .populate('teamLeader', 'username name')
             .populate('members', 'username name');
+
+        if ((!unassignedTeams || unassignedTeams.length === 0) && req.sessionId) {
+            delete query.session;
+            unassignedTeams = await Team.find(query)
+                .populate('teamLeader', 'username name')
+                .populate('members', 'username name');
+        }
 
         res.json(unassignedTeams);
     } catch (error) {
@@ -326,17 +374,20 @@ exports.getGuidesWithTeamCounts = async (req, res) => {
             memberType: { $ne: 'external' }
         }).select('username name designation');
         const { buildDesignationLimitMap, resolveGuideLimitStatus } = require('../utils/guideTeamLimit');
-        const limitMap = await buildDesignationLimitMap(programmeType);
+        const limitMap = await buildDesignationLimitMap(programmeType, req.sessionId);
 
         const programmeQuery = isBE
             ? { programme: 'B.E COMPUTER SCIENCE AND ENGINEERING' }
             : { programme: { $ne: 'B.E COMPUTER SCIENCE AND ENGINEERING' } };
 
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+
         const guidesWithCounts = await Promise.all(guides.map(async (guide) => {
             const teamsAssigned = await Team.find({
                 guidePreference: guide._id,
                 status: 'approved',
-                ...programmeQuery
+                ...programmeQuery,
+                ...sessionFilter
             }).select('_id teamName'); // Select team _id and teamName
 
             const limitStatus = resolveGuideLimitStatus(guide, teamsAssigned.length, limitMap);
@@ -440,21 +491,27 @@ exports.assignGuideToTeam = async (req, res) => {
 // Admin assigns all unassigned teams to guides automatically
 exports.assignAllUnassignedGuides = async (req, res) => {
     try {
-        const unassignedTeams = await Team.find({
+        const unassignedTeamsQuery = {
             $or: [
                 { guidePreference: null },
                 { status: 'pending' },
                 { status: 'rejected' }
             ]
-        }).select('_id programme');
+        };
+        if (req.sessionId) unassignedTeamsQuery.session = req.sessionId;
+        let unassignedTeams = await Team.find(unassignedTeamsQuery).select('_id programme');
+        if (req.sessionId && unassignedTeams.length === 0) {
+            delete unassignedTeamsQuery.session;
+            unassignedTeams = await Team.find(unassignedTeamsQuery).select('_id programme');
+        }
 
         if (unassignedTeams.length === 0) {
             return res.status(200).json({ message: 'No unassigned teams found to auto-assign guides.' });
         }
 
         const { buildDesignationLimitMap, resolveGuideLimitStatus, getTeamCountsByGuideIds } = require('../utils/guideTeamLimit');
-        const limitMapUG = await buildDesignationLimitMap('UG');
-        const limitMapPG = await buildDesignationLimitMap('PG');
+        const limitMapUG = await buildDesignationLimitMap('UG', req.sessionId || null);
+        const limitMapPG = await buildDesignationLimitMap('PG', req.sessionId || null);
 
         const guides = await User.find({
             'roles.role': 'guide',
@@ -466,8 +523,8 @@ exports.assignAllUnassignedGuides = async (req, res) => {
         }
 
         const guideIds = guides.map(g => g._id);
-        const countMapUG = await getTeamCountsByGuideIds(guideIds, 'UG');
-        const countMapPG = await getTeamCountsByGuideIds(guideIds, 'PG');
+        const countMapUG = await getTeamCountsByGuideIds(guideIds, 'UG', req.sessionId || null);
+        const countMapPG = await getTeamCountsByGuideIds(guideIds, 'PG', req.sessionId || null);
 
         const guidesData = guides.map(guide => {
             const ugCount = countMapUG.get(guide._id.toString()) || 0;
@@ -584,9 +641,15 @@ exports.removeGuideFromTeam = async (req, res) => {
 // Get all panels
 exports.getAllPanels = async (req, res) => {
     try {
-        const panels = await Panel.find()
+        const query = req.sessionId ? { session: req.sessionId } : {};
+        let panels = await Panel.find(query)
             .populate('members', 'username name memberType')
             .populate('coordinator', 'username name');
+        if (req.sessionId && panels.length === 0) {
+            panels = await Panel.find({})
+                .populate('members', 'username name memberType')
+                .populate('coordinator', 'username name');
+        }
         res.json(panels);
     } catch (error) {
         console.error('Error fetching panels:', error);
@@ -613,7 +676,11 @@ exports.createPanel = async (req, res) => {
             return res.status(400).json({ message: 'One or more members are invalid or not panel members.' });
         }
 
-        const newPanel = new Panel({ name, members: validMembers.map(m => m._id) });
+        const newPanel = new Panel({
+            name,
+            members: validMembers.map(m => m._id),
+            session: req.sessionId || null
+        });
         await newPanel.save();
 
         res.status(201).json({ message: 'Panel created successfully!', panel: newPanel });
@@ -690,9 +757,17 @@ exports.getUnassignedPanelTeams = async (req, res) => {
         const selectedProg = req.headers['x-selected-programme'] || req.query.programme;
         const query = { panel: null, status: 'approved' };
         if (selectedProg) query.programme = getProgrammeFilter(selectedProg);
-        const teams = await Team.find(query)
+        if (req.sessionId) query.session = req.sessionId;
+        let teams = await Team.find(query)
             .populate('teamLeader', 'username name')
             .populate('guidePreference', 'username name');
+
+        if (req.sessionId && teams.length === 0) {
+            delete query.session;
+            teams = await Team.find(query)
+                .populate('teamLeader', 'username name')
+                .populate('guidePreference', 'username name');
+        }
 
         res.json(teams);
     } catch (error) {
@@ -753,11 +828,22 @@ exports.removePanelFromTeam = async (req, res) => {
 // Get team panel assignments
 exports.getTeamPanelAssignments = async (req, res) => {
     try {
-        const assignments = await Team.find({ panel: { $ne: null } })
+        const query = { panel: { $ne: null } };
+        if (req.sessionId) query.session = req.sessionId;
+        let assignments = await Team.find(query)
             .populate('teamLeader', 'username name')
             .populate('guidePreference', 'username name')
             .populate('panel', 'name members')
             .populate('vivaPanel', 'name members');
+
+        if (req.sessionId && assignments.length === 0) {
+            delete query.session;
+            assignments = await Team.find(query)
+                .populate('teamLeader', 'username name')
+                .populate('guidePreference', 'username name')
+                .populate('panel', 'name members')
+                .populate('vivaPanel', 'name members');
+        }
 
         res.json(assignments);
 
@@ -790,9 +876,11 @@ exports.setReviewPeriodDates = async (req, res) => {
             return res.status(400).json({ message: 'End date must be after start date' });
         }
 
+        const configFilter = { programme };
+        if (req.sessionId) configFilter.session = req.sessionId;
         const config = await Config.findOneAndUpdate(
-            { programme },
-            { $set: { reviewPeriodStartDate: start, reviewPeriodEndDate: end } },
+            configFilter,
+            { $set: { reviewPeriodStartDate: start, reviewPeriodEndDate: end, ...(req.sessionId ? { session: req.sessionId } : {}) } },
             { new: true, upsert: true, setDefaultsOnInsert: true }
         );
         res.json({ message: 'Review period dates updated successfully', config });
@@ -808,7 +896,12 @@ exports.getReviewPeriodDates = async (req, res) => {
     try {
         const programme = req.headers['x-selected-programme'];
         if (!programme) return res.status(400).json({ message: 'Programme header (x-selected-programme) is required.' });
-        const config = await Config.findOne({ programme });
+        const configFilter = { programme };
+        if (req.sessionId) configFilter.session = req.sessionId;
+        let config = await Config.findOne(configFilter);
+        if (!config && req.sessionId) {
+            config = await Config.findOne({ programme });
+        }
         if (!config) {
             return res.json({ startDate: null, endDate: null });
         }
@@ -826,10 +919,19 @@ exports.getReviewPeriodDates = async (req, res) => {
 exports.getReviewSchedules = async (req, res) => {
     try {
         // Only return valid scheduled items with existing team and panel
-        const schedules = await TimeTable.find({ status: 'scheduled' })
+        const query = { status: 'scheduled' };
+        if (req.sessionId) query.session = req.sessionId;
+        let schedules = await TimeTable.find(query)
             .populate('team', 'teamName')
             .populate('panel', 'name')
             .sort({ startTime: 1 });
+        if (req.sessionId && schedules.length === 0) {
+            delete query.session;
+            schedules = await TimeTable.find(query)
+                .populate('team', 'teamName')
+                .populate('panel', 'name')
+                .sort({ startTime: 1 });
+        }
         // Filter out any entries with missing population (deleted refs)
         const filtered = schedules.filter(s => s.team && s.panel);
         res.json(filtered);
@@ -850,7 +952,7 @@ exports.createReviewSchedule = async (req, res) => {
 
         // Determine target slot type dynamically from config
         const programme = req.headers['x-selected-programme'];
-        const { validSlotTypes } = await getReviewSettings(programme);
+        const { validSlotTypes } = await getReviewSettings(programme, req.sessionId || null);
         const targetSlot = slotType && validSlotTypes.includes(slotType) ? slotType : validSlotTypes[0];
 
         // Enforce prerequisites for review2/review3
@@ -866,10 +968,15 @@ exports.createReviewSchedule = async (req, res) => {
         }
 
         // Basic check for existing schedule for the same team, panel, date, period
-        const existingSchedule = await TimeTable.findOne({ team: teamId, panel: panelId, date: scheduleDate, period });
+        const existingScheduleQuery = { team: teamId, panel: panelId, date: scheduleDate, period };
+        if (req.sessionId) existingScheduleQuery.session = req.sessionId;
+        const existingSchedule = await TimeTable.findOne(existingScheduleQuery);
         if (existingSchedule) {
             return res.status(409).json({ message: 'A review schedule for this team, panel, date, and period already exists.' });
         }
+
+        const teamObj = await Team.findById(teamId).select('session');
+        const assignedSession = req.sessionId || (teamObj && teamObj.session) || null;
 
         const newSchedule = new TimeTable({
             team: teamId,
@@ -878,7 +985,8 @@ exports.createReviewSchedule = async (req, res) => {
             period,
             isNotified: false, // Default to false
             slotType: targetSlot,
-            name: `${targetSlot} for ${teamId}`
+            name: `${targetSlot} for ${teamId}`,
+            session: assignedSession
         });
 
         await newSchedule.save();
@@ -917,13 +1025,15 @@ exports.updateReviewSchedule = async (req, res) => {
 
         // Check for conflicts if team, panel, date, or period are being changed
         if (teamId !== schedule.team.toString() || panelId !== schedule.panel.toString() || updatedDate.toISOString().split('T')[0] !== schedule.date.toISOString().split('T')[0] || period !== schedule.period) {
-            const conflict = await TimeTable.findOne({
+            const conflictQuery = {
                 _id: { $ne: scheduleId },
                 team: teamId,
                 panel: panelId,
                 date: updatedDate,
                 period
-            });
+            };
+            if (req.sessionId) conflictQuery.session = req.sessionId;
+            const conflict = await TimeTable.findOne(conflictQuery);
             if (conflict) {
                 return res.status(409).json({ message: 'A conflicting review schedule already exists.' });
             }
@@ -938,6 +1048,9 @@ exports.updateReviewSchedule = async (req, res) => {
         }
         if (schedule.slotType) {
             schedule.name = `${schedule.slotType} for ${schedule.team}`;
+        }
+        if (!schedule.session && req.sessionId) {
+            schedule.session = req.sessionId;
         }
         await schedule.save();
 
@@ -990,7 +1103,7 @@ exports.sendScheduleNotification = async (req, res) => {
     }
 };
 
-// Admin: Send schedule notification
+// Admin: Add user
 exports.addUser = async (req, res) => {
     const { username, password, role, name, memberType } = req.body;
 
@@ -999,9 +1112,10 @@ exports.addUser = async (req, res) => {
     }
 
     try {
-        let existing = await User.findOne({ username });
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        let existing = await User.findOne({ username, ...sessionFilter });
         if (existing) {
-            return res.status(400).json({ message: 'User already exists.' });
+            return res.status(400).json({ message: 'User already exists in this session.' });
         }
 
         // Determine initial plaintext password
@@ -1017,7 +1131,17 @@ exports.addUser = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(initialPassword, salt);
 
-        const user = new User({ username, password: hashedPassword, role, name, memberType });
+        const roles = [{ role }];
+
+        const user = new User({
+            username,
+            password: hashedPassword,
+            role,
+            roles,
+            name,
+            memberType,
+            session: req.sessionId || null
+        });
         await user.save();
 
         res.status(201).json({ message: 'User registered successfully.', user: { id: user._id, username: user.username, role: user.role, name: user.name, memberType: user.memberType } });
@@ -1030,7 +1154,12 @@ exports.addUser = async (req, res) => {
 // Admin: Get all users
 exports.getAllUsers = async (req, res) => {
     try {
-        const users = await User.find().select('-password'); // Exclude password
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        let users = await User.find(sessionFilter).select('-password');
+        // Fallback: if session filter applied but no users found, retrieve unassigned legacy users
+        if (users.length === 0 && req.sessionId) {
+            users = await User.find({ session: { $in: [null, undefined] } }).select('-password');
+        }
         res.json(users);
     } catch (error) {
         console.error('Error fetching users:', error);
@@ -1042,63 +1171,66 @@ exports.getAllUsers = async (req, res) => {
 exports.deleteUser = async (req, res) => {
     try {
         const { userId } = req.params;
-        const user = await User.findById(userId);
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        const user = (req.sessionId ? await User.findOne({ _id: userId, session: req.sessionId }) : null)
+            || await User.findById(userId);
 
         if (!user) {
             return res.status(404).json({ message: 'User not found.' });
         }
 
         const userObjectId = user._id;
+        const targetSessionFilter = req.sessionId ? { session: req.sessionId } : (user.session ? { session: user.session } : {});
 
         // Check if user is a faculty member (guide, panel, coordinator)
-        const hasFacultyRole = user.roles.some(role => ['guide', 'panel', 'coordinator'].includes(role.role));
-        const isStudent = user.roles.some(role => role.role === 'student');
+        const hasFacultyRole = (user.roles && user.roles.some(role => ['guide', 'panel', 'coordinator'].includes(role.role))) || ['guide', 'panel', 'coordinator'].includes(user.role);
+        const isStudent = (user.roles && user.roles.some(role => role.role === 'student')) || user.role === 'student';
 
         if (hasFacultyRole) {
-            // Handle faculty deletion with cascading deletes
-
-            // 1) Delete ALL teams where this faculty is the assigned guide
-            const teamsGuided = await Team.find({ guidePreference: userObjectId }).select('_id');
+            // Handle faculty deletion with cascading deletes scoped to session
+            // 1) Delete teams where this faculty is the assigned guide within this session
+            const teamsGuided = await Team.find({ guidePreference: userObjectId, ...targetSessionFilter }).select('_id');
             const teamIdsGuided = teamsGuided.map(t => t._id);
 
             if (teamIdsGuided.length > 0) {
                 // Cascade delete related data for these teams
-                try { await TimeTable.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) { }
-                try { await Mark.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) { }
-                try { await Attendance.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) { }
-                try { const FinalReport = require('../models/FinalReport'); await FinalReport.deleteMany({ team: { $in: teamIdsGuided } }); } catch (e) { }
-                try { const TeamPanelAssignment = require('../models/TeamPanelAssignment'); await TeamPanelAssignment.updateMany({}, { $pull: { teams: { $in: teamIdsGuided } } }); } catch (e) { }
-                await Team.deleteMany({ _id: { $in: teamIdsGuided } });
+                try { await TimeTable.deleteMany({ team: { $in: teamIdsGuided }, ...targetSessionFilter }); } catch (e) { }
+                try { await Mark.deleteMany({ team: { $in: teamIdsGuided }, ...targetSessionFilter }); } catch (e) { }
+                try { await Attendance.deleteMany({ team: { $in: teamIdsGuided }, ...targetSessionFilter }); } catch (e) { }
+                try { const FinalReport = require('../models/FinalReport'); await FinalReport.deleteMany({ team: { $in: teamIdsGuided }, ...targetSessionFilter }); } catch (e) { }
+                try { const TeamPanelAssignment = require('../models/TeamPanelAssignment'); await TeamPanelAssignment.updateMany(targetSessionFilter, { $pull: { teams: { $in: teamIdsGuided } } }); } catch (e) { }
+                await Team.deleteMany({ _id: { $in: teamIdsGuided }, ...targetSessionFilter });
             }
 
-            // 2) Remove this faculty from any panel memberships and coordinator positions
-            try { await Panel.updateMany({ members: userObjectId }, { $pull: { members: userObjectId } }); } catch (e) { }
-            // 7) Update time table entries to remove this faculty as slot assigner
-            try { await TimeTable.updateMany({ slotAssignedBy: userObjectId }, { $set: { slotAssignedBy: null } }); } catch (e) { }
+            // 2) Remove this faculty from panel memberships and coordinator positions in this session
+            try { await Panel.updateMany({ members: userObjectId, ...targetSessionFilter }, { $pull: { members: userObjectId } }); } catch (e) { }
+            try { await TimeTable.updateMany({ slotAssignedBy: userObjectId, ...targetSessionFilter }, { $set: { slotAssignedBy: null } }); } catch (e) { }
 
         } else if (isStudent) {
-            // Handle student deletion with cascading deletes
-
-            // 1) Remove this student from all teams (members and leader)
-            await Team.updateMany({ members: userObjectId }, { $pull: { members: userObjectId } });
-            await Team.updateMany({ teamLeader: userObjectId }, { $set: { teamLeader: null } });
+            // Handle student deletion with cascading deletes scoped to session
+            // 1) Remove this student from teams (members and leader)
+            await Team.updateMany({ members: userObjectId, ...targetSessionFilter }, { $pull: { members: userObjectId } });
+            await Team.updateMany({ teamLeader: userObjectId, ...targetSessionFilter }, { $set: { teamLeader: null } });
 
             // 2) Find teams that are now empty (no leader and no members) and delete them with cascade
-            const orphanTeams = await Team.find({ $or: [{ members: { $size: 0 } }, { members: { $exists: false } }], teamLeader: null }).select('_id');
+            const orphanTeams = await Team.find({ 
+                $or: [{ members: { $size: 0 } }, { members: { $exists: false } }], 
+                teamLeader: null,
+                ...targetSessionFilter 
+            }).select('_id');
             const orphanIds = orphanTeams.map(t => t._id);
             if (orphanIds.length > 0) {
-                try { await TimeTable.deleteMany({ team: { $in: orphanIds } }); } catch (e) { }
-                try { await Mark.deleteMany({ team: { $in: orphanIds } }); } catch (e) { }
-                try { await Attendance.deleteMany({ team: { $in: orphanIds } }); } catch (e) { }
-                try { const FinalReport = require('../models/FinalReport'); await FinalReport.deleteMany({ team: { $in: orphanIds } }); } catch (e) { }
-                try { const TeamPanelAssignment = require('../models/TeamPanelAssignment'); await TeamPanelAssignment.updateMany({}, { $pull: { teams: { $in: orphanIds } } }); } catch (e) { }
-                await Team.deleteMany({ _id: { $in: orphanIds } });
+                try { await TimeTable.deleteMany({ team: { $in: orphanIds }, ...targetSessionFilter }); } catch (e) { }
+                try { await Mark.deleteMany({ team: { $in: orphanIds }, ...targetSessionFilter }); } catch (e) { }
+                try { await Attendance.deleteMany({ team: { $in: orphanIds }, ...targetSessionFilter }); } catch (e) { }
+                try { const FinalReport = require('../models/FinalReport'); await FinalReport.deleteMany({ team: { $in: orphanIds }, ...targetSessionFilter }); } catch (e) { }
+                try { const TeamPanelAssignment = require('../models/TeamPanelAssignment'); await TeamPanelAssignment.updateMany(targetSessionFilter, { $pull: { teams: { $in: orphanIds } } }); } catch (e) { }
+                await Team.deleteMany({ _id: { $in: orphanIds }, ...targetSessionFilter });
             }
 
             // 3) Clean student-specific data
-            try { await Mark.deleteMany({ student: userObjectId }); } catch (e) { }
-            try { await Attendance.updateMany({}, { $pull: { 'studentAttendances': { student: userObjectId } } }); } catch (e) { }
-
+            try { await Mark.deleteMany({ student: userObjectId, ...targetSessionFilter }); } catch (e) { }
+            try { await Attendance.updateMany(targetSessionFilter, { $pull: { 'studentAttendances': { student: userObjectId } } }); } catch (e) { }
         }
 
         // Finally delete the user
@@ -1113,7 +1245,8 @@ exports.deleteUser = async (req, res) => {
 // Admin: Get attendance records (original implementation)
 exports.getAttendanceRecords = async (req, res) => {
     try {
-        const attendanceRecords = await Attendance.find({ attendanceType: 'session' })
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+        const attendanceRecords = await Attendance.find({ attendanceType: 'session', ...sessionFilter })
             .populate('panel', 'name')
             .populate('recordedBy', 'name')
             .populate('studentAttendances.student', 'name username');
@@ -1129,21 +1262,31 @@ exports.getAttendanceRecords = async (req, res) => {
 exports.getDailyAttendanceRecords = async (req, res) => {
     try {
         const programme = req.headers['x-selected-programme'] || req.query.programme;
-        const { validSlotTypes } = await getReviewSettings(programme);
+        const { validSlotTypes } = await getReviewSettings(programme, req.sessionId || null);
         const totalEvents = validSlotTypes.length || 1;
 
         const teamFilter = {};
         if (req.query.programme) teamFilter.programme = req.query.programme;
-        const teams = await Team.find(teamFilter)
+        if (req.sessionId) teamFilter.session = req.sessionId;
+        let teams = await Team.find(teamFilter)
             .populate('teamLeader', 'name username')
             .populate('members', 'name username')
             .populate('guidePreference', 'name')
             .populate('panel', 'name');
 
+        if (req.sessionId && teams.length === 0) {
+            delete teamFilter.session;
+            teams = await Team.find(teamFilter)
+                .populate('teamLeader', 'name username')
+                .populate('members', 'name username')
+                .populate('guidePreference', 'name')
+                .populate('panel', 'name');
+        }
+
         const studentData = [];
 
         for (const team of teams) {
-            const attendanceRecord = await Attendance.findOne({ team: team._id });
+            const attendanceRecord = await Attendance.findOne({ team: team._id, ...(req.sessionId ? { session: req.sessionId } : {}) });
 
             // Create a combined list of all team members including the team leader
             const allTeamMembers = [];
@@ -1181,7 +1324,7 @@ exports.getDailyAttendanceRecords = async (req, res) => {
 
                 const attendancePercentage = ((presentCount / totalEvents) * 100).toFixed(2);
 
-                const marks = await Mark.find({ student: member._id, team: team._id });
+                const marks = await Mark.find({ student: member._id, team: team._id, ...(req.sessionId ? { session: req.sessionId } : {}) });
 
                 let totalPercentageSum = 0;
                 if (marks.length > 0) {
@@ -1218,7 +1361,8 @@ exports.getAllTeams = async (req, res) => {
         const selectedProg = req.headers['x-selected-programme'] || req.query.programme;
         const filter = {};
         if (selectedProg) filter.programme = getProgrammeFilter(selectedProg);
-        const teams = await Team.find(filter)
+        if (req.sessionId) filter.session = req.sessionId;
+        let teams = await Team.find(filter)
             .populate('teamLeader', 'username name')
             .populate('members', 'username name')
             .populate('guidePreference', 'username name')
@@ -1236,6 +1380,28 @@ exports.getAllTeams = async (req, res) => {
                     select: 'username name memberType'
                 }
             });
+
+        if (req.sessionId && teams.length === 0) {
+            delete filter.session;
+            teams = await Team.find(filter)
+                .populate('teamLeader', 'username name')
+                .populate('members', 'username name')
+                .populate('guidePreference', 'username name')
+                .populate({
+                    path: 'panel',
+                    populate: {
+                        path: 'members',
+                        select: 'username name memberType'
+                    }
+                })
+                .populate({
+                    path: 'vivaPanel',
+                    populate: {
+                        path: 'members',
+                        select: 'username name memberType'
+                    }
+                });
+        }
         res.json(teams);
     } catch (error) {
         console.error('Error fetching teams:', error);
@@ -1284,16 +1450,30 @@ exports.generateSchedules = async (req, res) => {
     try {
         // Accept optional slotType; default to first valid slot from config
         const programme = req.headers['x-selected-programme'];
-        const { validSlotTypes } = await getReviewSettings(programme);
+        const { validSlotTypes } = await getReviewSettings(programme, req.sessionId || null);
         const targetSlot = req.body && validSlotTypes.includes(req.body.slotType) ? req.body.slotType : validSlotTypes[0];
 
         // Get all teams that need schedules
-        const teams = await Team.find({ status: 'approved' })
+        const teamFilter = { status: 'approved' };
+        if (req.sessionId) teamFilter.session = req.sessionId;
+        let teams = await Team.find(teamFilter)
             .populate('guidePreference', 'username')
             .populate('panel', 'name');
 
+        if (req.sessionId && teams.length === 0) {
+            delete teamFilter.session;
+            teams = await Team.find(teamFilter)
+                .populate('guidePreference', 'username')
+                .populate('panel', 'name');
+        }
+
         // Get review period dates
-        const config = await Config.findOne({ programme });
+        const configFilter = { programme };
+        if (req.sessionId) configFilter.session = req.sessionId;
+        let config = await Config.findOne(configFilter);
+        if (!config && req.sessionId) {
+            config = await Config.findOne({ programme });
+        }
         if (!config || !config.reviewPeriodStartDate || !config.reviewPeriodEndDate) {
             return res.status(400).json({ message: 'Review period dates not set' });
         }
@@ -1319,7 +1499,8 @@ exports.generateSchedules = async (req, res) => {
                         period: `${period.start}-${period.end}`,
                         isNotified: false,
                         slotType: targetSlot,
-                        name: `${targetSlot} for ${team.teamName || team._id}`
+                        name: `${targetSlot} for ${team.teamName || team._id}`,
+                        session: req.sessionId || team.session || null
                     });
 
                     await schedule.save();
@@ -1357,7 +1538,8 @@ exports.generateSlotForTeam = async (req, res) => {
 
         // Decide target slot type dynamically from config
         const programme = req.headers['x-selected-programme'] || team.programme;
-        const { validSlotTypes } = await getReviewSettings(programme);
+        const effectiveSession = req.sessionId || team.session || null;
+        const { validSlotTypes } = await getReviewSettings(programme, effectiveSession);
         const targetSlot = slotType && validSlotTypes.includes(slotType) ? slotType : validSlotTypes[0];
 
         // Enforce prerequisites
@@ -1367,7 +1549,12 @@ exports.generateSlotForTeam = async (req, res) => {
         }
 
         // Get review period dates
-        const config = await Config.findOne({ programme });
+        const configFilter = { programme };
+        if (effectiveSession) configFilter.session = effectiveSession;
+        let config = await Config.findOne(configFilter);
+        if (!config && effectiveSession) {
+            config = await Config.findOne({ programme });
+        }
         if (!config || !config.reviewPeriodStartDate || !config.reviewPeriodEndDate) {
             return res.status(400).json({ message: 'Review period dates not set' });
         }
@@ -1389,7 +1576,8 @@ exports.generateSlotForTeam = async (req, res) => {
                     period: `${period.start}-${period.end}`,
                     isNotified: false,
                     slotType: targetSlot,
-                    name: `${targetSlot} for ${team.teamName || team._id}`
+                    name: `${targetSlot} for ${team.teamName || team._id}`,
+                    session: effectiveSession
                 });
 
                 await schedule.save();
@@ -1411,10 +1599,14 @@ exports.generateSlotForTeam = async (req, res) => {
 // Admin: Clear all schedules
 exports.clearSchedules = async (req, res) => {
     try {
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
         // Only keep schedules that are linked to existing teams and panels
-        await TimeTable.deleteMany({ $or: [{ team: { $exists: false } }, { panel: { $exists: false } }] });
+        await TimeTable.deleteMany({
+            ...sessionFilter,
+            $or: [{ team: { $exists: false } }, { panel: { $exists: false } }]
+        });
         // Additionally, remove any schedules whose referenced team or panel no longer exists
-        const all = await TimeTable.find({});
+        const all = await TimeTable.find(sessionFilter);
         const toDelete = [];
         for (const s of all) {
             const teamExists = await Team.exists({ _id: s.team });
@@ -1440,9 +1632,17 @@ exports.getAssignedTeamsSummary = async (req, res) => {
             guidePreference: { $ne: null }
         };
         if (selectedProg) query.programme = getProgrammeFilter(selectedProg);
-        const assignedTeams = await Team.find(query)
+        if (req.sessionId) query.session = req.sessionId;
+        let assignedTeams = await Team.find(query)
             .populate('guidePreference', 'name')
             .select('teamName guidePreference');
+
+        if (req.sessionId && assignedTeams.length === 0) {
+            delete query.session;
+            assignedTeams = await Team.find(query)
+                .populate('guidePreference', 'name')
+                .select('teamName guidePreference');
+        }
 
         res.json(assignedTeams);
     } catch (error) {
@@ -1452,7 +1652,6 @@ exports.getAssignedTeamsSummary = async (req, res) => {
 };
 
 // User Management Functions
-const bcrypt = require('bcryptjs');
 
 // Upload faculty from CSV (email-based)
 exports.uploadFaculty = async (req, res) => {
@@ -2278,7 +2477,12 @@ exports.getReviewsVivaSettings = async (req, res) => {
     try {
         const programme = req.headers['x-selected-programme'];
         if (!programme) return res.status(400).json({ message: 'Programme header (x-selected-programme) is required.' });
-        const config = await Config.findOne({ programme });
+        const configFilter = { programme };
+        if (req.sessionId) configFilter.session = req.sessionId;
+        let config = await Config.findOne(configFilter);
+        if (!config && req.sessionId) {
+            config = await Config.findOne({ programme });
+        }
         res.json({
             numReviews: config ? config.numReviews : 3,
             vivaRequired: config ? config.vivaRequired : true
@@ -2306,9 +2510,11 @@ exports.setReviewsVivaSettings = async (req, res) => {
             return res.status(400).json({ message: 'numReviews must be a number between 1 and 10.' });
         }
 
+        const configFilter = { programme };
+        if (req.sessionId) configFilter.session = req.sessionId;
         const config = await Config.findOneAndUpdate(
-            { programme },
-            { $set: { numReviews: n, vivaRequired: !!vivaRequired } },
+            configFilter,
+            { $set: { numReviews: n, vivaRequired: !!vivaRequired, ...(req.sessionId ? { session: req.sessionId } : {}) } },
             { new: true, upsert: true, setDefaultsOnInsert: true }
         );
         res.json({ message: 'Reviews/Viva settings updated successfully', numReviews: config.numReviews, vivaRequired: config.vivaRequired });
@@ -2353,8 +2559,8 @@ exports.updateTeamAllocation = async (req, res) => {
                 const isPg = team.programme && team.programme !== 'UG';
                 const programmeType = isPg ? 'PG' : 'UG';
 
-                const limitMap = await buildDesignationLimitMap(programmeType);
-                const countMap = await getTeamCountsByGuideIds([guide._id], programmeType);
+                const limitMap = await buildDesignationLimitMap(programmeType, req.sessionId || team.session || null);
+                const countMap = await getTeamCountsByGuideIds([guide._id], programmeType, req.sessionId || team.session || null);
                 const currentApprovedCount = countMap.get(guide._id.toString()) || 0;
                 const limitStatus = resolveGuideLimitStatus(guide, currentApprovedCount, limitMap);
 
@@ -2413,9 +2619,11 @@ exports.updateTeamAllocation = async (req, res) => {
                 team.coordinator = panel.coordinator;
 
                 // Push the team to the new panel assignment record
+                const assignFilter = { panel: panelId };
+                if (req.sessionId || team.session) assignFilter.session = req.sessionId || team.session;
                 await TeamPanelAssignment.findOneAndUpdate(
-                    { panel: panelId },
-                    { $addToSet: { teams: teamId } },
+                    assignFilter,
+                    { $addToSet: { teams: teamId }, ...(assignFilter.session ? { session: assignFilter.session } : {}) },
                     { upsert: true }
                 );
 
@@ -2478,9 +2686,15 @@ exports.autoAssignPanels = async (req, res) => {
         // - For viva panels:   panelType === 'viva'
         // - For review panels: panelType !== 'viva'  (matches frontend: allPanels.filter(p => p.panelType !== 'viva'))
         //   This ensures panels without an explicit panelType field are correctly treated as review panels.
-        const panels = isViva
-            ? await Panel.find({ panelType: 'viva' })
-            : await Panel.find({ panelType: { $ne: 'viva' } });
+        const panelQuery = isViva
+            ? { panelType: 'viva' }
+            : { panelType: { $ne: 'viva' } };
+        if (req.sessionId) panelQuery.session = req.sessionId;
+        let panels = await Panel.find(panelQuery);
+        if (req.sessionId && panels.length === 0) {
+            delete panelQuery.session;
+            panels = await Panel.find(panelQuery);
+        }
 
         if (panels.length === 0) {
             return res.status(400).json({ message: `No ${typeLabel}s exist to assign.` });
@@ -2491,7 +2705,12 @@ exports.autoAssignPanels = async (req, res) => {
         if (req.body.programme) {
             teamQuery.programme = req.body.programme;
         }
-        const teams = await Team.find(teamQuery).populate('guidePreference').populate(teamField);
+        if (req.sessionId) teamQuery.session = req.sessionId;
+        let teams = await Team.find(teamQuery).populate('guidePreference').populate(teamField);
+        if (req.sessionId && teams.length === 0) {
+            delete teamQuery.session;
+            teams = await Team.find(teamQuery).populate('guidePreference').populate(teamField);
+        }
 
         let assignedCount = 0;
         const warnings = [];
@@ -2499,7 +2718,7 @@ exports.autoAssignPanels = async (req, res) => {
         // Count current assignments for each panel to ensure even distribution
         const panelCounts = {};
         for (const p of panels) {
-            const count = await Team.countDocuments({ [teamField]: p._id });
+            const count = await Team.countDocuments({ [teamField]: p._id, ...(req.sessionId ? { session: req.sessionId } : {}) });
             panelCounts[p._id.toString()] = count;
         }
 
@@ -2577,12 +2796,13 @@ exports.autoAssignPanels = async (req, res) => {
                     // Also update TeamPanelAssignment model (for review panels only)
                     if (!isViva) {
                         const TeamPanelAssignment = require('../models/TeamPanelAssignment');
+                        const assignmentFilter = req.sessionId ? { session: req.sessionId } : {};
                         // Pull from any previous panel assignments first
-                        await TeamPanelAssignment.updateMany({}, { $pull: { teams: team._id } });
+                        await TeamPanelAssignment.updateMany(assignmentFilter, { $pull: { teams: team._id } });
                         // Add to new
                         await TeamPanelAssignment.findOneAndUpdate(
-                            { panel: selectedPanel._id },
-                            { $addToSet: { teams: team._id } },
+                            { panel: selectedPanel._id, ...assignmentFilter },
+                            { $addToSet: { teams: team._id }, ...(req.sessionId ? { session: req.sessionId } : {}) },
                             { upsert: true }
                         );
                     }
@@ -2626,7 +2846,12 @@ exports.autoAssignGuidesFromAllocations = async (req, res) => {
         if (req.body.programme) {
             query.programme = req.body.programme;
         }
-        const teams = await Team.find(query).populate('guidePreference');
+        if (req.sessionId) query.session = req.sessionId;
+        let teams = await Team.find(query).populate('guidePreference');
+        if (req.sessionId && teams.length === 0) {
+            delete query.session;
+            teams = await Team.find(query).populate('guidePreference');
+        }
 
         let assignedCount = 0;
         const warnings = [];

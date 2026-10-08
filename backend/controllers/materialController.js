@@ -36,9 +36,11 @@ exports.getMaterialSettings = async (req, res) => {
         const programme = req.headers['programme'] || req.user.programme || 'UG';
         const { panelId } = req.query;
 
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
         const query = {
             createdBy: userId,
-            programme: programmeRegex(programme)
+            programme: programmeRegex(programme),
+            ...sessionFilter
         };
 
         if (panelId) {
@@ -72,13 +74,15 @@ exports.createMaterialSetting = async (req, res) => {
                 ? fileType.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
                 : [];
 
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
         let resolvedPanelId = panelId || null;
 
         // If no panelId provided, auto-lookup the coordinator's panel for this programme
         if (!resolvedPanelId) {
             const panel = await Panel.findOne({
                 coordinator: userId,
-                programme: programmeRegex(programme)
+                programme: programmeRegex(programme),
+                ...sessionFilter
             });
             resolvedPanelId = panel ? panel._id : null;
         }
@@ -89,7 +93,8 @@ exports.createMaterialSetting = async (req, res) => {
             name,
             fileType: normalisedFileType,
             isRequired,
-            createdBy: userId
+            createdBy: userId,
+            session: req.sessionId || null
         });
 
         await setting.save();
@@ -175,12 +180,15 @@ exports.getStudentRequirements = async (req, res) => {
     try {
         const userId = req.user.id;
 
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+
         // Find the student's team (they may be teamLeader or a regular member)
         const team = await Team.findOne({
             $or: [
                 { members: userId },
                 { teamLeader: userId }
-            ]
+            ],
+            ...sessionFilter
         }).populate('panel');
 
         if (!team) {
@@ -194,25 +202,28 @@ exports.getStudentRequirements = async (req, res) => {
             settings = await MaterialSetting.find({
                 createdBy: team.panel.coordinator,
                 panel: team.panel._id,
-                programme: programmeRegex(team.programme || 'UG')
+                programme: programmeRegex(team.programme || 'UG'),
+                ...sessionFilter
             });
 
             // Fallback: if no panel-specific settings, get all settings by coordinator for programme
             if (settings.length === 0) {
                 settings = await MaterialSetting.find({
                     createdBy: team.panel.coordinator,
-                    programme: programmeRegex(team.programme || 'UG')
+                    programme: programmeRegex(team.programme || 'UG'),
+                    ...sessionFilter
                 });
             }
         } else {
             // No panel assigned yet — try to find settings by programme only
             settings = await MaterialSetting.find({
-                programme: programmeRegex(normalizeProgramme(team.programme))
+                programme: programmeRegex(normalizeProgramme(team.programme)),
+                ...sessionFilter
             });
         }
 
         // Populate materialSetting so frontend can compare by _id safely
-        const uploads = await FinalReport.find({ team: team._id })
+        const uploads = await FinalReport.find({ team: team._id, ...sessionFilter })
             .populate('materialSetting', '_id name fileType isRequired');
 
         console.log(`[getStudentRequirements] team=${team._id} settings=${settings.length} uploads=${uploads.length}`);
@@ -236,12 +247,15 @@ exports.uploadMaterial = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded.' });
         }
 
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+
         // Resolve the student's team
         const team = await Team.findOne({
             $or: [
                 { members: userId },
                 { teamLeader: userId }
-            ]
+            ],
+            ...sessionFilter
         });
 
         if (!team) {
@@ -277,7 +291,7 @@ exports.uploadMaterial = async (req, res) => {
         // ─────────────────────────────────────────────────────────────────
 
         // Check if an upload already exists for this team+setting
-        let upload = await FinalReport.findOne({ team: team._id, materialSetting: settingId });
+        let upload = await FinalReport.findOne({ team: team._id, materialSetting: settingId, ...sessionFilter });
 
         if (upload) {
             if (upload.status === 'approved') {
@@ -298,7 +312,8 @@ exports.uploadMaterial = async (req, res) => {
                 filePath: req.file.path.replace(/\\/g, '/'),
                 fileName: req.file.originalname,
                 uploadedBy: userId,
-                status: 'draft'
+                status: 'draft',
+                session: req.sessionId || team.session || null
             });
             await upload.save();
         }
@@ -321,12 +336,15 @@ exports.submitMaterials = async (req, res) => {
     try {
         const userId = req.user.id;
 
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+
         // 1. Resolve the student's team
         const team = await Team.findOne({
             $or: [
                 { members: userId },
                 { teamLeader: userId }
-            ]
+            ],
+            ...sessionFilter
         }).populate('panel');
 
         if (!team) {
@@ -343,22 +361,25 @@ exports.submitMaterials = async (req, res) => {
             settings = await MaterialSetting.find({
                 createdBy: team.panel.coordinator,
                 panel: team.panel._id,
-                programme: programmeRegex(team.programme || 'UG')
+                programme: programmeRegex(team.programme || 'UG'),
+                ...sessionFilter
             });
             if (settings.length === 0) {
                 settings = await MaterialSetting.find({
                     createdBy: team.panel.coordinator,
-                    programme: programmeRegex(team.programme || 'UG')
+                    programme: programmeRegex(team.programme || 'UG'),
+                    ...sessionFilter
                 });
             }
         } else {
             settings = await MaterialSetting.find({
-                programme: programmeRegex(team.programme || 'UG')
+                programme: programmeRegex(team.programme || 'UG'),
+                ...sessionFilter
             });
         }
 
         // 3. Fetch existing uploads for this team
-        const uploads = await FinalReport.find({ team: team._id });
+        const uploads = await FinalReport.find({ team: team._id, ...sessionFilter });
 
         // 4. Map settings that have a VALID upload (we explicitly ignore 'rejected', 'guide_rejected', and 'coordinator_rejected' ones)
         const validUploadedSettingIds = uploads
@@ -421,55 +442,52 @@ exports.getTeamsMaterials = async (req, res) => {
             return res.status(401).json({ message: 'Unauthorized: No User ID found' });
         }
 
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+
         // ── 1. Resolve Panels & Teams based on role ─────────────────────────
         if (role === 'coordinator') {
-            // Coordinator: Find all panels they manage within the target programme
-            const panels = await Panel.find({ coordinator: userId, programme: progRegex });
+            // Coordinator: Find all panels they manage within the target programme in current session
+            const panels = await Panel.find({ coordinator: userId, programme: progRegex, ...sessionFilter });
             
             if (panels.length > 0) {
                 targetPanelIds = panels.map(p => p._id);
 
                 // Option A: If panel assignments are mapped in TeamPanelAssignment schema
-                const assignments = await TeamPanelAssignment.find({ panel: { $in: targetPanelIds } });
+                const assignments = await TeamPanelAssignment.find({ panel: { $in: targetPanelIds }, ...sessionFilter });
                 const assignedTeamIds = assignments.flatMap(a => a.teams);
 
                 // Fetch full team profiles
                 teams = await Team.find({
                     _id: { $in: assignedTeamIds },
-                    programme: progRegex
+                    programme: progRegex,
+                    ...sessionFilter
                 }).populate('panel', 'name coordinator');
-
-                /* 
-                  NOTE: If team documents directly store their panel reference (e.g., team.panel), 
-                  you can fall back to the original method if the assignment collection is empty:
-                  if (teams.length === 0) {
-                      teams = await Team.find({ panel: { $in: targetPanelIds }, programme: progRegex }).populate('panel', 'name coordinator');
-                  }
-                */
             }
 
             // Settings: Get settings specifically assigned to these panels OR global program settings (panel: null)
             settings = await MaterialSetting.find({
                 programme: progRegex,
+                ...sessionFilter,
                 $or: [
                     { panel: { $in: targetPanelIds } },
-                    { panel: null, createdBy: userId } // Fallback for settings created before a panel was assigned
+                    { panel: null, createdBy: userId }
                 ]
             });
 
         } else if (role === 'guide') {
-            // Guide: Find teams where this user is the approved guide
+            // Guide: Find teams where this user is the approved guide in current session
             teams = await Team.find({
                 guidePreference: userId,
                 status: 'approved',
-                programme: progRegex
+                programme: progRegex,
+                ...sessionFilter
             }).populate('panel', 'name coordinator');
 
             if (teams.length > 0) {
                 const teamIds = teams.map(t => t._id);
 
                 // Find panels assigned to these guide's teams via TeamPanelAssignment
-                const assignments = await TeamPanelAssignment.find({ teams: { $in: teamIds } });
+                const assignments = await TeamPanelAssignment.find({ teams: { $in: teamIds }, ...sessionFilter });
                 targetPanelIds = assignments.map(a => a.panel);
 
                 // Also collect direct panel IDs from populated team documents if available
@@ -482,6 +500,7 @@ exports.getTeamsMaterials = async (req, res) => {
                 // Settings: Fetch settings belonging to the guide's panels, or fall back to program defaults
                 settings = await MaterialSetting.find({
                     programme: progRegex,
+                    ...sessionFilter,
                     $or: [
                         { panel: { $in: targetPanelIds } },
                         { panel: null } 
@@ -498,7 +517,8 @@ exports.getTeamsMaterials = async (req, res) => {
         const teamIds = teams.map(t => t._id);
         const uploads = await FinalReport.find({
             team: { $in: teamIds },
-            status: { $ne: 'draft' }   // coordinator/guide never see draft uploads
+            status: { $ne: 'draft' },
+            ...sessionFilter
         })
             .populate('team', 'teamName _id programme')
             .populate('materialSetting', '_id name fileType isRequired');

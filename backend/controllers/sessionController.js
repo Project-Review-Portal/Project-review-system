@@ -201,6 +201,31 @@ exports.deleteSession = async (req, res) => {
 
         // Cascade delete session-scoped data if forced
         await Team.deleteMany({ session: id });
+        try {
+            const TimeTable = require('../models/TimeTable');
+            const Panel = require('../models/Panel');
+            const MarkingScheme = require('../models/MarkingScheme');
+            const TeamPanelAssignment = require('../models/TeamPanelAssignment');
+            const Attendance = require('../models/Attendance');
+            const FinalReport = require('../models/FinalReport');
+            const InstructionTemplate = require('../models/InstructionTemplate');
+            const DesignationTeamLimit = require('../models/DesignationTeamLimit');
+            const Programme = require('../models/Programme');
+
+            await TimeTable.deleteMany({ session: id });
+            await Panel.deleteMany({ session: id });
+            await MarkingScheme.deleteMany({ session: id });
+            await TeamPanelAssignment.deleteMany({ session: id });
+            await Attendance.deleteMany({ session: id });
+            await FinalReport.deleteMany({ session: id });
+            await InstructionTemplate.deleteMany({ session: id });
+            await DesignationTeamLimit.deleteMany({ session: id });
+            await Config.deleteMany({ session: id });
+            await Programme.deleteMany({ session: id });
+            await User.deleteMany({ session: id, role: 'student' });
+        } catch (e) {
+            console.error('Error during session cascade cleanup:', e);
+        }
         await Session.findByIdAndDelete(id);
 
         return res.json({ message: `Session '${session.name}' deleted successfully.` });
