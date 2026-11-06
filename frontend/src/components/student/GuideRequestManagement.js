@@ -58,7 +58,7 @@ const GuideRequestManagement = () => {
             const { startDate, endDate } = datesRes.data || {};
             setGuideSelectionDates({ startDate, endDate });
             
-            let activePeriod = true;
+            let activePeriod = false;
             if (startDate && endDate) {
                 const now = new Date();
                 const start = new Date(startDate);
@@ -116,6 +116,11 @@ const GuideRequestManagement = () => {
         const currentUserId = String(user?.id || user?._id || '');
         const teamLeaderId = String(myTeam?.teamLeader?._id || myTeam?.teamLeader?.id || myTeam?.teamLeader || '');
         const isLeader = Boolean(currentUserId && teamLeaderId && currentUserId === teamLeaderId);
+
+        if (!isRequestPeriodActive) {
+            setError('Guide selection request period is not currently active.');
+            return;
+        }
 
         if (!myTeam || !isLeader) {
             setError('Only team leaders can send guide requests.');

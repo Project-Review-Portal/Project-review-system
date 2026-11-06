@@ -80,18 +80,21 @@ const GuideRequestManagementForGuide = () => {
             const activePeriod = now >= start && now <= end;
             setIsRequestPeriodActive(activePeriod);
 
-            // Fetch guide requests 
-            if (activePeriod) {
-                const res = await axios.get(`${SERVER_API_KEY}/api/guide/team-requests`, { headers });
-                const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-                const selectedProgramme = storedUser.programme;
-                let filtered = res.data.filter(req => req.status === 'pending');
-                if (selectedProgramme) {
-                    filtered = filtered.filter(req => req.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
-                }
-                setRequests(filtered);
+            // Fetch guide requests (always allow guides to see and act on pending requests sent to them)
+            const res = await axios.get(`${SERVER_API_KEY}/api/guide/team-requests`, { headers });
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const selectedProgramme = storedUser.programme;
+            const allPending = (res.data || []).filter(req => req.status === 'pending');
+            if (selectedProgramme) {
+                const norm = (p) => {
+                    const l = (p || '').trim().toLowerCase();
+                    if (l === 'ug' || l === 'b.e computer science and engineering') return 'b.e. cse';
+                    return l;
+                };
+                const matching = allPending.filter(req => norm(req.programme) === norm(selectedProgramme));
+                setRequests(matching.length > 0 ? matching : allPending);
             } else {
-                setRequests([]); 
+                setRequests(allPending);
             }
         } catch (err) {
             console.error('Error fetching guide data:', err);
@@ -188,60 +191,58 @@ const GuideRequestManagementForGuide = () => {
                 </div>
             )}
 
-            {isRequestPeriodActive && (
-                <div className="mb-8">
-                    <h3 className="text-xl font-semibold mb-4">Pending Requests</h3>
-                    {requests.length === 0 ? (
-                        <p className="text-gray-500">No pending requests at this time.</p>
-                    ) : (
-                        <ul className="space-y-4">
-                            {requests.map(request => (
-                                <li key={request._id} className="border p-4 rounded-md bg-gray-50">
-                                    <div className="font-medium text-lg mb-2 flex items-center gap-2">
-                                        Team: {request.teamName}
-                                        <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
-                                            {request.programme || 'UG'}
-                                        </span>
-                                    </div>
+            <div className="mb-8">
+                <h3 className="text-xl font-semibold mb-4">Pending Requests</h3>
+                {requests.length === 0 ? (
+                    <p className="text-gray-500">No pending requests at this time.</p>
+                ) : (
+                    <ul className="space-y-4">
+                        {requests.map(request => (
+                            <li key={request._id} className="border p-4 rounded-md bg-gray-50">
+                                <div className="font-medium text-lg mb-2 flex items-center gap-2">
+                                    Team: {request.teamName}
+                                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                                        {request.programme || 'UG'}
+                                    </span>
+                                </div>
 
-                                    <div className="mb-4">
-                                        <h4 className="font-medium mb-2">Team Leader:</h4>
-                                        <p className="text-gray-700">
-                                            {request.teamLeader?.name || 'N/A'} {request.teamLeader?.username ? `(${request.teamLeader.username})` : ''}
-                                        </p>
-                                    </div>
+                                <div className="mb-4">
+                                    <h4 className="font-medium mb-2">Team Leader:</h4>
+                                    <p className="text-gray-700">
+                                        {request.teamLeader?.name || 'N/A'} {request.teamLeader?.username ? `(${request.teamLeader.username})` : ''}
+                                    </p>
+                                </div>
 
-                                    <div className="mb-4">
-                                        <h4 className="font-medium mb-2">Team Members:</h4>
-                                        <ul className="space-y-1">
-                                            {(request.members || []).filter(Boolean).map((member, index) => (
-                                                <li key={member._id || index} className="text-gray-700">
-                                                    {member.name || 'Unknown User'} {member.username ? `(${member.username})` : ''}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
+                                <div className="mb-4">
+                                    <h4 className="font-medium mb-2">Team Members:</h4>
+                                    <ul className="space-y-1">
+                                        {(request.members || []).filter(Boolean).map((member, index) => (
+                                            <li key={member._id || index} className="text-gray-700">
+                                                {member.name || 'Unknown User'} {member.username ? `(${member.username})` : ''}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
 
-                                    <div className="flex space-x-2">
-                                        <button
-                                            onClick={() => handleRespondToRequest(request._id, 'accept')}
-                                            className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700"
-                                        >
-                                            Accept
-                                        </button>
-                                        <button
-                                            onClick={() => handleRespondToRequest(request._id, 'reject')}
-                                            className="px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
-                                        >
-                                            Reject
-                                        </button>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-            )}
+                                <div className="flex space-x-2">
+                                    <button
+                                        onClick={() => handleRespondToRequest(request._id, 'accept')}
+                                        className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700"
+                                    >
+                                        Accept
+                                    </button>
+                                    <button
+                                        onClick={() => handleRespondToRequest(request._id, 'reject')}
+                                        className="px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
+                                    >
+                                        Reject
+                                    </button>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
         </div>
     );
 };

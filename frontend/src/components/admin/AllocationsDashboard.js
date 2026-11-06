@@ -64,7 +64,7 @@ const AllocationsDashboard = ({ programme }) => {
             const [teamsRes, facultyRes, panelsRes] = await Promise.all([
                 axios.get(`${SERVER_API_KEY}/api/admin/teams${progParam}`, { headers }),
                 axios.get(`${SERVER_API_KEY}/api/auth/faculty`, { headers }),
-                axios.get(`${SERVER_API_KEY}/api/panels`, { headers })
+                axios.get(`${SERVER_API_KEY}/api/panels${progParam}`, { headers })
             ]);
 
             const allTeams = teamsRes.data || [];
@@ -84,8 +84,9 @@ const AllocationsDashboard = ({ programme }) => {
             allTeams.forEach(team => {
                 const teamProg = (team.programme || 'UG').trim().toLowerCase();
                 
-                // 1. Validate Guide: must exist in internalGuides
-                const guideVal = team.guidePreference ? team.guidePreference._id || team.guidePreference : '';
+                // 1. Validate Guide: Only consider allocated if the guide request is APPROVED by the guide
+                const isApproved = team.status === 'approved';
+                const guideVal = (team.guidePreference && isApproved) ? team.guidePreference._id || team.guidePreference : '';
                 const hasValidGuide = guideVal && internalGuides.some(g => String(g._id) === String(guideVal));
 
                 // 2. Validate Review Panel: must exist in filtered reviewPanels for this programme

@@ -281,6 +281,36 @@ exports.requestGuide = async (req, res) => {
             return res.status(400).json({ message: 'You cannot request a guide until your team is locked and finalized.' });
         }
 
+        // Validate that guide selection period is currently active according to admin settings
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : (team.session ? { session: team.session } : {});
+        const programme = team.programme;
+        const config = (await Config.findOne({ programme, ...sessionFilter }))
+            || (await Config.findOne({ ...sessionFilter }))
+            || (await Config.findOne({ programme }))
+            || (await Config.findOne());
+
+        if (!config || !config.guideSelectionStartDate || !config.guideSelectionEndDate) {
+            return res.status(400).json({
+                message: 'Guide selection period is not currently active. Selection dates have not been set by the administrator.'
+            });
+        }
+
+        const now = new Date();
+        const start = new Date(config.guideSelectionStartDate);
+        const end = new Date(config.guideSelectionEndDate);
+
+        if (now < start) {
+            return res.status(400).json({
+                message: `Guide selection process has not started yet. It will begin on ${start.toLocaleString()}.`
+            });
+        }
+
+        if (now > end) {
+            return res.status(400).json({
+                message: `Guide selection process has ended. It concluded on ${end.toLocaleString()}.`
+            });
+        }
+
         // Check if there's an existing guide request that is pending or accepted
         if (team.guidePreference && (team.status === 'pending' || team.status === 'approved')) {
             return res.status(400).json({ message: 'You already have an active guide request or an assigned guide.' });

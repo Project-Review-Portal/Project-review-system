@@ -437,12 +437,12 @@ const AdminHome = () => {
                                     onChange={e => setFormData({ ...formData, semesterType: e.target.value })}
                                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none"
                                 >
-                                    <option value="odd">Odd Semester (July - Nov)</option>
-                                    <option value="even">Even Semester (Jan - May)</option>
+                                    <option value="odd">Odd Semester </option>
+                                    <option value="even">Even Semester </option>
                                 </select>
                                 <p className="text-xs text-gray-400 mt-1">
-                                    {formData.semesterType === 'even' 
-                                        ? 'Even semester automatically adds B.E. CSE to Programs Offered (removable).' 
+                                    {formData.semesterType === 'even'
+                                        ? 'Even semester automatically adds B.E. CSE to Programs Offered (removable).'
                                         : 'Odd semester starts with no default programs; add PG programs in Programs Offered.'}
                                 </p>
                             </div>
@@ -529,7 +529,7 @@ const AdminHome = () => {
                         </div>
 
                         <p className="text-xs text-gray-600 mb-4 leading-relaxed">
-                            UG (B.E. CSE) students continue the same project across both semesters. 
+                            UG (B.E. CSE) students continue the same project across both semesters.
                             This will copy all <strong>UG teams, members, lock states, and assigned guides</strong> from the selected Odd semester into <strong>{targetSessionForRollover.name}</strong>.
                             <br /><br />
                             <em className="text-gray-500">Note: PG students do not roll over (they begin fresh in Session 2). Reviews and marks start fresh.</em>

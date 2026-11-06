@@ -20,9 +20,9 @@ const SEED_USERS = [
     },
     // Faculty
     {
-        username: 'john@univ.edu',
-        email: 'john@univ.edu',
-        name: 'Dr. John',
+        username: 'john.doe@univ.edu',
+        email: 'john.doe@univ.edu',
+        name: 'Dr. John Doe',
         password: 'faculty123',
         role: 'guide',
         roles: [

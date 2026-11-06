@@ -369,9 +369,11 @@ exports.getGuidesWithTeamCounts = async (req, res) => {
         const progType = req.query.programmeType || 'B.E COMPUTER SCIENCE AND ENGINEERING';
         const isBE = progType === 'UG' || progType === 'B.E COMPUTER SCIENCE AND ENGINEERING';
         const programmeType = isBE ? 'UG' : 'PG';
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
         const guides = await User.find({
             'roles.role': 'guide',
-            memberType: { $ne: 'external' }
+            memberType: { $ne: 'external' },
+            ...sessionFilter
         }).select('username name designation');
         const { buildDesignationLimitMap, resolveGuideLimitStatus } = require('../utils/guideTeamLimit');
         const limitMap = await buildDesignationLimitMap(programmeType, req.sessionId);
@@ -379,8 +381,6 @@ exports.getGuidesWithTeamCounts = async (req, res) => {
         const programmeQuery = isBE
             ? { programme: 'B.E COMPUTER SCIENCE AND ENGINEERING' }
             : { programme: { $ne: 'B.E COMPUTER SCIENCE AND ENGINEERING' } };
-
-        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
 
         const guidesWithCounts = await Promise.all(guides.map(async (guide) => {
             const teamsAssigned = await Team.find({
@@ -515,7 +515,8 @@ exports.assignAllUnassignedGuides = async (req, res) => {
 
         const guides = await User.find({
             'roles.role': 'guide',
-            memberType: { $ne: 'external' }
+            memberType: { $ne: 'external' },
+            ...(req.sessionId ? { session: req.sessionId } : {})
         }).select('username name designation');
 
         if (!guides || guides.length === 0) {
@@ -642,14 +643,9 @@ exports.removeGuideFromTeam = async (req, res) => {
 exports.getAllPanels = async (req, res) => {
     try {
         const query = req.sessionId ? { session: req.sessionId } : {};
-        let panels = await Panel.find(query)
+        const panels = await Panel.find(query)
             .populate('members', 'username name memberType')
             .populate('coordinator', 'username name');
-        if (req.sessionId && panels.length === 0) {
-            panels = await Panel.find({})
-                .populate('members', 'username name memberType')
-                .populate('coordinator', 'username name');
-        }
         res.json(panels);
     } catch (error) {
         console.error('Error fetching panels:', error);
@@ -758,16 +754,9 @@ exports.getUnassignedPanelTeams = async (req, res) => {
         const query = { panel: null, status: 'approved' };
         if (selectedProg) query.programme = getProgrammeFilter(selectedProg);
         if (req.sessionId) query.session = req.sessionId;
-        let teams = await Team.find(query)
+        const teams = await Team.find(query)
             .populate('teamLeader', 'username name')
             .populate('guidePreference', 'username name');
-
-        if (req.sessionId && teams.length === 0) {
-            delete query.session;
-            teams = await Team.find(query)
-                .populate('teamLeader', 'username name')
-                .populate('guidePreference', 'username name');
-        }
 
         res.json(teams);
     } catch (error) {
@@ -830,20 +819,11 @@ exports.getTeamPanelAssignments = async (req, res) => {
     try {
         const query = { panel: { $ne: null } };
         if (req.sessionId) query.session = req.sessionId;
-        let assignments = await Team.find(query)
+        const assignments = await Team.find(query)
             .populate('teamLeader', 'username name')
             .populate('guidePreference', 'username name')
             .populate('panel', 'name members')
             .populate('vivaPanel', 'name members');
-
-        if (req.sessionId && assignments.length === 0) {
-            delete query.session;
-            assignments = await Team.find(query)
-                .populate('teamLeader', 'username name')
-                .populate('guidePreference', 'username name')
-                .populate('panel', 'name members')
-                .populate('vivaPanel', 'name members');
-        }
 
         res.json(assignments);
 
@@ -1268,20 +1248,11 @@ exports.getDailyAttendanceRecords = async (req, res) => {
         const teamFilter = {};
         if (req.query.programme) teamFilter.programme = req.query.programme;
         if (req.sessionId) teamFilter.session = req.sessionId;
-        let teams = await Team.find(teamFilter)
+        const teams = await Team.find(teamFilter)
             .populate('teamLeader', 'name username')
             .populate('members', 'name username')
             .populate('guidePreference', 'name')
             .populate('panel', 'name');
-
-        if (req.sessionId && teams.length === 0) {
-            delete teamFilter.session;
-            teams = await Team.find(teamFilter)
-                .populate('teamLeader', 'name username')
-                .populate('members', 'name username')
-                .populate('guidePreference', 'name')
-                .populate('panel', 'name');
-        }
 
         const studentData = [];
 
@@ -1362,7 +1333,7 @@ exports.getAllTeams = async (req, res) => {
         const filter = {};
         if (selectedProg) filter.programme = getProgrammeFilter(selectedProg);
         if (req.sessionId) filter.session = req.sessionId;
-        let teams = await Team.find(filter)
+        const teams = await Team.find(filter)
             .populate('teamLeader', 'username name')
             .populate('members', 'username name')
             .populate('guidePreference', 'username name')
@@ -1381,27 +1352,6 @@ exports.getAllTeams = async (req, res) => {
                 }
             });
 
-        if (req.sessionId && teams.length === 0) {
-            delete filter.session;
-            teams = await Team.find(filter)
-                .populate('teamLeader', 'username name')
-                .populate('members', 'username name')
-                .populate('guidePreference', 'username name')
-                .populate({
-                    path: 'panel',
-                    populate: {
-                        path: 'members',
-                        select: 'username name memberType'
-                    }
-                })
-                .populate({
-                    path: 'vivaPanel',
-                    populate: {
-                        path: 'members',
-                        select: 'username name memberType'
-                    }
-                });
-        }
         res.json(teams);
     } catch (error) {
         console.error('Error fetching teams:', error);
@@ -1456,16 +1406,9 @@ exports.generateSchedules = async (req, res) => {
         // Get all teams that need schedules
         const teamFilter = { status: 'approved' };
         if (req.sessionId) teamFilter.session = req.sessionId;
-        let teams = await Team.find(teamFilter)
+        const teams = await Team.find(teamFilter)
             .populate('guidePreference', 'username')
             .populate('panel', 'name');
-
-        if (req.sessionId && teams.length === 0) {
-            delete teamFilter.session;
-            teams = await Team.find(teamFilter)
-                .populate('guidePreference', 'username')
-                .populate('panel', 'name');
-        }
 
         // Get review period dates
         const configFilter = { programme };
@@ -2690,11 +2633,7 @@ exports.autoAssignPanels = async (req, res) => {
             ? { panelType: 'viva' }
             : { panelType: { $ne: 'viva' } };
         if (req.sessionId) panelQuery.session = req.sessionId;
-        let panels = await Panel.find(panelQuery);
-        if (req.sessionId && panels.length === 0) {
-            delete panelQuery.session;
-            panels = await Panel.find(panelQuery);
-        }
+        const panels = await Panel.find(panelQuery);
 
         if (panels.length === 0) {
             return res.status(400).json({ message: `No ${typeLabel}s exist to assign.` });
@@ -2706,11 +2645,7 @@ exports.autoAssignPanels = async (req, res) => {
             teamQuery.programme = req.body.programme;
         }
         if (req.sessionId) teamQuery.session = req.sessionId;
-        let teams = await Team.find(teamQuery).populate('guidePreference').populate(teamField);
-        if (req.sessionId && teams.length === 0) {
-            delete teamQuery.session;
-            teams = await Team.find(teamQuery).populate('guidePreference').populate(teamField);
-        }
+        const teams = await Team.find(teamQuery).populate('guidePreference').populate(teamField);
 
         let assignedCount = 0;
         const warnings = [];
@@ -2847,11 +2782,7 @@ exports.autoAssignGuidesFromAllocations = async (req, res) => {
             query.programme = req.body.programme;
         }
         if (req.sessionId) query.session = req.sessionId;
-        let teams = await Team.find(query).populate('guidePreference');
-        if (req.sessionId && teams.length === 0) {
-            delete query.session;
-            teams = await Team.find(query).populate('guidePreference');
-        }
+        const teams = await Team.find(query).populate('guidePreference');
 
         let assignedCount = 0;
         const warnings = [];

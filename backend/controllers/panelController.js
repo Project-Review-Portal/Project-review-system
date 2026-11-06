@@ -1120,11 +1120,7 @@ exports.getAllottedSchedulesForCoordinator = async (req, res) => {
         if (req.sessionId) {
             query.session = req.sessionId;
         }
-        let panels = await Panel.find(query);
-        if (panels.length === 0 && req.sessionId) {
-            delete query.session;
-            panels = await Panel.find(query);
-        }
+        const panels = await Panel.find(query);
         const panelIds = panels.map(p => p._id);
 
         const scheduleFilter = { panel: { $in: panelIds } };
@@ -1432,17 +1428,10 @@ exports.getCoordinatorVivaTeams = async (req, res) => {
 
         const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
         const Team = require('../models/Team');
-        let teams = await Team.find({ panel: reviewPanelId, ...sessionFilter })
+        const teams = await Team.find({ panel: reviewPanelId, ...sessionFilter })
             .populate('teamLeader', 'username name')
             .populate('members', 'username name')
             .populate('vivaPanel', 'name');
-
-        if ((!teams || teams.length === 0) && req.sessionId) {
-            teams = await Team.find({ panel: reviewPanelId })
-                .populate('teamLeader', 'username name')
-                .populate('members', 'username name')
-                .populate('vivaPanel', 'name');
-        }
 
         res.json(teams);
     } catch (error) {

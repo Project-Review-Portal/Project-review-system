@@ -137,10 +137,10 @@ test('Full End-to-End Workflow (Continuous Single Browser Session)', async ({ pa
             await page.click('button:has-text("Logout")');
         });
 
-        await test.step('5. Faculty (Dr. John): Session Selection & Accept Guide Request', async () => {
-            // John logs in with 'john@univ.edu' / 'faculty123'
+        await test.step('5. Faculty (Dr. John Doe): Session Selection & Accept Guide Request', async () => {
+            // John logs in with 'john.doe@univ.edu' / 'faculty123'
             await page.goto('/');
-            await page.fill('input[name="email"]', 'john@univ.edu');
+            await page.fill('input[name="email"]', 'john.doe@univ.edu');
             await page.fill('input[name="password"]', 'faculty123');
             await page.click('button[type="submit"]');
 

@@ -235,7 +235,7 @@ test.describe.serial('Comprehensive Session Feature Lifecycle & Access Control S
         // -------------------------------------------------------------
         await test.step('Case 8: Faculty Login with Session Selection Flow', async () => {
             await page.goto('/');
-            await page.fill('input[name="email"]', 'john@univ.edu');
+            await page.fill('input[name="email"]', 'john.doe@univ.edu');
             await page.fill('input[name="password"]', 'faculty123');
             await page.click('button[type="submit"]');
 

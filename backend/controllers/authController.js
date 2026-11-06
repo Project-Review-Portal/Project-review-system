@@ -281,12 +281,16 @@ exports.registerPanel = async (req, res) => {
     }
 };
 
-// Get faculty (guide and panel members)
+// Get faculty (guide and panel members) for current session
 exports.getFaculty = async (req, res) => {
     try {
-        const faculty = await User.find({
+        const query = {
             'roles.role': { $in: ['guide', 'panel'] }
-        }).select('username roles memberType name designation seniority');
+        };
+        if (req.sessionId) {
+            query.session = req.sessionId;
+        }
+        const faculty = await User.find(query).select('username roles memberType name designation seniority');
 
         res.json(faculty);
     } catch (error) {

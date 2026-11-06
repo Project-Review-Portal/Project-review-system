@@ -109,7 +109,7 @@ const ensureDefaultSessionAndMigrate = async () => {
         const resSchemes = await MarkingScheme.updateMany(updateFilter, updateAction);
         const resSettings = await MaterialSetting.updateMany(updateFilter, updateAction);
         const resTemplates = await InstructionTemplate.updateMany(updateFilter, updateAction);
-        const resStudents = await User.updateMany({ role: 'student', ...updateFilter }, updateAction);
+        const resUsers = await User.updateMany({ role: { $ne: 'admin' }, ...updateFilter }, updateAction);
 
         console.log(`✅ Session migration completed. Linked records to '${defaultSession.name}':`, {
             teams: resTeams.modifiedCount,
@@ -123,7 +123,7 @@ const ensureDefaultSessionAndMigrate = async () => {
             markingSchemes: resSchemes.modifiedCount,
             materialSettings: resSettings.modifiedCount,
             templates: resTemplates.modifiedCount,
-            students: resStudents.modifiedCount
+            users: resUsers.modifiedCount
         });
     } catch (err) {
         console.error('Error during session migration:', err);
