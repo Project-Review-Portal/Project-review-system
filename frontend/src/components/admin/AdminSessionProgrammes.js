@@ -57,14 +57,17 @@ const AdminSessionProgrammes = () => {
         navigate(`/admin-dashboard/programme/${encodeURIComponent(progName)}`);
     };
 
-    const ListItem = ({ title, subtitle, icon, color, onClick }) => (
+    const ListItem = ({ title, subtitle, icon, color, badge, onClick }) => (
         <button
             onClick={onClick}
             className={`group w-full relative flex items-center p-4 rounded-xl shadow border text-left transition-all duration-300 hover:scale-[1.01] hover:shadow-md ${color} mb-3`}
         >
             <div className="text-3xl mr-4">{icon}</div>
             <div className="flex-1">
-                <div className="text-lg font-bold text-gray-800">{title}</div>
+                <div className="flex items-center gap-2">
+                    <span className="text-lg font-bold text-gray-800">{title}</span>
+                    {badge}
+                </div>
                 {subtitle && <div className="text-sm text-gray-500">{subtitle}</div>}
             </div>
             <div className="text-gray-400 text-xl group-hover:translate-x-1 transition-transform">→</div>
@@ -83,16 +86,19 @@ const AdminSessionProgrammes = () => {
                     </button>
                     {session && (
                         <div className="flex items-center gap-2">
-                            <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
-                                session.status === 'active' 
-                                    ? 'bg-green-100 text-green-800 border border-green-200' 
-                                    : 'bg-amber-100 text-amber-800 border border-amber-200'
-                            }`}>
-                                {session.status === 'active' ? '● Active' : '⏸ Paused'}
-                            </span>
                             {session.isCurrent && (
-                                <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 border border-amber-200">
                                     ⭐ Current
+                                </span>
+                            )}
+                            {session.isAdvanced && (
+                                <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                                    🚀 Advanced
+                                </span>
+                            )}
+                            {session.isReadOnly && (
+                                <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+                                    🔒 Read-Only
                                 </span>
                             )}
                         </div>
@@ -113,7 +119,7 @@ const AdminSessionProgrammes = () => {
                     <h2 className="text-sm font-semibold uppercase tracking-widest text-indigo-500 mb-3">Session Global Management</h2>
                     <ListItem
                         title="Global Management"
-                        subtitle="Faculty · Designation Limits · PG Programmes Master List"
+                        subtitle="Faculty · Designation Limits · Programs Offered Master List"
                         icon="🌐"
                         color="bg-white border-gray-200 hover:border-indigo-300"
                         onClick={() => navigate(`/admin-dashboard/session/${sessionId}/global-management`)}
@@ -125,33 +131,44 @@ const AdminSessionProgrammes = () => {
                     <h2 className="text-sm font-semibold uppercase tracking-widest text-purple-500 mb-3">Available Programmes</h2>
                     {loading ? (
                         <div className="text-gray-400 text-sm animate-pulse">Loading programmes…</div>
+                    ) : programmes.length === 0 ? (
+                        <div className="p-8 text-center bg-white border border-dashed border-gray-300 rounded-xl text-gray-500">
+                            <div className="text-3xl mb-2">🎓</div>
+                            <div className="font-semibold text-gray-700 mb-1">No programmes added yet</div>
+                            <p className="text-xs text-gray-400 mb-4">Add programs (B.E. CSE, M.E. Big Data, etc.) via Global Management.</p>
+                            <button
+                                onClick={() => navigate(`/admin-dashboard/session/${sessionId}/global-management`)}
+                                className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
+                            >
+                                Open Programs Offered
+                            </button>
+                        </div>
                     ) : (
                         <div className="flex flex-col">
-                            {/* UG always present */}
-                            <ListItem
-                                title="B.E. CSE"
-                                subtitle="Undergraduate Computer Science and Engineering"
-                                icon="📚"
-                                color="bg-white border-gray-200 hover:border-emerald-300"
-                                onClick={() => handleSelectProgramme('B.E. CSE')}
-                            />
-                            {programmes
-                                .filter(pg => pg.name && pg.name.trim().toLowerCase() !== 'b.e. cse')
-                                .map(pg => (
+                            {programmes.map(pg => {
+                                const isUG = pg.name && pg.name.trim().toLowerCase().includes('b.e');
+                                const isPaused = pg.status === 'paused';
+
+                                return (
                                     <ListItem
                                         key={pg._id}
                                         title={pg.name}
-                                        subtitle="Postgraduate Programme"
-                                        icon="🎓"
-                                        color="bg-white border-gray-200 hover:border-purple-300"
+                                        subtitle={isUG ? 'Undergraduate Programme' : 'Postgraduate Programme'}
+                                        icon={isUG ? '📚' : '🎓'}
+                                        color={`bg-white border-gray-200 ${isUG ? 'hover:border-emerald-300' : 'hover:border-purple-300'}`}
+                                        badge={
+                                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full border ${
+                                                isPaused
+                                                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                                    : 'bg-green-100 text-green-800 border-green-300'
+                                            }`}>
+                                                {isPaused ? '⏸️ Paused' : '▶️ Active'}
+                                            </span>
+                                        }
                                         onClick={() => handleSelectProgramme(pg.name)}
                                     />
-                                ))}
-                            {programmes.filter(pg => pg.name && pg.name.trim().toLowerCase() !== 'b.e. cse').length === 0 && (
-                                <div className="text-gray-400 text-sm italic mt-2">
-                                    No additional PG programmes added yet. You can manage global programmes from <strong>Global Management</strong>.
-                                </div>
-                            )}
+                                );
+                            })}
                         </div>
                     )}
                 </div>

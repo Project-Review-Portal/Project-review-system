@@ -53,6 +53,10 @@ const sessionSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    isManualAdvanced: {
+        type: Boolean,
+        default: false
+    },
     programmes: [{
         type: String,
         trim: true

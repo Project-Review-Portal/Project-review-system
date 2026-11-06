@@ -2,7 +2,7 @@ const Session = require('../models/Session');
 const User = require('../models/User');
 const Team = require('../models/Team');
 const Config = require('../models/Config');
-const { getISTDate, resolveCurrentSession } = require('../utils/sessionHelper');
+const { getISTDate, resolveCurrentSession, resolveAdvancedSession } = require('../utils/sessionHelper');
 
 const MONTH_NAMES = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -18,17 +18,21 @@ exports.getAllSessions = async (req, res) => {
         const sessions = await Session.find().sort({ startYear: -1, startMonth: -1, createdAt: -1 });
         const currentSession = await resolveCurrentSession();
         const currentSessionId = currentSession ? currentSession._id.toString() : null;
+        const advancedSession = await resolveAdvancedSession(currentSessionId);
+        const advancedSessionId = advancedSession ? advancedSession._id.toString() : null;
 
         const enriched = sessions.map(s => {
             const sObj = s.toObject();
             sObj.isCurrent = sObj._id.toString() === currentSessionId;
-            sObj.isReadOnly = sObj.status === 'archived' || (!sObj.isCurrent && sObj.status !== 'active');
+            sObj.isAdvanced = sObj._id.toString() === advancedSessionId;
+            sObj.isReadOnly = !(sObj.isCurrent || sObj.isAdvanced);
             return sObj;
         });
 
         return res.json({
             sessions: enriched,
-            currentSessionId
+            currentSessionId,
+            advancedSessionId
         });
     } catch (error) {
         console.error('Error fetching sessions:', error);
@@ -68,6 +72,7 @@ exports.createSession = async (req, res) => {
             semesterType,
             status,
             isManualCurrent,
+            isManualAdvanced,
             programmes
         } = req.body;
 
@@ -92,12 +97,21 @@ exports.createSession = async (req, res) => {
             return res.status(400).json({ message: `Session '${formattedName}' already exists.` });
         }
 
+        let manualCurrent = !!isManualCurrent;
+        let manualAdvanced = !!isManualAdvanced;
+        if (manualCurrent && manualAdvanced) {
+            return res.status(400).json({ message: 'A session cannot be marked as both Current and Advanced.' });
+        }
+
         // Auto calculate academic year if not provided
         const academicYear = `${sYearNum}-${eYearNum}`;
         const semType = semesterType || (sMonthNum >= 6 && sMonthNum <= 11 ? 'odd' : 'even');
 
-        if (isManualCurrent) {
+        if (manualCurrent) {
             await Session.updateMany({}, { isManualCurrent: false });
+        }
+        if (manualAdvanced) {
+            await Session.updateMany({}, { isManualAdvanced: false });
         }
 
         const newSession = new Session({
@@ -108,12 +122,42 @@ exports.createSession = async (req, res) => {
             endYear: eYearNum,
             semesterType: semType,
             academicYear,
-            status: status || 'paused', // Default is paused as requested
-            isManualCurrent: !!isManualCurrent,
-            programmes: Array.isArray(programmes) ? programmes : ['B.E. CSE']
+            status: status || 'active',
+            isManualCurrent: manualCurrent,
+            isManualAdvanced: manualAdvanced,
+            programmes: []
         });
 
         await newSession.save();
+
+        // Default path:
+        // Even semester: defaultly add B.E. CSE program (with status 'active')
+        // Odd semester: don't add any programs to that session (admin will manually add later)
+        if (semType === 'even') {
+            const Programme = require('../models/Programme');
+            const Config = require('../models/Config');
+            const beProg = new Programme({
+                name: 'B.E. CSE',
+                session: newSession._id,
+                status: 'active'
+            });
+            await beProg.save();
+
+            await Config.findOneAndUpdate(
+                { programme: 'B.E. CSE', session: newSession._id },
+                {
+                    $setOnInsert: {
+                        programme: 'B.E. CSE',
+                        session: newSession._id,
+                        maxTeamSize: 4,
+                        numReviews: 3,
+                        vivaRequired: true,
+                        teamFormationOpen: true
+                    }
+                },
+                { upsert: true, new: true }
+            );
+        }
 
         return res.status(201).json({
             message: `Session '${formattedName}' created successfully.`,
@@ -139,6 +183,7 @@ exports.updateSession = async (req, res) => {
             semesterType,
             status,
             isManualCurrent,
+            isManualAdvanced,
             programmes
         } = req.body;
 
@@ -158,12 +203,30 @@ exports.updateSession = async (req, res) => {
         session.name = Session.formatSessionName(session.startMonth, session.startYear, session.endMonth, session.endYear);
         session.academicYear = `${session.startYear}-${session.endYear}`;
 
+        // Mutual exclusion between manual current and manual advanced
+        const targetCurrent = isManualCurrent !== undefined ? !!isManualCurrent : session.isManualCurrent;
+        const targetAdvanced = isManualAdvanced !== undefined ? !!isManualAdvanced : session.isManualAdvanced;
+        if (targetCurrent && targetAdvanced) {
+            return res.status(400).json({ message: 'A session cannot be marked as both Current and Advanced.' });
+        }
+
         if (isManualCurrent !== undefined) {
             if (isManualCurrent) {
                 await Session.updateMany({ _id: { $ne: id } }, { isManualCurrent: false });
                 session.isManualCurrent = true;
+                session.isManualAdvanced = false;
             } else {
                 session.isManualCurrent = false;
+            }
+        }
+
+        if (isManualAdvanced !== undefined) {
+            if (isManualAdvanced) {
+                await Session.updateMany({ _id: { $ne: id } }, { isManualAdvanced: false });
+                session.isManualAdvanced = true;
+                session.isManualCurrent = false;
+            } else {
+                session.isManualAdvanced = false;
             }
         }
 

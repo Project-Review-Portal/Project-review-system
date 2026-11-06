@@ -5,7 +5,7 @@ import ProgrammeManagement from './ProgrammeManagement';
 
 const TABS = [
     { key: 'faculty', label: '👥 Faculty & Designation Limits' },
-    { key: 'programmes', label: '🎓 PG Programmes' },
+    { key: 'programmes', label: '🎓 Programs Offered' },
 ];
 
 const GlobalManagement = () => {
@@ -44,7 +44,7 @@ const GlobalManagement = () => {
                 <h2 className="text-2xl font-bold text-gray-800 mb-1">
                     Global Management {storedSessionName ? `(${storedSessionName})` : ''}
                 </h2>
-                <p className="text-gray-500 text-sm">Manage faculty lists, designation limits, and PG programmes for this session.</p>
+                <p className="text-gray-500 text-sm">Manage faculty lists, designation limits, and programs offered for this session.</p>
             </div>
 
             {/* Tab Bar */}

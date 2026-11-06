@@ -55,7 +55,19 @@ const resolveCurrentSession = async () => {
     return allSessions[0];
 };
 
+/**
+ * Resolve the advanced session if marked (isManualAdvanced: true)
+ */
+const resolveAdvancedSession = async (currentSessionId = null) => {
+    const query = { isManualAdvanced: true };
+    if (currentSessionId) {
+        query._id = { $ne: currentSessionId };
+    }
+    return await Session.findOne(query);
+};
+
 module.exports = {
     getISTDate,
-    resolveCurrentSession
+    resolveCurrentSession,
+    resolveAdvancedSession
 };

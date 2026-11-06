@@ -1,5 +1,6 @@
 const Session = require('../models/Session');
-const { resolveCurrentSession } = require('../utils/sessionHelper');
+const Programme = require('../models/Programme');
+const { resolveCurrentSession, resolveAdvancedSession } = require('../utils/sessionHelper');
 
 /**
  * Middleware to extract session from headers or resolve to default current session.
@@ -13,16 +14,24 @@ const extractSessionContext = async (req, res, next) => {
             sessionDoc = await Session.findById(headerSession);
         }
 
+        const currentSession = await resolveCurrentSession();
+        const currentSessionId = currentSession ? currentSession._id.toString() : null;
+        const advancedSession = await resolveAdvancedSession(currentSessionId);
+        const advancedSessionId = advancedSession ? advancedSession._id.toString() : null;
+
         // If not found from header, resolve to current active session
         if (!sessionDoc) {
-            sessionDoc = await resolveCurrentSession();
+            sessionDoc = currentSession;
         }
 
         if (sessionDoc) {
-            req.sessionId = sessionDoc._id.toString();
+            const sid = sessionDoc._id.toString();
+            req.sessionId = sid;
             req.sessionDoc = sessionDoc;
-            req.isSessionPaused = sessionDoc.status === 'paused';
-            req.isSessionReadOnly = sessionDoc.status === 'archived';
+            req.isCurrentSession = sid === currentSessionId;
+            req.isAdvancedSession = sid === advancedSessionId;
+            // Sessions that are neither Current nor Advanced are Read-Only for non-admins
+            req.isSessionReadOnly = !(req.isCurrentSession || req.isAdvancedSession) || sessionDoc.status === 'archived';
         }
 
         next();
@@ -33,7 +42,7 @@ const extractSessionContext = async (req, res, next) => {
 };
 
 /**
- * Middleware to block non-admins from accessing paused sessions.
+ * Middleware to block non-admins from accessing paused programmes.
  */
 const requireActiveSession = async (req, res, next) => {
     // Admins always have access
@@ -41,29 +50,40 @@ const requireActiveSession = async (req, res, next) => {
         return next();
     }
 
-    if (req.sessionDoc && req.sessionDoc.status === 'paused') {
-        return res.status(403).json({
-            message: 'This session is currently paused by the administrator.',
-            isPaused: true
-        });
+    // Check programme-level paused status
+    try {
+        const progName = req.headers['x-selected-programme'] || req.query.programme || req.user?.programme;
+        if (progName && req.sessionId) {
+            const progDoc = await Programme.findOne({
+                name: { $regex: new RegExp(`^${progName.trim()}$`, 'i') },
+                session: req.sessionId
+            });
+            if (progDoc && progDoc.status === 'paused') {
+                return res.status(403).json({
+                    message: `Programme "${progDoc.name}" is currently paused by the administrator.`,
+                    isPaused: true
+                });
+            }
+        }
+    } catch (err) {
+        console.warn('Error checking programme paused status:', err.message);
     }
 
     next();
 };
 
 /**
- * Middleware to block modifications (POST/PUT/PATCH/DELETE) on archived/past sessions.
+ * Middleware to block modifications (POST/PUT/PATCH/DELETE) on read-only past sessions.
  */
 const enforceReadOnlyPastSession = (req, res, next) => {
     if (req.user && req.user.role === 'admin') {
-        // Admin might still view or manage, but if strictly read-only is requested:
-        // We allow admin mutations or block if archived
+        return next();
     }
 
     const mutatingMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
     if (mutatingMethods.includes(req.method.toUpperCase()) && req.isSessionReadOnly) {
         return res.status(403).json({
-            message: 'This session is archived. All past session data is strictly read-only.'
+            message: 'This session is in read-only mode. Only Current and Advanced sessions permit modifications.'
         });
     }
 

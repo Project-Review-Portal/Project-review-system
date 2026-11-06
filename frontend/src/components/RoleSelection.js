@@ -92,7 +92,7 @@ const RoleSelection = () => {
             const storedSessionId = localStorage.getItem('selectedSessionId');
             if (storedSessionId) {
                 const found = allSessions.find(s => s._id === storedSessionId);
-                if (found && found.status !== 'paused') {
+                if (found) {
                     setSelectedSession(found);
                     setStep('role');
                     fetchUserRolesForSession(found);
@@ -106,11 +106,6 @@ const RoleSelection = () => {
     };
 
     const handleSessionSelect = (session) => {
-        if (session.status === 'paused') {
-            toast.error('This session is currently paused by the administrator. Access is blocked.');
-            return;
-        }
-
         setSelectedSession(session);
         localStorage.setItem('selectedSessionId', session._id);
         localStorage.setItem('selectedSessionName', session.name);
@@ -253,42 +248,40 @@ const RoleSelection = () => {
                     ) : (
                         <div className="space-y-3">
                             {sessions.map(s => {
-                                const isPaused = s.status === 'paused';
                                 return (
                                     <div
                                         key={s._id}
-                                        onClick={() => !isPaused && handleSessionSelect(s)}
-                                        className={`w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between ${
-                                            isPaused
-                                                ? 'bg-gray-100 border-gray-200 opacity-60 cursor-not-allowed'
-                                                : 'bg-white border-gray-200 hover:border-indigo-500 hover:shadow-md cursor-pointer'
-                                        }`}
+                                        onClick={() => handleSessionSelect(s)}
+                                        className="w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between bg-white border-gray-200 hover:border-indigo-500 hover:shadow-md cursor-pointer"
                                     >
                                         <div>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="font-bold text-gray-900 text-base">{s.name}</span>
                                                 {s.isCurrent && (
                                                     <span className="px-2 py-0.5 text-xs font-bold bg-amber-100 text-amber-800 rounded-full border border-amber-200">
                                                         ⭐ Current
                                                     </span>
                                                 )}
+                                                {s.isAdvanced && (
+                                                    <span className="px-2 py-0.5 text-xs font-bold bg-blue-100 text-blue-800 rounded-full border border-blue-200">
+                                                        🚀 Advanced
+                                                    </span>
+                                                )}
+                                                {s.isReadOnly && (
+                                                    <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 rounded-full border border-gray-200">
+                                                        🔒 Read-Only
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="text-xs text-gray-500 mt-0.5">
                                                 {s.semesterType === 'odd' ? 'Odd Semester' : 'Even Semester'}
-                                                {s.academicYear ? ` · ${s.academicYear}` : ''}
                                             </div>
                                         </div>
 
                                         <div>
-                                            {isPaused ? (
-                                                <span className="px-2.5 py-1 text-xs font-bold bg-amber-100 text-amber-800 rounded-full border border-amber-300">
-                                                    ⏸️ Paused by Admin
-                                                </span>
-                                            ) : (
-                                                <span className="text-indigo-600 font-bold text-sm">
-                                                    Select →
-                                                </span>
-                                            )}
+                                            <span className="text-indigo-600 font-bold text-sm">
+                                                {s.isReadOnly ? 'View (Read-Only) →' : 'Select →'}
+                                            </span>
                                         </div>
                                     </div>
                                 );

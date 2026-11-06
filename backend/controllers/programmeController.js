@@ -52,7 +52,8 @@ exports.addProgramme = async (req, res) => {
         }
         const programme = new Programme({
             name: trimmedName,
-            session: req.sessionId || null
+            session: req.sessionId || null,
+            status: 'active'
         });
         await programme.save();
         await ensureConfigForProgramme(trimmedName, req.sessionId);
@@ -86,7 +87,8 @@ exports.bulkAddProgrammes = async (req, res) => {
             if (existing) { skipped.push(name); continue; }
             await new Programme({
                 name,
-                session: req.sessionId || null
+                session: req.sessionId || null,
+                status: 'active'
             }).save();
             await ensureConfigForProgramme(name, req.sessionId);
             added++;
@@ -158,6 +160,47 @@ exports.deleteProgramme = async (req, res) => {
         res.json({ message: `Programme "${programme.name}" deleted` });
     } catch (error) {
         console.error('Error deleting programme:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Toggle single programme status (active <-> paused)
+exports.toggleProgrammeStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const programme = await Programme.findById(id);
+        if (!programme) return res.status(404).json({ message: 'Programme not found' });
+
+        programme.status = programme.status === 'paused' ? 'active' : 'paused';
+        await programme.save();
+
+        res.json({
+            message: `Programme "${programme.name}" is now ${programme.status}.`,
+            programme
+        });
+    } catch (error) {
+        console.error('Error toggling programme status:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Bulk set programme status for a session (activate all / pause all)
+exports.bulkSetProgrammeStatus = async (req, res) => {
+    try {
+        const { status } = req.body;
+        const sessionId = req.sessionId || req.body.sessionId;
+        if (!['active', 'paused'].includes(status)) {
+            return res.status(400).json({ message: 'Status must be active or paused' });
+        }
+        const query = sessionId ? { session: sessionId } : {};
+        const result = await Programme.updateMany(query, { $set: { status } });
+
+        res.json({
+            message: `All programmes have been ${status === 'active' ? 'activated' : 'paused'} (${result.modifiedCount} updated).`,
+            status
+        });
+    } catch (error) {
+        console.error('Error bulk updating programme status:', error);
         res.status(500).json({ message: 'Server error' });
     }
 };

@@ -11,6 +11,11 @@ const programmeSchema = new mongoose.Schema({
         ref: 'Session',
         index: true
     },
+    status: {
+        type: String,
+        enum: ['active', 'paused'],
+        default: 'active'
+    },
     createdAt: {
         type: Date,
         default: Date.now

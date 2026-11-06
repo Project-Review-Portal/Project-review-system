@@ -35,8 +35,8 @@ const AdminHome = () => {
         endMonth: 11,
         endYear: new Date().getFullYear(),
         semesterType: 'odd',
-        status: 'paused', // default is paused
-        isManualCurrent: false
+        isManualCurrent: false,
+        isManualAdvanced: false
     });
     const [submitting, setSubmitting] = useState(false);
 
@@ -85,8 +85,8 @@ const AdminHome = () => {
             endMonth: 11,
             endYear: curYear,
             semesterType: 'odd',
-            status: 'paused', // default is pause
-            isManualCurrent: false
+            isManualCurrent: false,
+            isManualAdvanced: false
         });
         setIsModalOpen(true);
     };
@@ -100,8 +100,8 @@ const AdminHome = () => {
             endMonth: s.endMonth,
             endYear: s.endYear,
             semesterType: s.semesterType || 'odd',
-            status: s.status || 'paused',
-            isManualCurrent: !!s.isManualCurrent
+            isManualCurrent: !!s.isManualCurrent,
+            isManualAdvanced: !!s.isManualAdvanced
         });
         setIsModalOpen(true);
     };
@@ -291,42 +291,29 @@ const AdminHome = () => {
                                                 <div className="flex items-center gap-2 flex-wrap mb-1">
                                                     <span className="text-lg font-bold text-gray-900">{s.name}</span>
                                                     {s.isCurrent && (
-                                                        <span className="px-2 py-0.5 text-xs font-bold bg-amber-100 text-amber-800 rounded-full border border-amber-200">
+                                                        <span className="px-2.5 py-0.5 text-xs font-bold bg-amber-100 text-amber-800 rounded-full border border-amber-200">
                                                             ⭐ Current
+                                                        </span>
+                                                    )}
+                                                    {s.isAdvanced && (
+                                                        <span className="px-2.5 py-0.5 text-xs font-bold bg-blue-100 text-blue-800 rounded-full border border-blue-200">
+                                                            🚀 Advanced
+                                                        </span>
+                                                    )}
+                                                    {s.isReadOnly && (
+                                                        <span className="px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 rounded-full border border-gray-200">
+                                                            🔒 Read-Only
                                                         </span>
                                                     )}
                                                     <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-full border">
                                                         {s.semesterType === 'odd' ? 'Odd Semester' : 'Even Semester'}
                                                     </span>
-                                                    {s.academicYear && (
-                                                        <span className="px-2 py-0.5 text-xs font-medium bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100">
-                                                            {s.academicYear}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="text-xs text-gray-500">
-                                                    Duration: {s.startMonth}/{s.startYear} to {s.endMonth}/{s.endYear} · 
-                                                    Status: <strong className={isActive ? 'text-green-600' : 'text-amber-600'}>{isActive ? 'Active (Open for All Users)' : 'Paused (Blocked for Users)'}</strong>
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Session Controls & Actions */}
                                         <div className="flex items-center gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
-                                            {/* Start/Pause Control Button */}
-                                            <button
-                                                type="button"
-                                                onClick={(e) => handleToggleStatus(s, e)}
-                                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1.5 transition ${
-                                                    isActive
-                                                        ? 'bg-green-600 text-white hover:bg-green-700'
-                                                        : 'bg-amber-500 text-white hover:bg-amber-600'
-                                                }`}
-                                                title={isActive ? 'Session is Live. Click to Pause (block users)' : 'Session is Paused. Click to Start (allow users)'}
-                                            >
-                                                <span>{isActive ? '▶️ Active' : '⏸️ Paused'}</span>
-                                            </button>
-
                                             {/* Rollover UG button for Even semester sessions */}
                                             {isEvenSem && (
                                                 <button
@@ -441,47 +428,66 @@ const AdminHome = () => {
                             </div>
 
                             {/* Semester Type */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                                        Semester Type
-                                    </label>
-                                    <select
-                                        value={formData.semesterType}
-                                        onChange={e => setFormData({ ...formData, semesterType: e.target.value })}
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                                    >
-                                        <option value="odd">Odd Semester</option>
-                                        <option value="even">Even Semester</option>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                                        Initial Status
-                                    </label>
-                                    <select
-                                        value={formData.status}
-                                        onChange={e => setFormData({ ...formData, status: e.target.value })}
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                                    >
-                                        <option value="paused">⏸️ Paused (Default)</option>
-                                        <option value="active">▶️ Active</option>
-                                    </select>
-                                </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                                    Semester Type
+                                </label>
+                                <select
+                                    value={formData.semesterType}
+                                    onChange={e => setFormData({ ...formData, semesterType: e.target.value })}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                                >
+                                    <option value="odd">Odd Semester (July - Nov)</option>
+                                    <option value="even">Even Semester (Jan - May)</option>
+                                </select>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    {formData.semesterType === 'even' 
+                                        ? 'Even semester automatically adds B.E. CSE to Programs Offered (removable).' 
+                                        : 'Odd semester starts with no default programs; add PG programs in Programs Offered.'}
+                                </p>
                             </div>
 
-                            {/* Manual Current Session Override */}
-                            <div className="p-3 bg-purple-50 rounded-lg border border-purple-100 flex items-center gap-2">
+                            {/* Access Tier: Current Session */}
+                            <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 flex items-center gap-2">
                                 <input
                                     type="checkbox"
                                     id="manualCurrent"
                                     checked={formData.isManualCurrent}
-                                    onChange={e => setFormData({ ...formData, isManualCurrent: e.target.checked })}
-                                    className="rounded text-purple-600 focus:ring-purple-500 h-4 w-4"
+                                    disabled={formData.isManualAdvanced}
+                                    onChange={e => {
+                                        const checked = e.target.checked;
+                                        setFormData({
+                                            ...formData,
+                                            isManualCurrent: checked,
+                                            isManualAdvanced: checked ? false : formData.isManualAdvanced
+                                        });
+                                    }}
+                                    className="rounded text-amber-600 focus:ring-amber-500 h-4 w-4"
                                 />
-                                <label htmlFor="manualCurrent" className="text-xs text-gray-700 cursor-pointer font-medium">
-                                    Set as Current Session (Overrides automatic IST calculation)
+                                <label htmlFor="manualCurrent" className="text-xs text-gray-800 cursor-pointer font-medium">
+                                    ⭐ Set as Current Session (Primary active semester for review activities)
+                                </label>
+                            </div>
+
+                            {/* Access Tier: Advanced Session */}
+                            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    id="manualAdvanced"
+                                    checked={formData.isManualAdvanced}
+                                    disabled={formData.isManualCurrent}
+                                    onChange={e => {
+                                        const checked = e.target.checked;
+                                        setFormData({
+                                            ...formData,
+                                            isManualAdvanced: checked,
+                                            isManualCurrent: checked ? false : formData.isManualCurrent
+                                        });
+                                    }}
+                                    className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
+                                />
+                                <label htmlFor="manualAdvanced" className="text-xs text-gray-800 cursor-pointer font-medium">
+                                    🚀 Set as Advanced Session (Secondary active semester with full read-write access)
                                 </label>
                             </div>
 

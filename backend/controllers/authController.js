@@ -33,7 +33,8 @@ const getUserActiveRoles = async (userId, sessionId = null) => {
 
         const allProgrammes = await Programme.find(sessionQuery).sort({ name: 1 });
         const programmeNames = allProgrammes.map(p => p.name);
-        if (!programmeNames.some(name => name.toLowerCase() === 'b.e. cse')) {
+        // Only fallback to 'B.E. CSE' if no session is specified and no programmes exist in database
+        if (!sessionId && programmeNames.length === 0) {
             programmeNames.unshift('B.E. CSE');
         }
 
