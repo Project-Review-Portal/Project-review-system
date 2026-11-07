@@ -40,12 +40,6 @@ const AdminHome = () => {
     });
     const [submitting, setSubmitting] = useState(false);
 
-    // Modal state for UG Rollover
-    const [isRolloverModalOpen, setIsRolloverModalOpen] = useState(false);
-    const [targetSessionForRollover, setTargetSessionForRollover] = useState(null);
-    const [sourceSessionId, setSourceSessionId] = useState('');
-    const [rolloverLoading, setRolloverLoading] = useState(false);
-
     useEffect(() => {
         fetchSessions();
     }, []);
@@ -166,43 +160,6 @@ const AdminHome = () => {
         }
     };
 
-    const openRolloverModal = (targetSession, e) => {
-        e.stopPropagation();
-        setTargetSessionForRollover(targetSession);
-        // Find previous odd session if available
-        const oddSessions = sessions.filter(s => s._id !== targetSession._id && s.semesterType === 'odd');
-        setSourceSessionId(oddSessions.length > 0 ? oddSessions[0]._id : '');
-        setIsRolloverModalOpen(true);
-    };
-
-    const handlePerformRollover = async (e) => {
-        e.preventDefault();
-        if (!sourceSessionId) {
-            toast.error('Please select a source Odd semester session to copy from');
-            return;
-        }
-
-        setRolloverLoading(true);
-        const token = localStorage.getItem('token');
-        try {
-            const res = await axios.post(
-                `${SERVER_API_KEY}/api/sessions/rollover-ug`,
-                {
-                    fromSessionId: sourceSessionId,
-                    toSessionId: targetSessionForRollover._id
-                },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-            toast.success(res.data.message);
-            setIsRolloverModalOpen(false);
-        } catch (err) {
-            console.error('Error during UG rollover:', err);
-            toast.error(err.response?.data?.message || 'Failed to rollover UG data');
-        } finally {
-            setRolloverLoading(false);
-        }
-    };
-
     const handleSelectSession = (s) => {
         localStorage.setItem('selectedSessionId', s._id);
         localStorage.setItem('selectedSessionName', s.name);
@@ -275,7 +232,6 @@ const AdminHome = () => {
                         <div className="flex flex-col gap-3">
                             {sessions.map(s => {
                                 const isActive = s.status === 'active';
-                                const isEvenSem = s.semesterType === 'even';
 
                                 return (
                                     <div
@@ -326,18 +282,6 @@ const AdminHome = () => {
 
                                         {/* Session Controls & Actions */}
                                         <div className="flex items-center gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
-                                            {/* Rollover UG button for Even semester sessions */}
-                                            {isEvenSem && (
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => openRolloverModal(s, e)}
-                                                    className="px-2.5 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold hover:bg-blue-100 transition"
-                                                    title="Copy UG students, teams & guides from Odd semester"
-                                                >
-                                                    👥 UG Rollover
-                                                </button>
-                                            )}
-
                                             <button
                                                 type="button"
                                                 onClick={(e) => openEditModal(s, e)}
@@ -517,72 +461,6 @@ const AdminHome = () => {
                                     className="px-5 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 disabled:opacity-50"
                                 >
                                     {submitting ? 'Saving…' : editingSession ? 'Update Session' : 'Create Session'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* UG Rollover Modal */}
-            {isRolloverModalOpen && targetSessionForRollover && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-                        <div className="flex justify-between items-center mb-3 border-b pb-3">
-                            <h3 className="text-lg font-bold text-gray-800">
-                                UG Rollover (Odd → Even Semester)
-                            </h3>
-                            <button
-                                onClick={() => setIsRolloverModalOpen(false)}
-                                className="text-gray-400 hover:text-gray-600 font-bold"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        <p className="text-xs text-gray-600 mb-4 leading-relaxed">
-                            UG (B.E. CSE) students continue the same project across both semesters.
-                            This will copy all <strong>UG teams, members, lock states, and assigned guides</strong> from the selected Odd semester into <strong>{targetSessionForRollover.name}</strong>.
-                            <br /><br />
-                            <em className="text-gray-500">Note: PG students do not roll over (they begin fresh in Session 2). Reviews and marks start fresh.</em>
-                        </p>
-
-                        <form onSubmit={handlePerformRollover} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                                    Source Odd Semester Session:
-                                </label>
-                                <select
-                                    value={sourceSessionId}
-                                    onChange={e => setSourceSessionId(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                    required
-                                >
-                                    <option value="">-- Select Source Session --</option>
-                                    {sessions
-                                        .filter(s => s._id !== targetSessionForRollover._id)
-                                        .map(s => (
-                                            <option key={s._id} value={s._id}>
-                                                {s.name} ({s.semesterType === 'odd' ? 'Odd Sem' : 'Even Sem'})
-                                            </option>
-                                        ))}
-                                </select>
-                            </div>
-
-                            <div className="flex justify-end gap-3 pt-3 border-t">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsRolloverModalOpen(false)}
-                                    className="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={rolloverLoading || !sourceSessionId}
-                                    className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
-                                >
-                                    {rolloverLoading ? 'Rolling Over…' : 'Execute UG Rollover'}
                                 </button>
                             </div>
                         </form>
