@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import CoordinatorReviewSchedule from './CoordinatorReviewSchedule';
-import CoordinatorVivaSchedule from './coordinator/CoordinatorVivaSchedule';
 import CoordinatorAssignedTeams from './coordinator/CoordinatorAssignedTeams';
 import CoordinatorInstructionTemplate from './coordinator/CoordinatorInstructionTemplate';
 // Replaces old LetterGeneration page with the live editor
@@ -244,7 +243,7 @@ const CoordinatorDashboard = () => {
                     <Route path="assigned-teams" element={<CoordinatorAssignedTeams />} />
                     <Route path="upload-attendance" element={<GuideUploadAttendance />} />
                     <Route path="review-schedule" element={<CoordinatorReviewSchedule />} />
-                    <Route path="viva-schedule" element={<CoordinatorVivaSchedule />} />
+                    <Route path="viva-schedule" element={<Navigate to="../review-schedule" replace />} />
                     <Route path="materials" element={<MaterialsTab />} />
                     <Route path="materials/*" element={<MaterialsTab />} />
                     <Route path="instruction-template" element={<CoordinatorInstructionTemplate />} />
