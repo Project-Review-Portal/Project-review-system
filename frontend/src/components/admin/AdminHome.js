@@ -281,10 +281,22 @@ const AdminHome = () => {
                                     <div
                                         key={s._id}
                                         onClick={() => handleSelectSession(s)}
-                                        className="w-full bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-purple-300 transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4"
+                                        className={`w-full rounded-xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                                            s.isCurrent
+                                                ? 'bg-amber-50/80 border-2 border-amber-300 hover:border-amber-400'
+                                                : s.isAdvanced
+                                                ? 'bg-indigo-50/80 border-2 border-indigo-300 hover:border-indigo-400'
+                                                : 'bg-white border border-gray-200 hover:border-purple-300'
+                                        }`}
                                     >
                                         <div className="flex items-start gap-4 flex-1">
-                                            <div className="text-3xl p-2 bg-purple-50 rounded-lg text-purple-600 flex-shrink-0">
+                                            <div className={`text-3xl p-2 rounded-lg flex-shrink-0 ${
+                                                s.isCurrent 
+                                                    ? 'bg-amber-100 text-amber-700' 
+                                                    : s.isAdvanced 
+                                                    ? 'bg-indigo-100 text-indigo-700' 
+                                                    : 'bg-purple-50 text-purple-600'
+                                            }`}>
                                                 📅
                                             </div>
                                             <div>

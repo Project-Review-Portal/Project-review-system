@@ -252,7 +252,13 @@ const RoleSelection = () => {
                                     <div
                                         key={s._id}
                                         onClick={() => handleSessionSelect(s)}
-                                        className="w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between bg-white border-gray-200 hover:border-indigo-500 hover:shadow-md cursor-pointer"
+                                        className={`w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between hover:shadow-md cursor-pointer ${
+                                            s.isCurrent
+                                                ? 'bg-amber-50/80 border-amber-300 hover:border-amber-400'
+                                                : s.isAdvanced
+                                                ? 'bg-indigo-50/80 border-indigo-300 hover:border-indigo-400'
+                                                : 'bg-white border-gray-200 hover:border-indigo-500'
+                                        }`}
                                     >
                                         <div>
                                             <div className="flex items-center gap-2 flex-wrap">
