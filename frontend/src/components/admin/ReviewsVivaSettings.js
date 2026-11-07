@@ -7,6 +7,7 @@ const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3
 const ReviewsVivaSettings = ({ programme }) => {
     const [numReviews, setNumReviews] = useState(3);
     const [vivaRequired, setVivaRequired] = useState(true);
+    const [review0Required, setReview0Required] = useState(true);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState(null); // { type: 'success'|'error', text: string }
@@ -41,6 +42,7 @@ const ReviewsVivaSettings = ({ programme }) => {
             const data = res.data;
             setNumReviews(data.numReviews ?? 3);
             setVivaRequired(data.vivaRequired ?? true);
+            setReview0Required(data.review0Required ?? true);
         } catch (err) {
             setMessage({ type: 'error', text: err.response?.data?.message || err.message || 'Error fetching settings' });
         } finally {
@@ -58,7 +60,7 @@ const ReviewsVivaSettings = ({ programme }) => {
             };
             const res = await axios.post(
                 `${SERVER_API_KEY}/api/admin/reviews-viva-settings`,
-                { numReviews, vivaRequired },
+                { numReviews, vivaRequired, review0Required },
                 { headers }
             );
             const data = res.data;
@@ -72,6 +74,7 @@ const ReviewsVivaSettings = ({ programme }) => {
 
     // Build a preview list of slot types that would result from current settings
     const previewSlots = [];
+    if (review0Required) previewSlots.push('Review 0');
     for (let i = 1; i <= numReviews; i++) previewSlots.push(`Review ${i}`);
     if (vivaRequired) previewSlots.push('Viva');
 
@@ -132,6 +135,29 @@ const ReviewsVivaSettings = ({ programme }) => {
                 />
             </div>
 
+            {/* Review 0 Required Toggle */}
+            <div className="mb-6 flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div>
+                    <p className="text-sm font-medium text-gray-700">Review 0 Required</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                        When enabled, Review 0 is included for initial title/scope review.
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => setReview0Required(prev => !prev)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                        review0Required ? 'bg-indigo-600' : 'bg-gray-300'
+                    }`}
+                >
+                    <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                            review0Required ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                    />
+                </button>
+            </div>
+
             {/* Viva Required Toggle */}
             <div className="mb-6 flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
                 <div>
@@ -164,6 +190,8 @@ const ReviewsVivaSettings = ({ programme }) => {
                             className={`px-3 py-1 rounded-full text-xs font-semibold ${
                                 slot === 'Viva'
                                     ? 'bg-purple-100 text-purple-700'
+                                    : slot === 'Review 0'
+                                    ? 'bg-amber-100 text-amber-800'
                                     : 'bg-indigo-100 text-indigo-700'
                             }`}
                         >

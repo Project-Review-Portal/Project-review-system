@@ -42,6 +42,10 @@ const configSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    review0Required: {
+        type: Boolean,
+        default: true
+    },
     session: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Session',

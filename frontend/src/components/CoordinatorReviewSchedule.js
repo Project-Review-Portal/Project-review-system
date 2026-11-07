@@ -67,11 +67,12 @@ const CoordinatorReviewSchedule = () => {
       
       const generatedTypes = validSlots.map(slot => ({
         value: slot,
-        label: slot === 'viva' ? 'VIVA' : `Review ${slot.replace('review', '')}`
+        label: slot === 'viva' ? 'VIVA' : slot === 'review0' ? 'Review 0' : `Review ${slot.replace('review', '')}`
       }));
       setReviewTypes(generatedTypes);
       if (generatedTypes.length > 0) {
         setForm(prev => ({ ...prev, reviewType: generatedTypes[0].value }));
+        setSelectedSlotType(prev => validSlots.includes(prev) ? prev : generatedTypes[0].value);
       }
     } catch (err) {
       console.error('Failed to fetch review settings:', err);
@@ -684,7 +685,7 @@ const CoordinatorReviewSchedule = () => {
           
           {/* Slot Type Selector */}
           <div className="flex bg-white p-1 rounded-md border shadow-sm">
-            {['review0', 'review1', 'review2', 'review3', 'viva'].map(type => (
+            {slotTypes.map(type => (
               <button
                 key={type}
                 type="button"

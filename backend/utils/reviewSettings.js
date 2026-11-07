@@ -19,8 +19,12 @@ const getReviewSettings = async (programme = null, sessionId = null) => {
 
     const numReviews = (config && config.numReviews) ? config.numReviews : 3;
     const vivaRequired = config ? config.vivaRequired : true;
+    const review0Required = config ? (config.review0Required ?? true) : true;
 
-    const validSlotTypes = ['review0'];
+    const validSlotTypes = [];
+    if (review0Required) {
+        validSlotTypes.push('review0');
+    }
     for (let i = 1; i <= numReviews; i++) {
         validSlotTypes.push(`review${i}`);
     }
@@ -28,7 +32,7 @@ const getReviewSettings = async (programme = null, sessionId = null) => {
         validSlotTypes.push('viva');
     }
 
-    return { numReviews, vivaRequired, validSlotTypes };
+    return { numReviews, vivaRequired, review0Required, validSlotTypes };
 };
 
 module.exports = { getReviewSettings };

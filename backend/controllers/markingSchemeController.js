@@ -73,7 +73,7 @@ exports.saveSchemeForCoordinator = async (req, res) => {
 
         // Validate slotType
         const programme = req.headers['x-selected-programme'];
-        const { validSlotTypes } = await getReviewSettings(programme);
+        const { validSlotTypes } = await getReviewSettings(programme, req.sessionId);
         if (!validSlotTypes.includes(slotType)) {
             return res.status(400).json({ message: `Invalid slotType "${slotType}".` });
         }

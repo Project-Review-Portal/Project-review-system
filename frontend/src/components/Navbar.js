@@ -42,7 +42,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                 const panelNavItems = [
                     { label: 'Dashboard', path: '/panel-dashboard' },
                     { label: 'Assigned Teams', path: '/panel-dashboard/assigned-teams' },
-                    { label: 'Upload Attendance', path: '/panel-dashboard/upload-attendance' }
+                    { label: 'Review Attendance', path: '/panel-dashboard/upload-attendance' }
                 ];
                 if (user.memberType === 'external') {
                     panelNavItems.push({ label: 'Schedules', path: '/panel-dashboard/review-schedules' });
@@ -73,7 +73,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     { label: 'Registration', path: '/coordinator-dashboard/registration' },
                     { label: 'Viva Panel Formation', path: '/coordinator-dashboard/viva-panel-formation' },
                     { label: 'Assigned Teams', path: '/coordinator-dashboard/assigned-teams' },
-                    { label: 'Upload Attendance', path: '/coordinator-dashboard/upload-attendance' },
+                    { label: 'Review Attendance', path: '/coordinator-dashboard/upload-attendance' },
                     { label: 'Review Schedule', path: '/coordinator-dashboard/review-schedule' },
                     { label: 'Viva Schedule', path: '/coordinator-dashboard/viva-schedule' },
                     { label: 'Marking Scheme', path: '/coordinator-dashboard/marking-scheme' },

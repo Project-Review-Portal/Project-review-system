@@ -593,7 +593,7 @@ exports.submitMarks = async (req, res) => {
 
         // Validate slotType
         const programme = req.headers['x-selected-programme'];
-        const { validSlotTypes } = await getReviewSettings(programme);
+        const { validSlotTypes } = await getReviewSettings(programme, req.sessionId);
         if (!slotType || !validSlotTypes.includes(slotType)) {
             return res.status(400).json({ message: `Invalid or missing slotType. Expected one of ${validSlotTypes.join(', ')}.` });
         }

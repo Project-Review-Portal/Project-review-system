@@ -2428,7 +2428,8 @@ exports.getReviewsVivaSettings = async (req, res) => {
         }
         res.json({
             numReviews: config ? config.numReviews : 3,
-            vivaRequired: config ? config.vivaRequired : true
+            vivaRequired: config ? config.vivaRequired : true,
+            review0Required: config ? (config.review0Required ?? true) : true
         });
     } catch (error) {
         console.error('Error fetching reviews/viva settings:', error);
@@ -2442,7 +2443,7 @@ exports.setReviewsVivaSettings = async (req, res) => {
         const programme = req.headers['x-selected-programme'];
         if (!programme) return res.status(400).json({ message: 'Programme header (x-selected-programme) is required.' });
 
-        const { numReviews, vivaRequired } = req.body;
+        const { numReviews, vivaRequired, review0Required } = req.body;
 
         if (numReviews === undefined || vivaRequired === undefined) {
             return res.status(400).json({ message: 'numReviews and vivaRequired are required.' });
@@ -2457,10 +2458,22 @@ exports.setReviewsVivaSettings = async (req, res) => {
         if (req.sessionId) configFilter.session = req.sessionId;
         const config = await Config.findOneAndUpdate(
             configFilter,
-            { $set: { numReviews: n, vivaRequired: !!vivaRequired, ...(req.sessionId ? { session: req.sessionId } : {}) } },
+            { 
+                $set: { 
+                    numReviews: n, 
+                    vivaRequired: !!vivaRequired,
+                    review0Required: review0Required !== undefined ? !!review0Required : true,
+                    ...(req.sessionId ? { session: req.sessionId } : {}) 
+                } 
+            },
             { new: true, upsert: true, setDefaultsOnInsert: true }
         );
-        res.json({ message: 'Reviews/Viva settings updated successfully', numReviews: config.numReviews, vivaRequired: config.vivaRequired });
+        res.json({ 
+            message: 'Reviews/Viva settings updated successfully', 
+            numReviews: config.numReviews, 
+            vivaRequired: config.vivaRequired,
+            review0Required: config.review0Required 
+        });
     } catch (error) {
         console.error('Error updating reviews/viva settings:', error);
         res.status(500).json({ message: 'Server error' });

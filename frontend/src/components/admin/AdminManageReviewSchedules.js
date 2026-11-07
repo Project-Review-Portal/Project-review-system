@@ -151,7 +151,7 @@ const AdminManageReviewSchedules = ({ programme }) => {
                         >
                             <option value="all">All</option>
                             {slotTypes.map(st => (
-                                <option key={st} value={st}>{st === 'viva' ? 'VIVA' : `Review ${st.replace('review', '')}`}</option>
+                                <option key={st} value={st}>{st === 'viva' ? 'VIVA' : st === 'review0' ? 'Review 0' : `Review ${st.replace('review', '')}`}</option>
                             ))}
                         </select>
                     </div>
@@ -182,7 +182,7 @@ const AdminManageReviewSchedules = ({ programme }) => {
                                     .map((schedule) => {
                                     const displayName = schedule.name || (schedule.type ? schedule.type : 'Review');
                                     const rawType = (schedule.slotType || schedule.type || '').toString().toLowerCase();
-                                    const typeLabel = rawType === 'viva' ? 'VIVA' : `Review ${rawType.replace('review', '')}`;
+                                    const typeLabel = rawType === 'viva' ? 'VIVA' : rawType === 'review0' ? 'Review 0' : `Review ${rawType.replace('review', '')}`;
                                     let duration = schedule.duration;
                                     try {
                                         if ((!duration || duration === 0) && schedule.startTime && schedule.endTime) {
