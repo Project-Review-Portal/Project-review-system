@@ -1,4 +1,5 @@
-require('dotenv').config({ path: './backend/.env' });
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
@@ -190,7 +191,16 @@ const seedUsers = async () => {
 };
 
 if (require.main === module) {
-    seedUsers().then(() => mongoose.disconnect());
+    seedUsers()
+        .then(async () => {
+            await mongoose.disconnect();
+            process.exit(0);
+        })
+        .catch(async (err) => {
+            console.error('Seeding failed:', err);
+            await mongoose.disconnect();
+            process.exit(1);
+        });
 }
 
 module.exports = { seedUsers };

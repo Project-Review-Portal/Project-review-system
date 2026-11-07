@@ -220,10 +220,6 @@ app.listen(PORT, () => {
         // Run session migration and default initialization
         const { ensureDefaultSessionAndMigrate } = require('./scripts/migrateSessions');
         await ensureDefaultSessionAndMigrate();
-
-        // Seed brave-pass accounts
-        const { seedUsers } = require('./scripts/seedUsers');
-        await seedUsers();
     } catch (e) {
         console.error('Error ensuring default users & sessions:', e.message);
     }
