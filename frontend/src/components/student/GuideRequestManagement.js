@@ -155,6 +155,11 @@ const GuideRequestManagement = () => {
     };
 
     const handleCancelRequest = async () => {
+        if (myTeam?.status === 'approved') {
+            setError('Cannot cancel request once the guide has accepted it.');
+            return;
+        }
+
         if (!window.confirm('Are you sure you want to cancel your guide request?')) {
             return;
         }
@@ -261,15 +266,10 @@ const GuideRequestManagement = () => {
                                  myTeam.status}
                             </span>
                         </p>
-                        {myTeam.guidePreference && isTeamLeader && (
+                        {myTeam.guidePreference && isTeamLeader && myTeam.status === 'pending' && (
                             <button
                                 onClick={handleCancelRequest}
-                                disabled={myTeam.status === 'approved'}
-                                className={`mt-2 px-4 py-2 text-sm text-white rounded-md transition-colors ${
-                                    myTeam.status === 'approved'
-                                        ? 'bg-gray-400 cursor-not-allowed'
-                                        : 'bg-red-600 hover:bg-red-700'
-                                }`}
+                                className="mt-2 px-4 py-2 text-sm text-white rounded-md transition-colors bg-red-600 hover:bg-red-700"
                             >
                                 Cancel Request
                             </button>

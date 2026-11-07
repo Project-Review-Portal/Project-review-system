@@ -858,6 +858,10 @@ exports.cancelGuideRequest = async (req, res) => {
             return res.status(400).json({ message: 'No active guide request to cancel.' });
         }
 
+        if (team.status === 'approved') {
+            return res.status(400).json({ message: 'Cannot cancel request once the guide has accepted it.' });
+        }
+
         if (team.status !== 'pending') {
             return res.status(400).json({ message: 'Only pending guide requests can be cancelled.' });
         }
