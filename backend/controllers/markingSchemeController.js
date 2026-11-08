@@ -21,6 +21,7 @@ exports.getSchemeForCoordinator = async (req, res) => {
         // Verify caller coordinates this panel
         const panel = await Panel.findOne({
             _id: panelId,
+            panelType: { $ne: 'viva' },
             $or: [
                 { coordinator: coordinatorId },
                 { assistantCoordinators: coordinatorId }
@@ -83,6 +84,7 @@ exports.saveSchemeForCoordinator = async (req, res) => {
         // Verify coordinator owns this panel
         const panel = await Panel.findOne({
             _id: panelId,
+            panelType: { $ne: 'viva' },
             $or: [
                 { coordinator: coordinatorId },
                 { assistantCoordinators: coordinatorId }
@@ -177,7 +179,8 @@ exports.getMyPanels = async (req, res) => {
         const finalQuery = {
             ...roleMatch,
             ...progFilter,
-            ...sessionFilter
+            ...sessionFilter,
+            panelType: { $ne: 'viva' }
         };
 
         const panels = await Panel.find(finalQuery).select('_id name panelType programme session');

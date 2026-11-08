@@ -46,7 +46,7 @@ const CoordinatorMarkingScheme = () => {
                     axios.get(`${SERVER_API_KEY}/api/auth/review-settings`, { headers })
                 ]);
 
-                const fetchedPanels = panelsRes.data || [];
+                const fetchedPanels = (panelsRes.data || []).filter(p => p.panelType !== 'viva');
                 setPanels(fetchedPanels);
 
                 const validSlots = (settingsRes.data.validSlotTypes || ['review1', 'review2', 'review3', 'viva'])
@@ -179,11 +179,6 @@ const CoordinatorMarkingScheme = () => {
                                     }`}
                                 >
                                     {p.name}
-                                    <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
-                                        selectedPanelId === p._id ? 'bg-indigo-500 text-indigo-100' : 'bg-gray-100 text-gray-500'
-                                    }`}>
-                                        {p.panelType === 'viva' ? 'Viva' : 'Review'}
-                                    </span>
                                 </button>
                             ))}
                         </div>
