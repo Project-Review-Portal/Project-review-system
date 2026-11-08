@@ -1298,13 +1298,17 @@ exports.getDailyAttendanceRecords = async (req, res) => {
                 const marks = await Mark.find({ student: member._id, team: team._id, ...(req.sessionId ? { session: req.sessionId } : {}) });
 
                 let totalPercentageSum = 0;
+                let validMarksCount = 0;
                 if (marks.length > 0) {
                     marks.forEach(mark => {
-                        totalPercentageSum += mark.percentage;
+                        if (typeof mark.percentage === 'number' && !isNaN(mark.percentage)) {
+                            totalPercentageSum += mark.percentage;
+                            validMarksCount++;
+                        }
                     });
                 }
 
-                const averageMarks = marks.length > 0 ? (totalPercentageSum / marks.length).toFixed(2) : 'N/A';
+                const averageMarks = validMarksCount > 0 ? (totalPercentageSum / validMarksCount).toFixed(2) : 'N/A';
 
                 studentData.push({
                     studentId: member._id,

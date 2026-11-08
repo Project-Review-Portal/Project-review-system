@@ -645,7 +645,7 @@ exports.submitMarks = async (req, res) => {
             }
             if (scheme && scheme.components.length > 0) {
                 const maxTotal = scheme.components.reduce((sum, c) => sum + c.maxMarks, 0);
-                if (maxTotal > 0) percentage = (totalMarks / maxTotal) * 50;
+                if (maxTotal > 0) percentage = (totalMarks / maxTotal) * 100;
             }
         }
 
