@@ -53,7 +53,17 @@ const CoordinatorMarkingScheme = () => {
                     .filter(s => s !== 'review0');
                 setSlotTypes(validSlots);
 
-                if (fetchedPanels.length > 0) setSelectedPanelId(fetchedPanels[0]._id);
+                const activeStoredPanelId = localStorage.getItem('selectedPanelId');
+                const matchedPanel = fetchedPanels.find(p => p._id === activeStoredPanelId);
+                const activePanel = matchedPanel || fetchedPanels[0];
+
+                if (activePanel) {
+                    setSelectedPanelId(activePanel._id);
+                    if (!activeStoredPanelId || activeStoredPanelId !== activePanel._id) {
+                        localStorage.setItem('selectedPanelId', activePanel._id);
+                        localStorage.setItem('selectedPanelName', activePanel.name);
+                    }
+                }
                 if (validSlots.length > 0) setActiveSlot(validSlots[0]);
             } catch (err) {
                 setError('Failed to load panels or review settings.');
@@ -139,11 +149,13 @@ const CoordinatorMarkingScheme = () => {
         );
     }
 
+    const currentPanel = panels.find(p => p._id === selectedPanelId);
+
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <div className="flex items-center gap-3 mb-1">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
                         <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -154,6 +166,12 @@ const CoordinatorMarkingScheme = () => {
                         <p className="text-sm text-gray-500">Define mark components for each review/viva type for your panel.</p>
                     </div>
                 </div>
+                {currentPanel && (
+                    <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-indigo-700 self-start md:self-auto">
+                        <span className="text-indigo-500 font-normal">Active Panel:</span>
+                        <span className="font-bold text-indigo-900">{currentPanel.name}</span>
+                    </div>
+                )}
             </div>
 
             {panels.length === 0 ? (
@@ -164,26 +182,6 @@ const CoordinatorMarkingScheme = () => {
                 </div>
             ) : (
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    {/* Panel selector */}
-                    <div className="p-5 border-b border-gray-100 bg-gray-50/50">
-                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Panel</label>
-                        <div className="flex flex-wrap gap-2">
-                            {panels.map(p => (
-                                <button
-                                    key={p._id}
-                                    onClick={() => setSelectedPanelId(p._id)}
-                                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-150 border ${
-                                        selectedPanelId === p._id
-                                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                                            : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-400 hover:text-indigo-600'
-                                    }`}
-                                >
-                                    {p.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
                     {/* Evaluator Type tabs */}
                     <div className="px-5 pt-4 border-b border-gray-100 bg-white">
                         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Marking Scheme Target</label>
