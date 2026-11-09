@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 
-const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
+const SERVER_API_KEY = process.env.REACT_APP_SERVER_API_KEY || "http://localhost:3626";
 
 const PanelAssignedTeams = () => {
     const [assignedTeams, setAssignedTeams] = useState([]);
@@ -15,122 +15,253 @@ const PanelAssignedTeams = () => {
     const fetchAssignedTeams = async () => {
         try {
             const token = localStorage.getItem('token');
-
-            // Debug logging
-            console.log('🔍 Frontend Debug - Token from localStorage:', token ? 'Present' : 'Missing');
-            console.log('🔍 Frontend Debug - Token length:', token ? token.length : 0);
-            console.log('🔍 Frontend Debug - User object from context:', JSON.parse(localStorage.getItem('user') || '{}'));
-
             if (!token) {
-                console.error('❌ No token found in localStorage');
                 setError('Authentication token not found. Please login again.');
                 setLoading(false);
                 return;
             }
 
-            // Check if token is expired
-            try {
-                const tokenPayload = JSON.parse(atob(token.split('.')[1]));
-                const currentTime = Math.floor(Date.now() / 1000);
-                if (tokenPayload.exp < currentTime) {
-                    console.error('❌ Token has expired');
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    setError('Your session has expired. Please login again.');
-                    setLoading(false);
-                    return;
-                }
-                console.log('✅ Token is valid, expires at:', new Date(tokenPayload.exp * 1000));
-            } catch (error) {
-                console.error('❌ Invalid token format');
-                setError('Invalid authentication token. Please login again.');
-                setLoading(false);
-                return;
-            }
-
-            // First, let's debug the token
-            console.log('🔍 Testing token with debug endpoint...');
-            console.log('🔍 Full token:', token);
-            try {
-                const debugResponse = await axios.get(`${SERVER_API_KEY}/api/panels/debug-token`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                console.log('🔍 Token debug result:', debugResponse.data);
-            } catch (debugError) {
-                console.error('❌ Token debug failed:', debugError.response?.status, debugError.response?.data);
-                console.error('❌ Full debug error:', debugError);
-            }
-
-            console.log('🚀 Making request to /api/panels/assigned-teams');
-            const response = await axios.get(`${SERVER_API_KEY}/api/panels/assigned-teams`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            console.log('✅ Success! Response:', response.status, response.data);
             const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
             const selectedProgramme = storedUser.programme;
-            let fetchedTeams = response.data || [];
+
+            // Fetch both assigned-teams and review-schedules to guarantee full panel metadata (coordinator & members)
+            const [teamsRes, schedulesRes] = await Promise.all([
+                axios.get(`${SERVER_API_KEY}/api/panels/assigned-teams`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'x-selected-programme': selectedProgramme || '',
+                        'x-selected-role': storedUser.role || 'panel'
+                    }
+                }).catch(() => ({ data: [] })),
+                axios.get(`${SERVER_API_KEY}/api/panels/review-schedules`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                }).catch(() => ({ data: [] }))
+            ]);
+
+            // Build panel metadata lookup from review schedules (which populates members & coordinator)
+            const panelMetaMap = new Map();
+            (schedulesRes.data || []).forEach(sch => {
+                const p = sch.panel;
+                if (!p) return;
+                const pId = p._id ? String(p._id) : '';
+                const pName = (p.name || '').trim().toLowerCase();
+                if (pId && !panelMetaMap.has(pId)) panelMetaMap.set(pId, p);
+                if (pName && !panelMetaMap.has(pName)) panelMetaMap.set(pName, p);
+            });
+
+            let fetchedTeams = teamsRes.data || [];
             if (selectedProgramme) {
                 fetchedTeams = fetchedTeams.filter(t => t.programme?.toLowerCase() === selectedProgramme?.toLowerCase());
             }
-            setAssignedTeams(fetchedTeams);
+
+            // Enrich each team with full panel details if missing
+            const enrichedTeams = fetchedTeams.map(team => {
+                const pObj = team.panel;
+                const pId = pObj?._id ? String(pObj._id) : '';
+                const pName = (pObj?.name || team.panelName || '').trim().toLowerCase();
+                const meta = (pObj?.members && pObj.members.length > 0)
+                    ? pObj
+                    : (panelMetaMap.get(pId) || panelMetaMap.get(pName) || pObj);
+                return {
+                    ...team,
+                    panel: meta,
+                    panelName: meta?.name || team.panelName || 'Panel'
+                };
+            });
+
+            setAssignedTeams(enrichedTeams);
             setLoading(false);
         } catch (err) {
-            console.error('❌ Error fetching assigned teams:', err);
-            console.error('❌ Error response:', err.response?.data);
-            console.error('❌ Error status:', err.response?.status);
+            console.error('Error fetching assigned teams:', err);
             setError(`Failed to fetch assigned teams: ${err.response?.data?.message || err.message}`);
             setLoading(false);
         }
     };
 
-    if (loading) return <div className="text-center p-4">Loading assigned teams...</div>;
-    if (error) return <div className="text-red-500 p-4">{error}</div>;
+    // Extract all team members with roll numbers and mark the leader
+    const extractTeamMembers = (team) => {
+        const list = [];
+        const leader = team.teamLeader;
+        if (leader?.name) {
+            list.push({
+                name: leader.name,
+                rollNo: leader.username || '',
+                isLeader: true
+            });
+        }
+        const rawMembers = Array.isArray(team.members) ? team.members : [];
+        rawMembers.forEach(m => {
+            if (!m?.name) return;
+            const isDuplicate = list.some(
+                existing => existing.name === m.name || (m.username && existing.rollNo === m.username)
+            );
+            if (!isDuplicate) {
+                list.push({
+                    name: m.name,
+                    rollNo: m.username || '',
+                    isLeader: false
+                });
+            }
+        });
+        return list;
+    };
+
+    // Segregate teams panel-wise
+    const panelGroups = useMemo(() => {
+        const map = new Map();
+        assignedTeams.forEach(team => {
+            const pObj = team.panel;
+            const panelId = pObj?._id ? String(pObj._id) : (team.panelName || 'unassigned');
+            const panelName = pObj?.name || team.panelName || 'Unassigned Panel';
+            const coordinator = pObj?.coordinator?.name || (typeof pObj?.coordinator === 'string' ? pObj.coordinator : '');
+
+            // Build members list mentioning the coordinator
+            const rawMembers = Array.isArray(pObj?.members) ? pObj.members : [];
+            const memberNames = rawMembers.map(m => {
+                if (!m) return null;
+                const name = typeof m === 'string' ? m : (m.name || m.username);
+                if (!name) return null;
+                if (coordinator && name.toLowerCase() === coordinator.toLowerCase()) {
+                    return `${name} (Coordinator)`;
+                }
+                return name;
+            }).filter(Boolean);
+
+            // If coordinator wasn't already in members list, add them explicitly
+            if (coordinator && !memberNames.some(n => n.toLowerCase().includes(coordinator.toLowerCase()))) {
+                memberNames.unshift(`${coordinator} (Coordinator)`);
+            }
+
+            const membersList = memberNames.join(', ');
+
+            if (!map.has(panelId)) {
+                map.set(panelId, {
+                    id: panelId,
+                    name: panelName,
+                    coordinator,
+                    membersList,
+                    teams: []
+                });
+            }
+            map.get(panelId).teams.push(team);
+        });
+        return Array.from(map.values());
+    }, [assignedTeams]);
+
+    if (loading) return <div className="text-center p-6 text-gray-500 font-medium">Loading assigned teams...</div>;
+    if (error) return <div className="text-red-500 p-6 bg-red-50 rounded-lg border border-red-200">{error}</div>;
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-2xl font-bold mb-6">Your Assigned Teams</h2>
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 space-y-6">
+            <div className="border-b border-gray-200 pb-4">
+                <h2 className="text-xl font-bold text-gray-800">Your Assigned Teams</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                    Teams allotted to your review panels
+                </p>
+            </div>
 
-            {assignedTeams.length === 0 ? (
-                <p>No teams have been assigned to your panel yet.</p>
+            {panelGroups.length === 0 ? (
+                <div className="text-center py-10 text-xs text-gray-500 bg-gray-50 border border-dashed border-gray-200 rounded-lg">
+                    No teams have been assigned to your panel yet.
+                </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {assignedTeams.map(team => (
-                        <div key={team._id} className="border p-4 rounded-lg shadow-sm">
-                            <div className="flex items-center gap-2 mb-2">
-                                <h3 className="font-semibold text-lg">Team: {team.teamName}</h3>
-                                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
-                                    {team.programme || 'UG'}
+                panelGroups.map(panelGroup => (
+                    <div key={panelGroup.id} className="border border-gray-200 rounded-lg p-5 bg-white shadow-xs space-y-4">
+                        {/* Panel Header: Panel name, Coordinator, and Members (mentioning coordinator) */}
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-xs text-gray-800 flex flex-wrap items-center gap-x-6 gap-y-1.5 font-medium">
+                            <div>
+                                <span className="font-bold text-gray-900">Panel: </span>
+                                <span className="text-indigo-900 font-bold">{panelGroup.name}</span>
+                            </div>
+                            {panelGroup.coordinator && (
+                                <div>
+                                    <span className="font-bold text-gray-900">Coordinator: </span>
+                                    <span className="text-gray-700">{panelGroup.coordinator}</span>
+                                </div>
+                            )}
+                            <div>
+                                <span className="font-bold text-gray-900">Members: </span>
+                                <span className="text-gray-700">
+                                    {panelGroup.membersList || 'None listed'}
                                 </span>
                             </div>
-                            <p className="text-gray-700">Team Leader: {team.teamLeader?.name || 'N/A'} ({team.teamLeader?.username || 'N/A'})</p>
-                            <p className="text-gray-700">Review Panel: {team.panel?.name || 'Not Assigned'}</p>
-                            <p className="text-gray-700">Viva Panel: {team.vivaPanel?.name || 'Not Assigned'}</p>
-                            <p className="text-gray-700">Guide: {team.guidePreference?.name || 'Not Assigned'}</p>
-                            <div className="mt-2">
-                                <p className="font-medium">Members:</p>
-                                {team.members && team.members.length > 0 ? (
-                                    <ul className="list-disc list-inside ml-4 text-gray-700">
-                                        {(team.members || []).filter(Boolean).map((member, idx) => (
-                                            <li key={member._id || idx}>{member.name || member.username || 'Unknown User'}</li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <p className="text-gray-500">No members listed.</p>
-                                )}
-                            </div>
                         </div>
-                    ))}
-                </div>
+
+                        {/* Teams Table: Columns: Team Name, Members, Guide, Viva Panel (No programme name) */}
+                        <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-2xs">
+                            <table className="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr className="bg-gray-100 text-gray-700 border-b border-gray-200">
+                                        <th className="py-2.5 px-3 font-semibold text-center w-12">SNo</th>
+                                        <th className="py-2.5 px-4 font-semibold whitespace-nowrap">Team Name</th>
+                                        <th className="py-2.5 px-4 font-semibold">Members</th>
+                                        <th className="py-2.5 px-4 font-semibold whitespace-nowrap">Guide</th>
+                                        <th className="py-2.5 px-4 font-semibold whitespace-nowrap">Viva Panel</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 bg-white">
+                                    {panelGroup.teams.map((team, idx) => {
+                                        const members = extractTeamMembers(team);
+                                        const guideName = team.guidePreference?.name || '—';
+                                        const vivaPanelName = team.vivaPanel?.name || '—';
+
+                                        return (
+                                            <tr key={team._id || idx} className="hover:bg-gray-50/80 transition-colors">
+                                                {/* SNo */}
+                                                <td className="py-2.5 px-3 align-top text-center text-gray-500 font-medium">
+                                                    {idx + 1}
+                                                </td>
+
+                                                {/* Team Name (no programme name) */}
+                                                <td className="py-2.5 px-4 align-top whitespace-nowrap">
+                                                    <div className="font-bold text-gray-900">
+                                                        {team.teamName}
+                                                    </div>
+                                                </td>
+
+                                                {/* Members with Roll No and Leader indicator */}
+                                                <td className="py-2.5 px-4 align-top min-w-[200px]">
+                                                    {members.length > 0 ? (
+                                                        <div className="space-y-1">
+                                                            {members.map((m, mIdx) => (
+                                                                <div key={mIdx} className="text-gray-800 text-xs">
+                                                                    <span className="font-semibold text-gray-900">{m.name}</span>
+                                                                    {m.rollNo && (
+                                                                        <span className="text-gray-500 text-[11px] ml-1">({m.rollNo})</span>
+                                                                    )}
+                                                                    {m.isLeader && (
+                                                                        <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold rounded bg-indigo-100 text-indigo-700">
+                                                                            Leader
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-gray-400">No members listed</span>
+                                                    )}
+                                                </td>
+
+                                                {/* Guide */}
+                                                <td className="py-2.5 px-4 align-top whitespace-nowrap text-gray-800">
+                                                    {guideName}
+                                                </td>
+
+                                                {/* Viva Panel */}
+                                                <td className="py-2.5 px-4 align-top whitespace-nowrap text-gray-700">
+                                                    {vivaPanelName}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ))
             )}
         </div>
     );
 };
 
-export default PanelAssignedTeams; 
+export default PanelAssignedTeams;

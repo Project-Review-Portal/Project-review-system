@@ -429,9 +429,9 @@ exports.getPanelReviewSchedules = async (req, res) => {
 exports.getAssignedTeamsForPanel = async (req, res) => {
     try {
         const userId = req.user.id;
-        const userRole = req.headers['x-selected-role'];
-        const selectedProgramme=req.headers['x-selected-programme'];
-        console.log(userRole,selectedProgramme);
+        const userRole = req.headers['x-selected-role'] || req.user.role;
+        const selectedProgramme = req.headers['x-selected-programme'];
+        console.log(userRole, selectedProgramme);
         const rolesArray = Array.isArray(req.user.roles) ? req.user.roles.map(r => (typeof r === 'string' ? r : r.role)).filter(Boolean) : [];
         console.log('User ID:', userId, 'Role:', userRole, 'Roles array:', rolesArray);
 
@@ -440,7 +440,13 @@ exports.getAssignedTeamsForPanel = async (req, res) => {
         if (userRole === 'panel' || rolesArray.includes('panel')) {
             // For panel members, find teams assigned to their panels using Team.panel for source of truth
             console.log('User is a panel member, finding teams assigned to their panels');
-            const panels = await Panel.find({ members: userId ,programme:selectedProgramme});
+            const panelQuery = { members: userId };
+            if (selectedProgramme) {
+                panelQuery.programme = selectedProgramme;
+            }
+            const panels = await Panel.find(panelQuery)
+                .populate('members', 'username name designation email memberType')
+                .populate('coordinator', 'username name');
             console.log('Found panels for user:', panels.length);
 
             if (panels.length === 0) {
@@ -455,14 +461,26 @@ exports.getAssignedTeamsForPanel = async (req, res) => {
                 .populate('teamLeader', 'username name')
                 .populate('members', 'username name')
                 .populate('guidePreference', 'username name')
-                .populate('panel', 'name')
+                .populate({
+                    path: 'panel',
+                    select: 'name members coordinator',
+                    populate: [
+                        { path: 'members', select: 'username name designation email memberType' },
+                        { path: 'coordinator', select: 'username name' }
+                    ]
+                })
                 .populate('vivaPanel', 'name');
 
-            const panelIdToName = new Map(panels.map(p => [p._id.toString(), p.name]));
-            assignedTeams = teams.map(team => ({
-                ...team.toObject(),
-                panelName: panelIdToName.get(team.panel?._id?.toString() || team.panel?.toString() || '') || 'Panel'
-            }));
+            const panelIdToPanel = new Map(panels.map(p => [p._id.toString(), p]));
+            assignedTeams = teams.map(team => {
+                const tObj = team.toObject();
+                const pObj = tObj.panel || panelIdToPanel.get(tObj.panel?._id?.toString() || tObj.panel?.toString() || '');
+                return {
+                    ...tObj,
+                    panel: pObj,
+                    panelName: pObj?.name || 'Panel'
+                };
+            });
         } else if (userRole === 'coordinator' || rolesArray.includes('coordinator')) {
             // For coordinators, find teams assigned to their coordinated panel
             console.log('User is a coordinator, finding teams for their panel');
@@ -1516,81 +1534,114 @@ exports.getCoordinatedTeams = async (req, res) => {
         // 3. Build a regex array for case-insensitive matching
         const regexFilters = programmeArray.map(prog => new RegExp(`^${prog}$`, 'i'));
 
-        // 4. Find the panel matching the coordinator and ANY of the clean regex options
+        // 4. Find all panels matching the coordinator and the programme
         const selectedPanelId = req.headers['x-selected-panel-id'];
         const mongoose = require('mongoose');
-        let panel;
+        let panels = [];
+
+        const basePanelQuery = {
+            panelType: 'review',
+            $or: [
+                { coordinator: coordinatorId },
+                { assistantCoordinators: coordinatorId }
+            ]
+        };
+
         if (selectedPanelId && mongoose.Types.ObjectId.isValid(selectedPanelId)) {
-            const panelQuery = {
-                _id: selectedPanelId,
-                panelType: 'review',
-                $or: [
-                    { coordinator: coordinatorId },
-                    { assistantCoordinators: coordinatorId }
-                ]
-            };
-            if (req.sessionId) panelQuery.session = req.sessionId;
-            panel = await Panel.findOne(panelQuery) || await Panel.findOne({
-                _id: selectedPanelId,
-                panelType: 'review',
-                $or: [
-                    { coordinator: coordinatorId },
-                    { assistantCoordinators: coordinatorId }
-                ]
-            });
+            const specificQuery = { ...basePanelQuery, _id: selectedPanelId };
+            if (req.sessionId) specificQuery.session = req.sessionId;
+            panels = await Panel.find(specificQuery)
+                .populate('coordinator', 'username name')
+                .populate('members', 'username name designation email memberType');
+            if (panels.length === 0) {
+                panels = await Panel.find({ ...basePanelQuery, _id: selectedPanelId })
+                    .populate('coordinator', 'username name')
+                    .populate('members', 'username name designation email memberType');
+            }
         }
-        if (!panel) {
-            const panelQuery = { 
-                panelType: 'review',
-                $or: [
-                    { coordinator: coordinatorId },
-                    { assistantCoordinators: coordinatorId }
-                ],
-                programme: { $in: regexFilters } 
-            };
-            if (req.sessionId) panelQuery.session = req.sessionId;
-            panel = await Panel.findOne(panelQuery) || await Panel.findOne({ 
-                panelType: 'review',
-                $or: [
-                    { coordinator: coordinatorId },
-                    { assistantCoordinators: coordinatorId }
-                ],
-                programme: { $in: regexFilters } 
-            });
+
+        if (panels.length === 0) {
+            const progQuery = { ...basePanelQuery, programme: { $in: regexFilters } };
+            if (req.sessionId) progQuery.session = req.sessionId;
+            panels = await Panel.find(progQuery)
+                .populate('coordinator', 'username name')
+                .populate('members', 'username name designation email memberType');
+            if (panels.length === 0) {
+                panels = await Panel.find({ ...basePanelQuery, programme: { $in: regexFilters } })
+                    .populate('coordinator', 'username name')
+                    .populate('members', 'username name designation email memberType');
+            }
         }
-        
-        if (!panel) {
+
+        if (!panels || panels.length === 0) {
             return res.status(404).json({ 
                 message: `No panel found where you are assigned as a coordinator for programme matching "${rawProgramme}".` 
             });
         }
 
-        // 5. Find all teams assigned to this specific panel ID
-        const teamFilter = { panel: panel._id };
+        // 5. Find all teams assigned to any of these panels
+        const panelIds = panels.map(p => p._id);
+        const teamFilter = { panel: { $in: panelIds } };
         if (req.sessionId) teamFilter.session = req.sessionId;
-        else if (panel.session) teamFilter.session = panel.session;
 
         let coordinatedTeams = await Team.find(teamFilter)
             .populate('teamLeader', 'username name')
             .populate('members', 'username name')
             .populate('guidePreference', 'username name')
-            .populate('vivaPanel', 'name');
+            .populate({
+                path: 'panel',
+                select: 'name members coordinator',
+                populate: [
+                    { path: 'members', select: 'username name designation email memberType' },
+                    { path: 'coordinator', select: 'username name' }
+                ]
+            })
+            .populate({
+                path: 'vivaPanel',
+                select: 'name members coordinator',
+                populate: [
+                    { path: 'members', select: 'username name designation email memberType' },
+                    { path: 'coordinator', select: 'username name' }
+                ]
+            });
 
-        if ((!coordinatedTeams || coordinatedTeams.length === 0) && (req.sessionId || panel.session)) {
-            coordinatedTeams = await Team.find({ panel: panel._id })
+        if ((!coordinatedTeams || coordinatedTeams.length === 0) && req.sessionId) {
+            coordinatedTeams = await Team.find({ panel: { $in: panelIds } })
                 .populate('teamLeader', 'username name')
                 .populate('members', 'username name')
                 .populate('guidePreference', 'username name')
-                .populate('vivaPanel', 'name');
+                .populate({
+                    path: 'panel',
+                    select: 'name members coordinator',
+                    populate: [
+                        { path: 'members', select: 'username name designation email memberType' },
+                        { path: 'coordinator', select: 'username name' }
+                    ]
+                })
+                .populate({
+                    path: 'vivaPanel',
+                    select: 'name members coordinator',
+                    populate: [
+                        { path: 'members', select: 'username name designation email memberType' },
+                        { path: 'coordinator', select: 'username name' }
+                    ]
+                });
         }
 
-        // 6. Inject the panel name context for frontend convenience
-        const formattedTeams = coordinatedTeams.map(team => ({
-            ...team.toObject(),
-            panelName: panel.name
-        }));
+        // 6. Inject the panel context for frontend convenience
+        const formattedTeams = coordinatedTeams.map(team => {
+            const tObj = team.toObject();
+            const matchedPanel = panels.find(p => p._id.toString() === (tObj.panel?._id || tObj.panel)?.toString());
+            const panelName = tObj.panel?.name || matchedPanel?.name || '';
+            const panelObj = tObj.panel || matchedPanel || null;
+            return {
+                ...tObj,
+                panel: panelObj,
+                panelName: panelName
+            };
+        });
 
-        console.log(`Found ${formattedTeams.length} coordinated teams for Panel: ${panel.name}`);
+        console.log(`Found ${formattedTeams.length} coordinated teams across ${panels.length} panel(s)`);
         res.json(formattedTeams);
 
     } catch (error) {
