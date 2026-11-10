@@ -13,6 +13,7 @@ import GuideMyTeams from './components/guide/GuideMyTeams';
 import GuideReview from './components/guide/GuideReview';
 import GuideAnnouncements from './components/guide/GuideAnnouncements';
 import GuideUploadAttendance from './components/guide/GuideUploadAttendance';
+import GuideTeamAttendance from './components/guide/GuideTeamAttendance';
 import GuideMarking from './components/guide/GuideMarking';
 import PanelDashboard from './components/PanelDashboard';
 import PanelAssignedTeams from './components/panel/PanelAssignedTeams';
@@ -56,6 +57,7 @@ const App = () => {
                     <Route index element={<GuideDashboardHome />} />
                     <Route path="requests" element={<GuideRequestManagementForGuide />} />
                     <Route path="my-teams" element={<GuideMyTeams />} />
+                    <Route path="attendance" element={<GuideTeamAttendance />} />
                     <Route path="guide-request-management" element={<GuideRequestManagementForGuide />} />
                     <Route path="review-schedules" element={<GuideReview />} />
                     <Route path="upload-attendance" element={<GuideUploadAttendance />} />

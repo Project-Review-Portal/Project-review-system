@@ -23,8 +23,24 @@ const attendanceSchema = new mongoose.Schema({
                 type: Boolean, 
                 default: false 
             }
-        }]
+        }],
+        attendedHours: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+        attendancePercentage: {
+            type: Number,
+            default: 0,
+            min: 0,
+            max: 100
+        }
     }],
+    totalHours: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
     guide: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

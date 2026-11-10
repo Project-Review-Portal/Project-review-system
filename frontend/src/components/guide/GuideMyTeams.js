@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from '../../utils/toast';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 
 const GuideMyTeams = () => {
+    const navigate = useNavigate();
     const [approvedTeams, setApprovedTeams] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -99,10 +101,16 @@ const GuideMyTeams = () => {
                                 </ul>
                             </div>
 
-                            <div className="mt-2">
-                                <span className="px-2 py-1 rounded text-sm font-medium bg-green-100 text-green-800">
+                            <div className="mt-4 flex items-center gap-3">
+                                <span className="px-2.5 py-1 rounded text-xs font-bold bg-green-100 text-green-800">
                                     Approved ✓
                                 </span>
+                                <button
+                                    onClick={() => navigate(`/guide-dashboard/attendance?teamId=${team._id}`)}
+                                    className="px-3 py-1 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-sm"
+                                >
+                                    Update Attendance →
+                                </button>
                             </div>
                         </li>
                     ))}

@@ -12,6 +12,11 @@ const configSchema = new mongoose.Schema({
         required: true,
         min: 1
     },
+    totalAttendanceHours: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
     guideSelectionStartDate: {
         type: Date,
         default: null,

@@ -91,6 +91,11 @@ router.get('/panel/:panelId/instructions', auth, authorize(['guide', 'panel', 'c
 // Coordinator panel stats (teams assigned, free/occupied slots)
 router.get('/coordinator/panel-stats', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), panelController.getPanelStats);
 
+// Coordinator Attendance Hours endpoints
+router.get('/coordinator/attendance-hours', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), panelController.getCoordinatorAttendanceHours);
+router.post('/coordinator/attendance-hours', auth, authorize(['coordinator', 'admin']), panelController.saveCoordinatorAttendanceHours);
+router.get('/coordinator/project-attendance-summary', auth, authorize(['coordinator', 'assistant coordinator', 'admin']), panelController.getCoordinatorProjectAttendanceSummary);
+
 // Coordinator Viva Panel endpoints
 router.get('/coordinator/viva-panels', auth, authorize(['coordinator', 'assistant coordinator']), panelController.getCoordinatorVivaPanels);
 router.post('/coordinator/viva-panel', auth, authorize(['coordinator']), panelController.saveCoordinatorVivaPanel);

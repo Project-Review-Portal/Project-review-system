@@ -1,4 +1,12 @@
 const mongoose = require('mongoose');
+const dns = require('dns');
+
+// Configure public DNS servers for reliable SRV resolution on Windows
+try {
+    dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch (e) {
+    // Keep default if restricted
+}
 
 // Load env vars from current directory's .env file
 require('dotenv').config();

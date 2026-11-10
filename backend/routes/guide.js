@@ -34,6 +34,10 @@ router.get('/assigned-teams', auth, authorize(['guide', 'panel', 'coordinator', 
 // Dedicated route to fetch all teams guided by the guide for marking page
 router.get('/marking-teams', auth, authorize(['guide', 'admin']), guideController.getGuidedTeamsForMarking);
 
+// Dedicated routes for guide team attendance (hours tracking)
+router.get('/team-attendance', auth, authorize(['guide', 'admin']), guideController.getTeamAttendanceForGuide);
+router.post('/team-attendance', auth, authorize(['guide', 'admin']), guideController.saveTeamAttendanceForGuide);
+
 // New route for getting review period dates
 router.get('/review-period-dates', auth, guideController.getReviewPeriodDatesPublic);
 

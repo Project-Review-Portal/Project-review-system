@@ -1407,3 +1407,200 @@ exports.confirmSlotAssignments = async (req, res) => {
         res.status(500).json({ message: 'Server error confirming assignments' });
     }
 };
+
+// Guide: Get attendance data for all approved teams guided by this guide
+exports.getTeamAttendanceForGuide = async (req, res) => {
+    try {
+        const Config = require('../models/Config');
+        const guideId = req.user.id;
+        const sessionFilter = req.sessionId ? { session: req.sessionId } : {};
+
+        const rawProgramme = req.headers['x-selected-programme'] || req.query.programme || req.user.programme;
+        let programme = rawProgramme ? String(rawProgramme).trim() : null;
+        if (programme && (programme.includes(','))) programme = programme.split(',')[0].trim();
+        if (programme && (programme.toLowerCase() === 'ug' || programme === 'B.E COMPUTER SCIENCE AND ENGINEERING')) {
+            programme = 'B.E. CSE';
+        }
+
+        const teamQuery = {
+            guidePreference: guideId,
+            status: 'approved',
+            ...sessionFilter
+        };
+        if (programme) {
+            teamQuery.programme = programme;
+        }
+
+        const teams = await Team.find(teamQuery)
+            .populate('teamLeader', 'username name')
+            .populate('members', 'username name')
+            .populate('panel', 'name')
+            .sort({ teamName: 1 });
+
+        // Resolve totalAttendanceHours for this programme/session
+        let totalAttendanceHours = 0;
+        const targetProg = programme || (teams.length > 0 ? teams[0].programme : 'B.E. CSE');
+        if (targetProg) {
+            const configQuery = { programme: targetProg };
+            if (req.sessionId) configQuery.session = req.sessionId;
+            let config = await Config.findOne(configQuery);
+            if (!config && req.sessionId) {
+                config = await Config.findOne({ programme: targetProg });
+            }
+            if (config && config.totalAttendanceHours) {
+                totalAttendanceHours = config.totalAttendanceHours;
+            }
+        }
+
+        const teamIds = teams.map(t => t._id);
+        const attQuery = { team: { $in: teamIds } };
+        if (req.sessionId) attQuery.session = req.sessionId;
+        let attendanceRecords = await Attendance.find(attQuery);
+        if (attendanceRecords.length === 0 && req.sessionId) {
+            attendanceRecords = await Attendance.find({ team: { $in: teamIds } });
+        }
+
+        const attMap = {};
+        attendanceRecords.forEach(att => {
+            attMap[att.team.toString()] = att;
+        });
+
+        const formattedTeams = teams.map(team => {
+            const att = attMap[team._id.toString()];
+            const students = [];
+
+            if (team.teamLeader) {
+                const sa = att?.studentAttendances?.find(s => s.student.toString() === team.teamLeader._id.toString());
+                const attendedHours = sa ? (sa.attendedHours || 0) : 0;
+                const percentage = totalAttendanceHours > 0 ? Number(((attendedHours / totalAttendanceHours) * 100).toFixed(2)) : (sa?.attendancePercentage || 0);
+                students.push({
+                    studentId: team.teamLeader._id,
+                    username: team.teamLeader.username,
+                    name: team.teamLeader.name,
+                    isLeader: true,
+                    attendedHours,
+                    attendancePercentage: percentage
+                });
+            }
+
+            if (Array.isArray(team.members)) {
+                team.members.forEach(m => {
+                    const sa = att?.studentAttendances?.find(s => s.student.toString() === m._id.toString());
+                    const attendedHours = sa ? (sa.attendedHours || 0) : 0;
+                    const percentage = totalAttendanceHours > 0 ? Number(((attendedHours / totalAttendanceHours) * 100).toFixed(2)) : (sa?.attendancePercentage || 0);
+                    students.push({
+                        studentId: m._id,
+                        username: m.username,
+                        name: m.name,
+                        isLeader: false,
+                        attendedHours,
+                        attendancePercentage: percentage
+                    });
+                });
+            }
+
+            return {
+                _id: team._id,
+                teamName: team.teamName,
+                programme: team.programme,
+                panel: team.panel ? { _id: team.panel._id, name: team.panel.name } : null,
+                totalAttendanceHours,
+                students,
+                lastUpdated: att?.lastUpdated || null
+            };
+        });
+
+        res.json({
+            success: true,
+            totalAttendanceHours,
+            programme: targetProg,
+            teams: formattedTeams
+        });
+    } catch (error) {
+        console.error('Error fetching team attendance for guide:', error);
+        res.status(500).json({ message: 'Server error fetching team attendance' });
+    }
+};
+
+// Guide: Update/save attendance hours for a specific team
+exports.saveTeamAttendanceForGuide = async (req, res) => {
+    try {
+        const Config = require('../models/Config');
+        const guideId = req.user.id;
+        const { teamId, studentAttendances } = req.body;
+
+        if (!teamId || !Array.isArray(studentAttendances)) {
+            return res.status(400).json({ message: 'teamId and studentAttendances array are required.' });
+        }
+
+        const team = await Team.findById(teamId);
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found.' });
+        }
+
+        // Verify authorization: guide must be assigned to this team (unless admin)
+        if (req.user.role !== 'admin' && String(team.guidePreference) !== String(guideId)) {
+            return res.status(403).json({ message: 'Forbidden: You are not the assigned guide for this team.' });
+        }
+
+        // Retrieve totalAttendanceHours from Config
+        const configQuery = { programme: team.programme };
+        const sessionToUse = req.sessionId || team.session;
+        if (sessionToUse) configQuery.session = sessionToUse;
+
+        let config = await Config.findOne(configQuery);
+        if (!config && sessionToUse) {
+            config = await Config.findOne({ programme: team.programme });
+        }
+        const totalAttendanceHours = config ? (config.totalAttendanceHours || 0) : 0;
+
+        let attendance = await Attendance.findOne({ team: teamId });
+        if (!attendance) {
+            attendance = new Attendance({
+                team: teamId,
+                guide: guideId,
+                session: sessionToUse || null,
+                totalHours: totalAttendanceHours,
+                studentAttendances: []
+            });
+        } else {
+            attendance.guide = guideId;
+            attendance.totalHours = totalAttendanceHours;
+            if (sessionToUse && !attendance.session) {
+                attendance.session = sessionToUse;
+            }
+        }
+
+        // Merge or insert student attendances
+        for (const input of studentAttendances) {
+            const studentId = input.studentId || input.student;
+            const parsedHours = Number(input.attendedHours || 0);
+            const percentage = totalAttendanceHours > 0 ? Number(((parsedHours / totalAttendanceHours) * 100).toFixed(2)) : 0;
+
+            const existingIndex = attendance.studentAttendances.findIndex(sa => String(sa.student) === String(studentId));
+            if (existingIndex > -1) {
+                attendance.studentAttendances[existingIndex].attendedHours = parsedHours;
+                attendance.studentAttendances[existingIndex].attendancePercentage = percentage;
+            } else {
+                attendance.studentAttendances.push({
+                    student: studentId,
+                    attendedHours: parsedHours,
+                    attendancePercentage: percentage,
+                    assessments: []
+                });
+            }
+        }
+
+        attendance.lastUpdated = Date.now();
+        await attendance.save();
+
+        res.json({
+            success: true,
+            message: `Attendance for ${team.teamName} updated successfully.`,
+            attendance
+        });
+    } catch (error) {
+        console.error('Error saving team attendance for guide:', error);
+        res.status(500).json({ message: 'Server error saving team attendance' });
+    }
+};

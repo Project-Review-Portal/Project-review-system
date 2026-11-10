@@ -12,6 +12,7 @@ import CoordinatorVivaPanelFormation from './coordinator/CoordinatorVivaPanelFor
 import MaterialsTab from './coordinator/materials/MaterialsTab';
 import CoordinatorMarkingScheme from './coordinator/CoordinatorMarkingScheme';
 import CoordinatorRegistration from './coordinator/CoordinatorRegistration';
+import CoordinatorProjectAttendance from './coordinator/CoordinatorProjectAttendance';
 
 const SERVER_API_KEY= process.env.REACT_APP_SERVER_API_KEY ||"http://localhost:3626";
 const CoordinatorRulesDashboard = () => {
@@ -241,6 +242,7 @@ const CoordinatorDashboard = () => {
                     <Route path="registration" element={<CoordinatorRegistration />} />
                     <Route path="guide-me" element={<GuideMe userRole="coordinator" />} />
                     <Route path="assigned-teams" element={<CoordinatorAssignedTeams />} />
+                    <Route path="project-attendance" element={<CoordinatorProjectAttendance />} />
                     <Route path="upload-attendance" element={<GuideUploadAttendance />} />
                     <Route path="review-schedule" element={<CoordinatorReviewSchedule />} />
                     <Route path="viva-schedule" element={<Navigate to="../review-schedule" replace />} />

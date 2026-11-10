@@ -1890,3 +1890,217 @@ exports.getPanelInstructions = async (req, res) => {
         res.status(500).json({ message: 'Server error fetching instructions' });
     }
 };
+
+// Coordinator: Get total attendance hours for current session and programme
+exports.getCoordinatorAttendanceHours = async (req, res) => {
+    try {
+        const Config = require('../models/Config');
+        const rawProgramme = req.headers['x-selected-programme'] || req.query.programme || req.user.programme || 'B.E. CSE';
+        let programme = String(rawProgramme).trim();
+        if (programme.includes(',')) programme = programme.split(',')[0].trim();
+        if (programme.toLowerCase() === 'ug' || programme === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
+            programme = 'B.E. CSE';
+        }
+
+        const configQuery = { programme };
+        if (req.sessionId) configQuery.session = req.sessionId;
+
+        let config = await Config.findOne(configQuery);
+        if (!config && req.sessionId) {
+            config = await Config.findOne({ programme });
+        }
+
+        res.json({
+            success: true,
+            programme,
+            sessionId: req.sessionId || null,
+            totalAttendanceHours: config ? (config.totalAttendanceHours || 0) : 0
+        });
+    } catch (error) {
+        console.error('Error fetching coordinator attendance hours:', error);
+        res.status(500).json({ message: 'Server error fetching attendance hours' });
+    }
+};
+
+// Coordinator: Save/upload total attendance hours for current session and programme
+exports.saveCoordinatorAttendanceHours = async (req, res) => {
+    try {
+        const Config = require('../models/Config');
+        const Attendance = require('../models/Attendance');
+        const Team = require('../models/Team');
+
+        const { totalAttendanceHours } = req.body;
+        const rawProgramme = req.body.programme || req.headers['x-selected-programme'] || req.query.programme || req.user.programme || 'B.E. CSE';
+        let programme = String(rawProgramme).trim();
+        if (programme.includes(',')) programme = programme.split(',')[0].trim();
+        if (programme.toLowerCase() === 'ug' || programme === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
+            programme = 'B.E. CSE';
+        }
+
+        const parsedHours = Number(totalAttendanceHours);
+        if (isNaN(parsedHours) || parsedHours < 0) {
+            return res.status(400).json({ message: 'Total attendance hours must be a valid positive number.' });
+        }
+
+        const configFilter = { programme };
+        if (req.sessionId) configFilter.session = req.sessionId;
+
+        let config = await Config.findOne(configFilter);
+        if (!config) {
+            config = new Config({
+                programme,
+                session: req.sessionId || null,
+                totalAttendanceHours: parsedHours
+            });
+        } else {
+            config.totalAttendanceHours = parsedHours;
+        }
+        await config.save();
+
+        // Update all existing Attendance records for teams in this programme and session
+        try {
+            const teamQuery = { programme };
+            if (req.sessionId) teamQuery.session = req.sessionId;
+            const teams = await Team.find(teamQuery).select('_id');
+            const teamIds = teams.map(t => t._id);
+
+            if (teamIds.length > 0) {
+                const attQuery = { team: { $in: teamIds } };
+                if (req.sessionId) attQuery.session = req.sessionId;
+                const attendanceRecords = await Attendance.find(attQuery);
+
+                for (const att of attendanceRecords) {
+                    att.totalHours = parsedHours;
+                    if (Array.isArray(att.studentAttendances)) {
+                        att.studentAttendances.forEach(sa => {
+                            if (parsedHours > 0) {
+                                sa.attendancePercentage = Number((( (sa.attendedHours || 0) / parsedHours ) * 100).toFixed(2));
+                            } else {
+                                sa.attendancePercentage = 0;
+                            }
+                        });
+                    }
+                    await att.save();
+                }
+            }
+        } catch (syncErr) {
+            console.warn('Warning syncing attendance percentage updates:', syncErr.message);
+        }
+
+        res.json({
+            success: true,
+            message: `Total attendance hours for ${programme} updated to ${parsedHours} hours.`,
+            totalAttendanceHours: parsedHours,
+            programme
+        });
+    } catch (error) {
+        console.error('Error saving coordinator attendance hours:', error);
+        res.status(500).json({ message: 'Server error saving attendance hours' });
+    }
+};
+
+// Coordinator: Get overall project attendance summary across all teams in programme and session
+exports.getCoordinatorProjectAttendanceSummary = async (req, res) => {
+    try {
+        const Config = require('../models/Config');
+        const Attendance = require('../models/Attendance');
+        const Team = require('../models/Team');
+
+        const rawProgramme = req.headers['x-selected-programme'] || req.query.programme || req.user.programme || 'B.E. CSE';
+        let programme = String(rawProgramme).trim();
+        if (programme.includes(',')) programme = programme.split(',')[0].trim();
+        if (programme.toLowerCase() === 'ug' || programme === 'B.E COMPUTER SCIENCE AND ENGINEERING') {
+            programme = 'B.E. CSE';
+        }
+
+        const configQuery = { programme };
+        if (req.sessionId) configQuery.session = req.sessionId;
+        let config = await Config.findOne(configQuery);
+        if (!config && req.sessionId) {
+            config = await Config.findOne({ programme });
+        }
+        const totalAttendanceHours = config ? (config.totalAttendanceHours || 0) : 0;
+
+        const teamQuery = { status: 'approved' };
+        if (programme) teamQuery.programme = programme;
+        if (req.sessionId) teamQuery.session = req.sessionId;
+
+        const teams = await Team.find(teamQuery)
+            .populate('teamLeader', 'username name')
+            .populate('members', 'username name')
+            .populate('guidePreference', 'username name')
+            .populate('panel', 'name')
+            .sort({ teamName: 1 });
+
+        const teamIds = teams.map(t => t._id);
+        const attQuery = { team: { $in: teamIds } };
+        if (req.sessionId) attQuery.session = req.sessionId;
+        let attendanceRecords = await Attendance.find(attQuery);
+        if (attendanceRecords.length === 0 && req.sessionId) {
+            attendanceRecords = await Attendance.find({ team: { $in: teamIds } });
+        }
+
+        const attMap = {};
+        attendanceRecords.forEach(att => {
+            attMap[att.team.toString()] = att;
+        });
+
+        const summary = teams.map(team => {
+            const att = attMap[team._id.toString()];
+            const allStudents = [];
+
+            if (team.teamLeader) {
+                const sa = att?.studentAttendances?.find(s => s.student.toString() === team.teamLeader._id.toString());
+                const attendedHours = sa ? (sa.attendedHours || 0) : 0;
+                const percentage = totalAttendanceHours > 0 ? Number(((attendedHours / totalAttendanceHours) * 100).toFixed(2)) : (sa?.attendancePercentage || 0);
+                allStudents.push({
+                    studentId: team.teamLeader._id,
+                    username: team.teamLeader.username,
+                    name: team.teamLeader.name,
+                    isLeader: true,
+                    attendedHours,
+                    totalHours: totalAttendanceHours,
+                    attendancePercentage: percentage
+                });
+            }
+
+            if (Array.isArray(team.members)) {
+                team.members.forEach(m => {
+                    const sa = att?.studentAttendances?.find(s => s.student.toString() === m._id.toString());
+                    const attendedHours = sa ? (sa.attendedHours || 0) : 0;
+                    const percentage = totalAttendanceHours > 0 ? Number(((attendedHours / totalAttendanceHours) * 100).toFixed(2)) : (sa?.attendancePercentage || 0);
+                    allStudents.push({
+                        studentId: m._id,
+                        username: m.username,
+                        name: m.name,
+                        isLeader: false,
+                        attendedHours,
+                        totalHours: totalAttendanceHours,
+                        attendancePercentage: percentage
+                    });
+                });
+            }
+
+            return {
+                teamId: team._id,
+                teamName: team.teamName,
+                programme: team.programme,
+                guide: team.guidePreference ? { id: team.guidePreference._id, name: team.guidePreference.name, username: team.guidePreference.username } : null,
+                panel: team.panel ? { id: team.panel._id, name: team.panel.name } : null,
+                totalAttendanceHours,
+                students: allStudents,
+                lastUpdated: att?.lastUpdated || null
+            };
+        });
+
+        res.json({
+            success: true,
+            programme,
+            totalAttendanceHours,
+            teams: summary
+        });
+    } catch (error) {
+        console.error('Error fetching coordinator project attendance summary:', error);
+        res.status(500).json({ message: 'Server error fetching project attendance summary' });
+    }
+};

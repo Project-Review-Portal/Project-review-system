@@ -1293,7 +1293,11 @@ exports.getDailyAttendanceRecords = async (req, res) => {
                     }
                 }
 
-                const attendancePercentage = ((presentCount / totalEvents) * 100).toFixed(2);
+                const reviewAttendancePercentage = ((presentCount / totalEvents) * 100).toFixed(2);
+                const projectAttendancePercentage = studentAtt?.attendancePercentage;
+                const attendancePercentage = (projectAttendancePercentage !== undefined && projectAttendancePercentage !== null && projectAttendancePercentage > 0)
+                    ? projectAttendancePercentage.toFixed(2)
+                    : reviewAttendancePercentage;
 
                 const marks = await Mark.find({ student: member._id, team: team._id, ...(req.sessionId ? { session: req.sessionId } : {}) });
 
@@ -1317,7 +1321,10 @@ exports.getDailyAttendanceRecords = async (req, res) => {
                     teamName: team.teamName,
                     guideName: team.guidePreference ? team.guidePreference.name : 'N/A',
                     panelName: team.panel ? team.panel.name : 'N/A',
+                    attendedHours: studentAtt ? (studentAtt.attendedHours || 0) : 0,
+                    totalHours: attendanceRecord ? (attendanceRecord.totalHours || 0) : 0,
                     attendancePercentage: attendancePercentage,
+                    reviewAttendancePercentage: reviewAttendancePercentage,
                     averageMarks: averageMarks
                 });
             }
