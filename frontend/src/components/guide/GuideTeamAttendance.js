@@ -2,6 +2,16 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useLocation } from 'react-router-dom';
 import { toast } from '../../utils/toast';
+import SpotlightCard from '../ui/SpotlightCard';
+import StatusBadge from '../ui/StatusBadge';
+import { 
+  UsersIcon, 
+  ClockIcon, 
+  CheckCircleIcon, 
+  AlertTriangleIcon, 
+  SparklesIcon,
+  ShieldCheckIcon
+} from '../ui/Icons';
 
 const SERVER_API_KEY = process.env.REACT_APP_SERVER_API_KEY || 'http://localhost:3626';
 
@@ -114,6 +124,7 @@ const GuideTeamAttendance = () => {
                 if (t._id !== teamId) return t;
                 return {
                     ...t,
+                    lastUpdated: new Date().toISOString(),
                     students: t.students.map(s => {
                         const newHours = Number(teamHours[s.studentId] || 0);
                         const newPct = totalAttendanceHours > 0
@@ -137,59 +148,60 @@ const GuideTeamAttendance = () => {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center py-20 text-indigo-600 font-medium">
-                <svg className="animate-spin -ml-1 mr-3 h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                </svg>
-                Loading team attendance...
+            <div className="flex flex-col justify-center items-center py-28 text-slate-500 font-medium space-y-3">
+                <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm font-semibold tracking-wide">Loading team attendance records...</span>
             </div>
         );
     }
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6 pb-12">
-            {/* Header */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Team Attendance Management</h1>
-                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700 uppercase tracking-wide">
-                            Guide Portal
+        <div className="max-w-6xl mx-auto space-y-6 pb-16">
+            {/* Header Section */}
+            <div className="glass-panel rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 border border-white/80 shadow-lg">
+                <div className="space-y-1.5">
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                            Team Attendance Management
+                        </h1>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/60 shadow-xs">
+                            <ShieldCheckIcon className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Guide Portal</span>
                         </span>
                     </div>
-                    <p className="text-sm text-slate-500 mt-1">
-                        Update and record project attendance hours for students in your respective guided teams.
+                    <p className="text-xs sm:text-sm text-slate-500 max-w-2xl">
+                        Log student attended hours for each guided group. Percentages compute dynamically against the coordinator's benchmark hours.
                     </p>
                 </div>
-                <div className="px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-xl text-right">
-                    <span className="text-xs text-indigo-600 font-semibold uppercase tracking-wider block">
+
+                <div className="bg-white/80 border border-slate-200/80 rounded-2xl p-4 sm:text-right shadow-xs min-w-[220px]">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
                         Mandatory Benchmark ({programme})
                     </span>
-                    <span className="text-lg font-extrabold text-indigo-700">
-                        {totalAttendanceHours > 0 ? `${totalAttendanceHours} Total Hours` : 'Not Set by Coordinator'}
+                    <span className="text-lg font-black text-blue-900 block mt-0.5">
+                        {totalAttendanceHours > 0 ? `${totalAttendanceHours} Total Hours` : 'Pending Coordinator Setup'}
                     </span>
                 </div>
             </div>
 
+            {/* Coordinator Notice Banner */}
             {totalAttendanceHours === 0 && (
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-center gap-3">
-                    <svg className="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <span>
-                        <strong>Coordinator Notice:</strong> Total attendance hours have not yet been configured by the coordinator for this programme. You can still input and save attended hours now; percentages will automatically compute once the coordinator uploads the benchmark.
-                    </span>
+                <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200 text-amber-800 text-xs flex items-start gap-3 shadow-xs">
+                    <AlertTriangleIcon className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="leading-relaxed">
+                        <strong className="font-bold">Coordinator Benchmark Pending:</strong> Total attendance hours have not yet been uploaded for this session and programme. You can still input and save attended hours now; attendance percentages will automatically compute once the benchmark is uploaded.
+                    </div>
                 </div>
             )}
 
+            {/* Empty State */}
             {teams.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
-                    <svg className="w-12 h-12 text-slate-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    <h3 className="text-lg font-bold text-slate-800">No Approved Teams Found</h3>
-                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                <div className="glass-panel rounded-3xl p-12 text-center border border-white/80 shadow-xl max-w-md mx-auto">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mx-auto mb-3">
+                        <UsersIcon className="w-7 h-7" />
+                    </div>
+                    <h3 className="text-base font-extrabold text-slate-800">No Approved Teams Found</h3>
+                    <p className="text-xs text-slate-500 mt-1">
                         You do not currently have any approved teams assigned to guide in this session and programme.
                     </p>
                 </div>
@@ -201,39 +213,46 @@ const GuideTeamAttendance = () => {
                         return (
                             <div
                                 key={team._id}
-                                className={`bg-white rounded-2xl border shadow-sm transition-all overflow-hidden ${
-                                    isTargeted ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200'
+                                className={`glass-panel rounded-3xl border transition-all duration-300 shadow-xl overflow-hidden ${
+                                    isTargeted ? 'ring-2 ring-blue-500/50 border-blue-400' : 'border-white/80'
                                 }`}
                             >
                                 {/* Team Card Header */}
-                                <div className="p-5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                    <div className="flex items-center gap-3">
-                                        <h2 className="text-lg font-extrabold text-slate-900">{team.teamName}</h2>
-                                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-200 text-slate-700">
-                                            {team.programme}
-                                        </span>
-                                        {team.panel && (
-                                            <span className="text-xs text-slate-500">
-                                                Panel: <span className="font-semibold text-slate-700">{team.panel.name}</span>
-                                            </span>
-                                        )}
+                                <div className="p-5 sm:p-6 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                        <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-xs">
+                                            <UsersIcon className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg font-black text-slate-900 tracking-tight">{team.teamName}</h2>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-200/80 text-slate-700">
+                                                    {team.programme}
+                                                </span>
+                                                {team.panel && (
+                                                    <span className="text-xs text-slate-500 font-medium">
+                                                        Panel: <strong className="text-slate-700 font-semibold">{team.panel.name}</strong>
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {/* Team Quick Fill Controls */}
                                     {totalAttendanceHours > 0 && (
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold text-slate-500">Team Quick Fill:</span>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Quick Fill:</span>
                                             <button
                                                 type="button"
                                                 onClick={() => handleSetTeamAllHours(team._id, totalAttendanceHours)}
-                                                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 transition"
+                                                className="px-3 py-1 text-xs font-bold rounded-xl bg-white/90 border border-slate-200 text-slate-700 hover:border-blue-300 hover:text-blue-600 active:scale-95 transition shadow-xs"
                                             >
                                                 All Full ({totalAttendanceHours}h)
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => handleSetTeamAllHours(team._id, Math.round(totalAttendanceHours / 2))}
-                                                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 transition"
+                                                className="px-3 py-1 text-xs font-bold rounded-xl bg-white/90 border border-slate-200 text-slate-700 hover:border-blue-300 hover:text-blue-600 active:scale-95 transition shadow-xs"
                                             >
                                                 All Half ({Math.round(totalAttendanceHours / 2)}h)
                                             </button>
@@ -244,16 +263,16 @@ const GuideTeamAttendance = () => {
                                 {/* Students Table */}
                                 <div className="overflow-x-auto">
                                     <table className="min-w-full divide-y divide-slate-100 text-left text-xs">
-                                        <thead className="bg-white text-slate-500 font-semibold uppercase">
+                                        <thead className="bg-white/70 text-slate-400 font-bold uppercase tracking-wider">
                                             <tr>
-                                                <th className="px-5 py-3">Student Name</th>
-                                                <th className="px-5 py-3">Register Number</th>
-                                                <th className="px-5 py-3">Attended Hours</th>
-                                                <th className="px-5 py-3 text-center">Attendance %</th>
-                                                <th className="px-5 py-3">Quick Presets</th>
+                                                <th className="px-6 py-3.5">Student Member</th>
+                                                <th className="px-6 py-3.5">Register Number</th>
+                                                <th className="px-6 py-3.5">Attended Hours</th>
+                                                <th className="px-6 py-3.5 text-center">Progress %</th>
+                                                <th className="px-6 py-3.5">Quick Presets</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                                        <tbody className="divide-y divide-slate-100 bg-white/50 font-medium text-slate-700">
                                             {(team.students || []).map(student => {
                                                 const currentHours = localAttendance[team._id]?.[student.studentId] ?? student.attendedHours ?? 0;
                                                 const livePct = totalAttendanceHours > 0
@@ -261,19 +280,19 @@ const GuideTeamAttendance = () => {
                                                     : (student.attendancePercentage || 0);
 
                                                 return (
-                                                    <tr key={student.studentId} className="hover:bg-slate-50/70 transition">
-                                                        <td className="px-5 py-3.5">
-                                                            <div className="font-bold text-slate-900">{student.name}</div>
+                                                    <tr key={student.studentId} className="hover:bg-blue-50/20 transition-colors">
+                                                        <td className="px-6 py-4">
+                                                            <div className="font-bold text-slate-900 text-sm">{student.name}</div>
                                                             {student.isLeader && (
-                                                                <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600">
+                                                                <span className="inline-block mt-0.5 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60">
                                                                     Leader
                                                                 </span>
                                                             )}
                                                         </td>
-                                                        <td className="px-5 py-3.5 font-mono text-slate-600">
+                                                        <td className="px-6 py-4 font-mono font-semibold text-slate-600">
                                                             {student.username}
                                                         </td>
-                                                        <td className="px-5 py-3.5">
+                                                        <td className="px-6 py-4">
                                                             <div className="flex items-center gap-2">
                                                                 <input
                                                                     type="number"
@@ -282,45 +301,45 @@ const GuideTeamAttendance = () => {
                                                                     step="0.5"
                                                                     value={currentHours}
                                                                     onChange={(e) => handleHourChange(team._id, student.studentId, e.target.value)}
-                                                                    className="w-24 px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                                                    className="neo-input w-24 px-3 py-1.5 rounded-xl text-sm font-black text-slate-800"
                                                                 />
                                                                 {totalAttendanceHours > 0 && (
-                                                                    <span className="text-xs text-slate-400 font-medium">
+                                                                    <span className="text-xs text-slate-400 font-semibold">
                                                                         / {totalAttendanceHours} hrs
                                                                     </span>
                                                                 )}
                                                             </div>
                                                         </td>
-                                                        <td className="px-5 py-3.5 text-center">
-                                                            <div className="inline-flex items-center gap-2">
-                                                                <div className="w-14 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                                        <td className="px-6 py-4 text-center">
+                                                            <div className="inline-flex items-center gap-2.5">
+                                                                <div className="w-16 bg-slate-100 rounded-full h-2 overflow-hidden">
                                                                     <div
-                                                                        className={`h-full rounded-full ${
+                                                                        className={`h-full rounded-full transition-all duration-300 ${
                                                                             livePct >= 75 ? 'bg-emerald-500' : livePct >= 50 ? 'bg-amber-500' : 'bg-rose-500'
                                                                         }`}
                                                                         style={{ width: `${Math.min(livePct, 100)}%` }}
-                                                                    ></div>
+                                                                    />
                                                                 </div>
-                                                                <span className="font-bold text-xs">
+                                                                <span className="font-black text-xs text-slate-800">
                                                                     {totalAttendanceHours > 0 ? `${livePct}%` : '—'}
                                                                 </span>
                                                             </div>
                                                         </td>
-                                                        <td className="px-5 py-3.5">
+                                                        <td className="px-6 py-4">
                                                             <div className="flex items-center gap-1.5">
                                                                 {totalAttendanceHours > 0 && (
                                                                     <>
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => handleSetStudentQuickHours(team._id, student.studentId, totalAttendanceHours)}
-                                                                            className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition"
+                                                                            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 active:scale-95 transition border border-emerald-200/60"
                                                                         >
                                                                             {totalAttendanceHours}h
                                                                         </button>
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => handleSetStudentQuickHours(team._id, student.studentId, Math.round(totalAttendanceHours / 2))}
-                                                                            className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 transition"
+                                                                            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 hover:bg-amber-100 active:scale-95 transition border border-amber-200/60"
                                                                         >
                                                                             {Math.round(totalAttendanceHours / 2)}h
                                                                         </button>
@@ -329,7 +348,7 @@ const GuideTeamAttendance = () => {
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleSetStudentQuickHours(team._id, student.studentId, 0)}
-                                                                    className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
+                                                                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 active:scale-95 transition border border-slate-200"
                                                                 >
                                                                     0h
                                                                 </button>
@@ -342,18 +361,28 @@ const GuideTeamAttendance = () => {
                                     </table>
                                 </div>
 
-                                {/* Save Button */}
-                                <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-                                    <span className="text-xs text-slate-400">
-                                        Last saved: {team.lastUpdated ? new Date(team.lastUpdated).toLocaleString() : 'Never'}
+                                {/* Save Bar */}
+                                <div className="p-4 sm:p-5 bg-slate-50/70 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+                                    <span className="text-xs text-slate-400 font-medium">
+                                        Last synchronized: {team.lastUpdated ? new Date(team.lastUpdated).toLocaleString() : 'Never'}
                                     </span>
                                     <button
                                         type="button"
                                         onClick={() => handleSaveTeam(team._id)}
                                         disabled={isSaving}
-                                        className="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-sm hover:shadow disabled:opacity-50"
+                                        className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white active:scale-[0.98] transition-all shadow-md hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
                                     >
-                                        {isSaving ? 'Saving...' : `Save Attendance for ${team.teamName}`}
+                                        {isSaving ? (
+                                            <>
+                                                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                <span>Saving Changes...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircleIcon className="w-4 h-4 text-emerald-400" />
+                                                <span>Save Attendance for {team.teamName}</span>
+                                            </>
+                                        )}
                                     </button>
                                 </div>
                             </div>

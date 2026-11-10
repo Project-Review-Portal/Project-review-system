@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
-import { useLocation } from 'react-router-dom'; // required for displaying activeness of section items
-import { useNavigate } from 'react-router-dom';
-
+import { useLocation, useNavigate } from 'react-router-dom';
+import { 
+  CalendarIcon, 
+  LockIcon, 
+  UserIcon, 
+  LogoutIcon, 
+  RefreshIcon, 
+  LayersIcon 
+} from './ui/Icons';
 
 const Navbar = ({ user, onLogout, activeProgramme }) => {
     const location = useLocation();
     const navigate = useNavigate();
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const handleLogout = () => {
         onLogout();
@@ -13,8 +20,7 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
     };
 
     const getNavItems = () => {
-        console.log('Navbar user object:', user);
-        switch (user.role) {
+        switch (user?.role) {
             case 'student':
                 return [
                     { label: 'Dashboard', path: '/student-dashboard' },
@@ -45,17 +51,14 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
                     { label: 'Assigned Teams', path: '/panel-dashboard/assigned-teams' },
                     { label: 'Review Attendance', path: '/panel-dashboard/upload-attendance' }
                 ];
-                if (user.memberType === 'external') {
-                    panelNavItems.push({ label: 'Schedules', path: '/panel-dashboard/review-schedules' });
-                }
-                if (user.memberType === 'internal') {
+                if (user.memberType === 'external' || user.memberType === 'internal') {
                     panelNavItems.push({ label: 'Schedules', path: '/panel-dashboard/review-schedules' });
                 }
                 panelNavItems.push({ label: 'Mark Teams', path: '/panel-dashboard/mark-teams' });
                 panelNavItems.push({ label: 'Guide Me', path: '/panel-dashboard/guide-me' });
                 return panelNavItems;
             case 'admin':
-                if (!activeProgramme) return []; // Hidden on home screen via parent, but extra safeguard
+                if (!activeProgramme) return [];
                 const prefix = `/admin-dashboard/programme/${encodeURIComponent(activeProgramme)}`;
                 return [
                     { label: 'Student Registration', path: `${prefix}/user-management` },
@@ -88,180 +91,207 @@ const Navbar = ({ user, onLogout, activeProgramme }) => {
         }
     };
 
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    let userRoleText = '';
+    let displayPanelsSelect = false;
+    let coordinatorPanels = [];
+    let activePanelId = '';
+
+    if (user) {
+        if (user.role === 'admin') {
+            userRoleText = `Admin${activeProgramme ? ` (${activeProgramme})` : ''}`;
+        } else if (['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(user.role)) {
+            const displayProg = user.programme || 'B.E. CSE';
+            const roleLabel = user.role === 'panel' 
+                ? 'Panel Member' 
+                : user.role === 'assistant coordinator'
+                    ? 'Assistant Coordinator'
+                    : user.role.charAt(0).toUpperCase() + user.role.slice(1);
+            userRoleText = `${roleLabel} · ${displayProg}`;
+
+            if (['coordinator', 'assistant coordinator'].includes(user.role)) {
+                try {
+                    coordinatorPanels = JSON.parse(localStorage.getItem('coordinatorPanels') || '[]');
+                    activePanelId = localStorage.getItem('selectedPanelId') || '';
+                    if (coordinatorPanels.length > 1) {
+                        displayPanelsSelect = true;
+                    }
+                } catch (e) {
+                    console.warn(e);
+                }
+            }
+        } else if (user.role === 'student') {
+            userRoleText = `${user.username} · ${user.name}`;
+        }
+    }
+
+    const sessionName = localStorage.getItem('selectedSessionName');
+    const isReadOnly = localStorage.getItem('isSessionReadOnly') === 'true';
 
     return (
-        <nav className="bg-indigo-600">
+        <header className="sticky top-0 z-50 w-full glass-nav transition-all">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16 gap-4">
-                    <div className="flex items-center min-w-0 flex-1">
-                        {user && (() => {
-                            let text = '';
-                            let displayPanelsSelect = false;
-                            let coordinatorPanels = [];
-                            let activePanelId = '';
-                            if (user.role === 'admin') {
-                                text = `Admin${activeProgramme ? ` (${activeProgramme})` : ''}`;
-                            } else if (['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(user.role)) {
-                                const displayProg = user.programme || 'B.E. CSE';
-                                const roleLabel = user.role === 'panel' 
-                                    ? 'Panel Member' 
-                                    : user.role === 'assistant coordinator'
-                                        ? 'Assistant Coordinator'
-                                        : user.role.charAt(0).toUpperCase() + user.role.slice(1);
-                                text = `${roleLabel} (${displayProg})`;
-
-                                if (['coordinator', 'assistant coordinator'].includes(user.role)) {
-                                    try {
-                                        coordinatorPanels = JSON.parse(localStorage.getItem('coordinatorPanels') || '[]');
-                                        activePanelId = localStorage.getItem('selectedPanelId') || '';
-                                        if (coordinatorPanels.length > 1) {
-                                            displayPanelsSelect = true;
-                                        }
-                                    } catch (e) {
-                                        console.warn(e);
-                                    }
-                                }
-                            } else if (user.role === 'student') {
-                                text = `${user.username} - ${user.name}`;
-                            }
-
-                            if (!text) return null;
-
-                            const sessionName = localStorage.getItem('selectedSessionName');
-                            const isReadOnly = localStorage.getItem('isSessionReadOnly') === 'true';
-
-                            return (
-                                <div className="flex items-center gap-2 mr-3">
-                                    <span className="text-indigo-200 font-semibold bg-indigo-800/40 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm whitespace-nowrap flex items-center gap-1.5 shadow-inner">
-                                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                        </svg>
-                                        <span>{text}</span>
-                                        {sessionName && (
-                                            <span className="ml-1 text-xs text-indigo-300 bg-indigo-900/50 px-1.5 py-0.5 rounded border border-indigo-700/50">
-                                                📅 {sessionName}
-                                            </span>
-                                        )}
-                                        {isReadOnly && (
-                                            <span className="ml-1 text-xs font-bold text-amber-200 bg-amber-900/60 px-1.5 py-0.5 rounded border border-amber-500/50">
-                                                🔒 Read-Only
-                                            </span>
-                                        )}
-                                    </span>
-                                    {displayPanelsSelect && (
-                                        <select
-                                            value={activePanelId}
-                                            onChange={(e) => {
-                                                const panelId = e.target.value;
-                                                const selectedPanel = coordinatorPanels.find(p => p._id === panelId);
-                                                if (selectedPanel) {
-                                                    localStorage.setItem('selectedPanelId', selectedPanel._id);
-                                                    localStorage.setItem('selectedPanelName', selectedPanel.name);
-                                                    window.location.reload(); // Refresh the current page to reload using the new panel context
-                                                }
-                                            }}
-                                            className="text-xs px-2 py-1 border border-indigo-500 rounded bg-indigo-700 text-white font-semibold focus:outline-none focus:ring-1 focus:ring-white max-w-[140px] truncate"
-                                        >
-                                            {coordinatorPanels.map(p => (
-                                                <option key={p._id} value={p._id}>{p.name}</option>
-                                            ))}
-                                        </select>
-                                    )}
-                                </div>
-                            );
-                        })()}
-                        <div className="flex-shrink-0 flex items-center">
-                            <span className="text-white font-bold">Project Review</span>
-                            
-                        </div>
-                        
-                        {/* Desktop Navigation */}
-                        <div className="hidden md:block ml-6 min-w-0 flex-1">
-                            <div className="flex items-baseline space-x-1 overflow-x-auto scrollbar-hide w-full">
-                                {getNavItems().map((item) => {
-                                    const isActive = location.pathname === item.path;
-
-                                    return (
-                                        <button
-                                            key={item.path}
-                                            onClick={() => navigate(item.path)}
-                                            className={`text-white hover:bg-indigo-500 px-2 py-2 rounded-md text-xs lg:text-sm font-medium whitespace-nowrap flex-shrink-0 ${
-                                                isActive ? 'border-b-2 border-r-2 border-black' : ''
-                                            }`}
-                                        >
-                                            {item.label}
-                                        </button>
-                                    );
-                                })}
+                    {/* Left: Brand & Context Pills */}
+                    <div className="flex items-center min-w-0 gap-3 flex-1">
+                        <div 
+                            onClick={() => {
+                                if (user?.role === 'admin') navigate('/admin-dashboard');
+                                else if (user?.role === 'student') navigate('/student-dashboard');
+                                else if (user?.role === 'coordinator') navigate('/coordinator-dashboard');
+                                else if (user?.role === 'guide') navigate('/guide-dashboard');
+                            }}
+                            className="flex items-center gap-2.5 cursor-pointer group flex-shrink-0"
+                        >
+                            <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-sm group-hover:bg-blue-600 transition-colors">
+                                <LayersIcon className="w-4 h-4 text-white" />
+                            </div>
+                            <div className="hidden sm:block">
+                                <span className="text-sm font-bold tracking-tight text-slate-900 block leading-tight">
+                                    Project Review
+                                </span>
+                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest block">
+                                    Portal
+                                </span>
                             </div>
                         </div>
+
+                        {/* User Role & Session Badges */}
+                        {userRoleText && (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100/90 text-slate-700 border border-slate-200/80 shadow-sm">
+                                    <UserIcon className="w-3.5 h-3.5 text-slate-400" />
+                                    <span>{userRoleText}</span>
+                                </div>
+
+                                {sessionName && (
+                                    <div className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50/80 text-blue-700 border border-blue-200/60 shadow-sm">
+                                        <CalendarIcon className="w-3.5 h-3.5 text-blue-500" />
+                                        <span>{sessionName}</span>
+                                    </div>
+                                )}
+
+                                {isReadOnly && (
+                                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 shadow-sm">
+                                        <LockIcon className="w-3 h-3 text-amber-600" />
+                                        <span>Read-Only</span>
+                                    </div>
+                                )}
+
+                                {displayPanelsSelect && (
+                                    <select
+                                        value={activePanelId}
+                                        onChange={(e) => {
+                                            const panelId = e.target.value;
+                                            const selectedPanel = coordinatorPanels.find(p => p._id === panelId);
+                                            if (selectedPanel) {
+                                                localStorage.setItem('selectedPanelId', selectedPanel._id);
+                                                localStorage.setItem('selectedPanelName', selectedPanel.name);
+                                                window.location.reload();
+                                            }
+                                        }}
+                                        className="text-xs px-2.5 py-1 border border-slate-200 rounded-lg bg-white/90 text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 max-w-[150px] truncate shadow-sm"
+                                    >
+                                        {coordinatorPanels.map(p => (
+                                            <option key={p._id} value={p._id}>{p.name}</option>
+                                        ))}
+                                    </select>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Desktop Navigation Links */}
+                        <nav className="hidden lg:flex items-center space-x-1 overflow-x-auto scrollbar-hide ml-2">
+                            {getNavItems().map((item) => {
+                                const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+                                return (
+                                    <button
+                                        key={item.path}
+                                        onClick={() => navigate(item.path)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-150 ${
+                                            isActive
+                                                ? 'bg-slate-900 text-white shadow-sm'
+                                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 active:scale-[0.98]'
+                                        }`}
+                                    >
+                                        {item.label}
+                                    </button>
+                                );
+                            })}
+                        </nav>
                     </div>
 
-                    {/* Right side - User info and buttons */}
-                    <div className="flex items-center space-x-2 flex-shrink-0">
-                        {/* Switch Session & Role buttons */}
-                        {['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(user.role) && (
+                    {/* Right: Actions (Role Switch, Logout) */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        {['guide', 'panel', 'coordinator', 'assistant coordinator'].includes(user?.role) && (
                             <button
                                 onClick={() => navigate('/role-selection')}
-                                className="bg-indigo-500 text-white px-2 py-2 rounded-md text-xs sm:text-sm font-medium hover:bg-indigo-600 whitespace-nowrap"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/90 shadow-sm active:scale-[0.98] transition-all"
                             >
-                                Switch Session / Role
+                                <RefreshIcon className="w-3.5 h-3.5 text-slate-500" />
+                                <span className="hidden sm:inline">Switch Role</span>
                             </button>
                         )}
 
-                        {user.role === 'admin' && (
+                        {user?.role === 'admin' && (
                             <button
                                 onClick={() => navigate('/admin-dashboard')}
-                                className="bg-indigo-500 text-white px-2 py-2 rounded-md text-xs sm:text-sm font-medium hover:bg-indigo-600 whitespace-nowrap mr-2"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/90 shadow-sm active:scale-[0.98] transition-all"
                             >
-                                Sessions
+                                <CalendarIcon className="w-3.5 h-3.5 text-slate-500" />
+                                <span className="hidden sm:inline">Sessions</span>
                             </button>
                         )}
-                        
+
                         <button
                             onClick={handleLogout}
-                            className="bg-indigo-700 text-white px-2 py-2 rounded-md text-xs sm:text-sm font-medium hover:bg-indigo-800 whitespace-nowrap"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 bg-rose-50/80 hover:bg-rose-100/80 border border-rose-200/60 shadow-sm active:scale-[0.98] transition-all"
                         >
-                            Logout
+                            <LogoutIcon className="w-3.5 h-3.5 text-rose-500" />
+                            <span>Logout</span>
                         </button>
 
-                        {/* Mobile menu button */}
-                        <div className="md:hidden">
+                        {/* Mobile Hamburger */}
+                        <div className="lg:hidden">
                             <button
                                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                                className="text-white hover:bg-indigo-500 p-2 rounded-md"
+                                className="p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                                aria-label="Toggle Navigation"
                             >
-                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
                                 </svg>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                {/* Mobile Navigation */}
+                {/* Mobile Drawer */}
                 {isMobileMenuOpen && (
-                    <div className="md:hidden">
-                        <div className="px-2 pt-2 pb-3 space-y-1 bg-indigo-700 rounded-b-lg">
-                            {getNavItems().map((item) => (
+                    <div className="lg:hidden border-t border-slate-200/80 py-3 space-y-1 animate-slide-in">
+                        {getNavItems().map((item) => {
+                            const isActive = location.pathname === item.path;
+                            return (
                                 <button
                                     key={item.path}
                                     onClick={() => {
                                         navigate(item.path);
                                         setIsMobileMenuOpen(false);
                                     }}
-                                    className="text-white hover:bg-indigo-600 block w-full text-left px-3 py-2 rounded-md text-sm font-medium"
+                                    className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                        isActive
+                                            ? 'bg-slate-900 text-white shadow-sm'
+                                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                                    }`}
                                 >
                                     {item.label}
                                 </button>
-                            ))}
-                        </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
-        </nav>
+        </header>
     );
 };
 
-export default Navbar; 
+export default Navbar;
