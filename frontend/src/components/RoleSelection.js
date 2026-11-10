@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from '../utils/toast';
-import SpotlightCard from './ui/SpotlightCard';
 import { 
   CalendarIcon, 
   SparklesIcon, 
@@ -16,7 +15,7 @@ import {
 
 const SERVER_API_KEY = process.env.REACT_APP_SERVER_API_KEY || "http://localhost:3626";
 
-// Sub-component to render a role card (separated by programme)
+// Sub-component to render a role card with taste-calibrated styling
 const RoleRow = ({ roleObj, loading, getRoleDisplayName, handleRoleSelect }) => {
     const onClick = () => {
         handleRoleSelect(roleObj);
@@ -27,21 +26,21 @@ const RoleRow = ({ roleObj, loading, getRoleDisplayName, handleRoleSelect }) => 
             onClick={loading ? undefined : onClick}
             className={`w-full p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex items-center justify-between ${
                 loading 
-                    ? 'bg-slate-100/70 border-slate-200 cursor-not-allowed opacity-60' 
-                    : 'bg-white/80 hover:bg-white border-slate-200/90 hover:border-blue-400 hover:shadow-md active:scale-[0.99]'
+                    ? 'bg-slate-100/60 border-slate-200 cursor-not-allowed opacity-50' 
+                    : 'liquid-glass-interactive border-slate-200/80 hover:border-slate-300 active:scale-[0.99]'
             }`}
         >
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
-                    <UserIcon className="w-5 h-5" />
+            <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                    {roleObj.role.slice(0, 2).toUpperCase()}
                 </div>
                 <div>
-                    <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                    <h3 className="font-extrabold text-slate-900 text-sm tracking-tight">
                         {getRoleDisplayName(roleObj.role)}
                     </h3>
                     <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100/60">
-                            Programme: {roleObj.programme}
+                        <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60">
+                            Programme: <span className="font-bold text-slate-700">{roleObj.programme}</span>
                         </span>
                     </div>
                 </div>
@@ -53,10 +52,10 @@ const RoleRow = ({ roleObj, loading, getRoleDisplayName, handleRoleSelect }) => 
                         onClick();
                     }}
                     disabled={loading}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50/80 hover:bg-blue-600 hover:text-white px-3.5 py-2 rounded-xl transition-all border border-blue-200/50 shadow-xs"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-900 bg-slate-100/80 hover:bg-slate-900 hover:text-white px-3.5 py-2 rounded-xl transition-all border border-slate-200 shadow-xs active:scale-95"
                 >
                     <span>Enter</span>
-                    <ArrowRightIcon className="w-3.5 h-3.5" />
+                    <ArrowRightIcon className="w-3 h-3" />
                 </button>
             </div>
         </div>
@@ -260,78 +259,76 @@ const RoleSelection = () => {
     // Step 1: Session Selection View
     if (step === 'session') {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-mesh-pattern relative overflow-hidden p-4 py-12">
-                <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="min-h-[100dvh] flex items-center justify-center bg-mesh-pattern relative overflow-hidden p-4 py-16">
+                <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-gradient-to-b from-blue-500/10 to-transparent rounded-full blur-3xl pointer-events-none" />
 
-                <div className="glass-panel max-w-lg w-full rounded-3xl p-8 sm:p-10 shadow-2xl relative z-10 border border-white/80 space-y-6">
+                <div className="liquid-glass max-w-lg w-full rounded-3xl p-8 sm:p-10 relative z-10 space-y-6">
                     <div className="text-center">
-                        <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mx-auto mb-3 shadow-xs">
-                            <CalendarIcon className="w-6 h-6" />
+                        <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center mx-auto mb-3 shadow-sm ring-4 ring-white/60">
+                            <CalendarIcon className="w-5 h-5 text-blue-400" />
                         </div>
-                        <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Select Academic Session</h2>
-                        <p className="text-slate-500 text-xs sm:text-sm mt-1">Choose the session to view and manage allocations:</p>
+                        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Academic Session</h2>
+                        <p className="text-slate-500 text-xs sm:text-sm mt-1">Select the active academic term to access allocations:</p>
                     </div>
 
                     {loadingSessions ? (
-                        <div className="text-center py-8 text-slate-400 text-sm animate-pulse flex flex-col items-center gap-2">
-                            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                        <div className="text-center py-8 text-slate-400 text-xs flex flex-col items-center gap-2">
+                            <div className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
                             <span>Loading academic sessions...</span>
                         </div>
                     ) : sessions.length === 0 ? (
-                        <div className="p-8 text-center text-slate-400 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                            No academic sessions available. Please contact administrator.
+                        <div className="p-8 text-center text-slate-400 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50 text-xs font-medium">
+                            No academic sessions available. Please contact your portal administrator.
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {sessions.map(s => {
-                                return (
-                                    <div
-                                        key={s._id}
-                                        onClick={() => handleSessionSelect(s)}
-                                        className={`w-full p-4 rounded-2xl border transition-all duration-200 flex items-center justify-between cursor-pointer ${
-                                            s.isCurrent
-                                                ? 'bg-amber-50/70 border-amber-200 hover:border-amber-400 hover:shadow-md'
-                                                : s.isAdvanced
-                                                ? 'bg-blue-50/70 border-blue-200 hover:border-blue-400 hover:shadow-md'
-                                                : 'bg-white/80 border-slate-200 hover:border-blue-400 hover:shadow-md'
-                                        }`}
-                                    >
-                                        <div>
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="font-bold text-slate-900 text-sm sm:text-base">{s.name}</span>
-                                                {s.isCurrent && (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-800 rounded-full border border-amber-200">
-                                                        <SparklesIcon className="w-3 h-3 text-amber-600" />
-                                                        <span>Current</span>
-                                                    </span>
-                                                )}
-                                                {s.isAdvanced && (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold bg-blue-100 text-blue-800 rounded-full border border-blue-200">
-                                                        <ShieldCheckIcon className="w-3 h-3 text-blue-600" />
-                                                        <span>Advanced</span>
-                                                    </span>
-                                                )}
-                                                {s.isReadOnly && (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium bg-slate-100 text-slate-600 rounded-full border border-slate-200">
-                                                        <LockIcon className="w-3 h-3 text-slate-500" />
-                                                        <span>Read-Only</span>
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="text-xs text-slate-500 mt-1 font-medium">
-                                                {s.semesterType === 'odd' ? 'Odd Semester' : 'Even Semester'}
-                                            </div>
+                            {sessions.map(s => (
+                                <div
+                                    key={s._id}
+                                    onClick={() => handleSessionSelect(s)}
+                                    className={`w-full p-4 rounded-2xl border transition-all duration-200 flex items-center justify-between cursor-pointer active:scale-[0.99] ${
+                                        s.isCurrent
+                                            ? 'bg-amber-50/60 border-amber-200 hover:border-amber-400 hover:shadow-md'
+                                            : s.isAdvanced
+                                            ? 'bg-blue-50/60 border-blue-200 hover:border-blue-400 hover:shadow-md'
+                                            : 'liquid-glass-interactive border-slate-200 hover:border-slate-400 hover:shadow-md'
+                                    }`}
+                                >
+                                    <div>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="font-extrabold text-slate-900 text-sm sm:text-base tracking-tight">{s.name}</span>
+                                            {s.isCurrent && (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 rounded-full border border-amber-200">
+                                                    <SparklesIcon className="w-3 h-3 text-amber-600" />
+                                                    <span>Current</span>
+                                                </span>
+                                            )}
+                                            {s.isAdvanced && (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-800 rounded-full border border-blue-200">
+                                                    <ShieldCheckIcon className="w-3 h-3 text-blue-600" />
+                                                    <span>Advanced</span>
+                                                </span>
+                                            )}
+                                            {s.isReadOnly && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-600 rounded-full border border-slate-200">
+                                                    <LockIcon className="w-3 h-3 text-slate-500" />
+                                                    <span>Read-Only</span>
+                                                </span>
+                                            )}
                                         </div>
-
-                                        <div>
-                                            <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100">
-                                                {s.isReadOnly ? 'View (Read-Only)' : 'Select'}
-                                                <ArrowRightIcon className="w-3.5 h-3.5" />
-                                            </span>
+                                        <div className="text-xs text-slate-500 mt-1 font-medium">
+                                            {s.semesterType === 'odd' ? 'Odd Semester' : 'Even Semester'}
                                         </div>
                                     </div>
-                                );
-                            })}
+
+                                    <div>
+                                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-900 bg-white/90 px-3 py-1.5 rounded-xl border border-slate-200 shadow-xs">
+                                            {s.isReadOnly ? 'Inspect' : 'Select'}
+                                            <ArrowRightIcon className="w-3 h-3 text-slate-400" />
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )}
 
@@ -342,9 +339,9 @@ const RoleSelection = () => {
                                 localStorage.removeItem('user');
                                 navigate('/login');
                             }}
-                            className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
+                            className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition"
                         >
-                            Sign out
+                            Sign Out
                         </button>
                     </div>
                 </div>
@@ -352,11 +349,11 @@ const RoleSelection = () => {
         );
     }
 
-    // Step 3: Panel Selection (Coordinator with multiple panels)
+    // Step 3: Panel Selection
     if (step === 'panel' && panelsToSelect.length > 0) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-mesh-pattern relative overflow-hidden p-4 py-12">
-                <div className="glass-panel max-w-md w-full rounded-3xl p-8 shadow-2xl relative z-10 border border-white/80 space-y-6">
+            <div className="min-h-[100dvh] flex items-center justify-center bg-mesh-pattern relative overflow-hidden p-4 py-16">
+                <div className="liquid-glass max-w-md w-full rounded-3xl p-8 sm:p-10 relative z-10 space-y-6">
                     <div className="text-center">
                         <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">Select Panel</h2>
                         <p className="text-slate-500 text-xs">
@@ -369,10 +366,10 @@ const RoleSelection = () => {
                             <div 
                                 key={panel._id} 
                                 onClick={() => handlePanelSelect(panel)}
-                                className="w-full p-4 rounded-2xl border bg-white/80 hover:bg-white border-slate-200 hover:border-blue-400 transition cursor-pointer flex justify-between items-center shadow-xs hover:shadow-md"
+                                className="w-full p-4 rounded-2xl border liquid-glass-interactive border-slate-200 hover:border-slate-400 transition cursor-pointer flex justify-between items-center shadow-xs hover:shadow-md"
                             >
                                 <div>
-                                    <h3 className="font-bold text-slate-900 text-sm">{panel.name}</h3>
+                                    <h3 className="font-extrabold text-slate-900 text-sm">{panel.name}</h3>
                                     <p className="text-xs text-slate-500 mt-0.5">Programme: {panel.programme}</p>
                                 </div>
                                 <button
@@ -380,7 +377,7 @@ const RoleSelection = () => {
                                         e.stopPropagation();
                                         handlePanelSelect(panel);
                                     }}
-                                    className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100 hover:bg-blue-600 hover:text-white transition"
+                                    className="text-xs font-bold text-slate-900 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-900 hover:text-white transition"
                                 >
                                     Select →
                                 </button>
@@ -407,35 +404,35 @@ const RoleSelection = () => {
 
     // Step 2: Role Selection View
     return (
-        <div className="min-h-screen flex items-center justify-center bg-mesh-pattern relative overflow-hidden p-4 py-12">
-            <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="min-h-[100dvh] flex items-center justify-center bg-mesh-pattern relative overflow-hidden p-4 py-16">
+            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-gradient-to-b from-blue-500/10 to-transparent rounded-full blur-3xl pointer-events-none" />
 
-            <div className="glass-panel max-w-md w-full rounded-3xl p-8 sm:p-10 shadow-2xl relative z-10 border border-white/80 space-y-6">
+            <div className="liquid-glass max-w-md w-full rounded-3xl p-8 sm:p-10 relative z-10 space-y-6">
                 {/* Active Session Ribbon */}
-                <div className="flex items-center justify-between pb-4 border-b border-slate-200/80">
+                <div className="p-3.5 rounded-2xl bg-slate-100/70 border border-slate-200/80 flex items-center justify-between">
                     <div>
-                        <div className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">Active Session</div>
-                        <div className="text-sm font-extrabold text-slate-900">{selectedSession?.name}</div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Active Academic Session</div>
+                        <div className="text-sm font-extrabold text-slate-900 tracking-tight">{selectedSession?.name}</div>
                     </div>
                     <button
                         onClick={() => setStep('session')}
-                        className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100 transition active:scale-95"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white px-3 py-1.5 rounded-xl border border-slate-200 transition shadow-xs active:scale-95"
                     >
-                        <RefreshIcon className="w-3.5 h-3.5" />
+                        <RefreshIcon className="w-3.5 h-3.5 text-slate-400" />
                         <span>Switch</span>
                     </button>
                 </div>
 
                 <div className="text-center">
                     <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Select Role & Programme</h2>
-                    <p className="text-slate-500 text-xs mt-1">Choose the specific profile you wish to access for this session:</p>
+                    <p className="text-slate-500 text-xs mt-1">Choose the designated faculty profile for this academic term:</p>
                 </div>
 
                 <div className="space-y-3">
                     {loadingRoles ? (
-                        <div className="text-center py-6 text-slate-400 text-xs animate-pulse flex flex-col items-center gap-2">
-                            <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                            <span>Loading roles for this session…</span>
+                        <div className="text-center py-8 text-slate-400 text-xs flex flex-col items-center gap-2">
+                            <div className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                            <span>Synchronizing role authorizations...</span>
                         </div>
                     ) : (
                         uniqueRoles.map((roleObj, index) => (
@@ -452,15 +449,15 @@ const RoleSelection = () => {
 
                 {loading && (
                     <div className="text-center py-2 flex items-center justify-center gap-2 text-xs font-semibold text-slate-600">
-                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                        <span>Connecting to dashboard...</span>
+                        <div className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                        <span>Initializing role dashboard...</span>
                     </div>
                 )}
 
-                <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200 text-amber-800 text-xs flex items-start gap-2.5">
+                <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-amber-900 text-xs flex items-start gap-2.5">
                     <AlertTriangleIcon className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                        <span className="font-bold">EXTERNAL MEMBERS NOTICE:</span> Choose <strong>Panel Member</strong> as your entry role to access external evaluation sheets.
+                    <div className="leading-relaxed">
+                        <strong className="font-bold">EXTERNAL EXAMINERS:</strong> Select <strong>Panel Member</strong> as your entry role to access external evaluation marks sheets.
                     </div>
                 </div>
 

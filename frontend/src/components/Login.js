@@ -10,7 +10,8 @@ import {
   ShieldCheckIcon, 
   AlertTriangleIcon, 
   CheckCircleIcon,
-  ArrowRightIcon
+  ArrowRightIcon,
+  SparklesIcon
 } from './ui/Icons';
 
 const SERVER_API_KEY = process.env.REACT_APP_SERVER_API_KEY || "http://localhost:3626";
@@ -85,7 +86,7 @@ const Login = () => {
                 navigate('/role-selection');
             }
         } catch (error) {
-            setError(error.response?.data?.message || 'Login failed. Please check your credentials.');
+            setError(error.response?.data?.message || 'Invalid credentials. Please verify your username and password.');
         } finally {
             setLoading(false);
         }
@@ -144,7 +145,7 @@ const Login = () => {
                 return;
             }
             await axios.post(`${SERVER_API_KEY}/api/auth/reset-password-otp`, { identifier, otp, newPassword });
-            setSuccess('Password reset successfully. You can now sign in.');
+            setSuccess('Password reset successful. You can now sign in.');
             setMode('login');
             setFormData({ email: identifier, password: '' });
             setConfirmNewPassword('');
@@ -156,42 +157,51 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-mesh-pattern relative overflow-hidden px-4 py-12">
-            {/* Ambient Lighting Accents */}
-            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-10 right-10 w-80 h-80 bg-slate-400/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="min-h-[100dvh] flex items-center justify-center bg-mesh-pattern relative overflow-hidden px-4 py-16">
+            {/* Taste Skill: Ambient Multi-Layer Lighting Wash */}
+            <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[650px] h-[450px] bg-gradient-to-b from-blue-500/10 to-transparent rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 right-1/4 w-[500px] h-[350px] bg-slate-300/20 rounded-full blur-3xl pointer-events-none" />
 
-            {/* Central Neo-Glass Card */}
-            <div className="glass-panel max-w-md w-full rounded-3xl p-8 sm:p-10 shadow-2xl relative z-10 border border-white/80 transition-all">
-                {/* Branding Badge */}
-                <div className="text-center mb-6">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 shadow-xs mb-3">
-                        <ShieldCheckIcon className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Project Review Portal</span>
+            {/* Central Liquid Glass Card with Edge Refraction */}
+            <div className="liquid-glass max-w-md w-full rounded-3xl p-8 sm:p-11 relative z-10 transition-all">
+                {/* Brand Header */}
+                <div className="text-center mb-8">
+                    {/* Emblem */}
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-slate-900 text-white shadow-md shadow-slate-900/10 mb-4 ring-4 ring-white/60">
+                        <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
                     </div>
+
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                            Academic Portal · v2.4
+                        </span>
+                    </div>
+
                     <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                        {mode === 'login' && 'Sign in to Portal'}
+                        {mode === 'login' && 'Welcome Back'}
                         {mode === 'forgot-email' && 'Reset Password'}
-                        {mode === 'verify-otp' && 'Verify Security Code'}
-                        {mode === 'reset' && 'Create New Password'}
+                        {mode === 'verify-otp' && 'Verify Code'}
+                        {mode === 'reset' && 'Create Password'}
                     </h1>
-                    <p className="text-xs text-slate-500 mt-1.5">
-                        {mode === 'login' && 'Enter your institutional credentials to continue'}
-                        {mode === 'forgot-email' && 'We will send a 6-digit verification code to your email'}
-                        {mode === 'verify-otp' && `Enter the OTP sent to ${identifier}`}
-                        {mode === 'reset' && 'Choose a strong password for your account'}
+                    <p className="text-xs text-slate-500 mt-1 max-w-[32ch] mx-auto leading-relaxed">
+                        {mode === 'login' && 'Sign in with your institutional credentials to access reviews & attendance.'}
+                        {mode === 'forgot-email' && 'Enter your registered email to receive an instant verification code.'}
+                        {mode === 'verify-otp' && `Enter the 6-digit verification code sent to ${identifier}.`}
+                        {mode === 'reset' && 'Choose a strong password to secure your portal account.'}
                     </p>
                 </div>
 
                 {/* Notifications */}
                 {error && (
-                    <div className="mb-5 p-3.5 rounded-xl text-xs font-semibold bg-rose-50 border border-rose-200 text-rose-700 flex items-start gap-2.5 animate-fadeIn" role="alert">
+                    <div className="mb-6 p-4 rounded-2xl text-xs font-semibold bg-rose-50/90 border border-rose-200/90 text-rose-800 flex items-start gap-3 shadow-xs" role="alert">
                         <AlertTriangleIcon className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
                         <span className="leading-relaxed">{error}</span>
                     </div>
                 )}
                 {success && (
-                    <div className="mb-5 p-3.5 rounded-xl text-xs font-semibold bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-start gap-2.5 animate-fadeIn" role="alert">
+                    <div className="mb-6 p-4 rounded-2xl text-xs font-semibold bg-emerald-50/90 border border-emerald-200/90 text-emerald-800 flex items-start gap-3 shadow-xs" role="alert">
                         <CheckCircleIcon className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                         <span className="leading-relaxed">{success}</span>
                     </div>
@@ -201,8 +211,8 @@ const Login = () => {
                 {mode === 'login' && (
                     <form className="space-y-4" onSubmit={handleSubmit}>
                         <div>
-                            <label htmlFor="email" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                                Email / Username
+                            <label htmlFor="email" className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                                Institutional ID / Email
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -213,8 +223,8 @@ const Login = () => {
                                     name="email"
                                     type="text"
                                     required
-                                    className="neo-input block w-full pl-10 pr-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 transition"
-                                    placeholder="e.g. faculty@institution.edu"
+                                    className="neo-input block w-full pl-10 pr-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400"
+                                    placeholder="e.g. john.doe@univ.edu"
                                     value={formData.email}
                                     onChange={handleChange}
                                 />
@@ -223,7 +233,7 @@ const Login = () => {
 
                         <div>
                             <div className="flex items-center justify-between mb-1.5">
-                                <label htmlFor="password" className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                <label htmlFor="password" className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                                     Password
                                 </label>
                                 <button
@@ -231,7 +241,7 @@ const Login = () => {
                                     onClick={startForgot}
                                     className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition"
                                 >
-                                    Forgot password?
+                                    Forgot?
                                 </button>
                             </div>
                             <div className="relative">
@@ -243,8 +253,8 @@ const Login = () => {
                                     name="password"
                                     type={showPassword ? 'text' : 'password'}
                                     required
-                                    className="neo-input block w-full pl-10 pr-10 py-2.5 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 transition"
-                                    placeholder="Enter your account password"
+                                    className="neo-input block w-full pl-10 pr-10 py-2.5 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400"
+                                    placeholder="••••••••••••"
                                     value={formData.password}
                                     onChange={handleChange}
                                 />
@@ -258,20 +268,20 @@ const Login = () => {
                             </div>
                         </div>
 
-                        <div className="pt-2">
+                        <div className="pt-3">
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full py-2.5 px-4 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 active:scale-[0.98] transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="w-full py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-slate-900 hover:bg-slate-800 active:scale-[0.98] transition-all shadow-md shadow-slate-900/10 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {loading ? (
                                     <>
                                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        <span>Signing in...</span>
+                                        <span>Authenticating...</span>
                                     </>
                                 ) : (
                                     <>
-                                        <span>Sign In</span>
+                                        <span>Sign In to Portal</span>
                                         <ArrowRightIcon className="w-4 h-4" />
                                     </>
                                 )}
@@ -280,12 +290,12 @@ const Login = () => {
                     </form>
                 )}
 
-                {/* Mode: Forgot Password Request */}
+                {/* Mode: Forgot Password */}
                 {mode === 'forgot-email' && (
                     <form className="space-y-4" onSubmit={submitForgot}>
                         <div>
-                            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                                Registered Email
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                                Registered Email Address
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -294,8 +304,8 @@ const Login = () => {
                                 <input
                                     type="email"
                                     required
-                                    className="neo-input block w-full pl-10 pr-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400"
-                                    placeholder="Enter registered email address"
+                                    className="neo-input block w-full pl-10 pr-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400"
+                                    placeholder="Enter registered email"
                                     value={identifier}
                                     onChange={(e) => setIdentifier(e.target.value)}
                                 />
@@ -306,16 +316,16 @@ const Login = () => {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full py-2.5 px-4 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 active:scale-[0.98] transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="w-full py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-slate-900 hover:bg-slate-800 active:scale-[0.98] transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
                             >
-                                {loading ? 'Sending Code...' : 'Send OTP Code'}
+                                {loading ? 'Dispatching Code...' : 'Send Verification Code'}
                             </button>
                             <button 
                                 type="button" 
                                 onClick={() => setMode('login')} 
-                                className="w-full py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition"
+                                className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
                             >
-                                Back to sign in
+                                ← Return to Sign In
                             </button>
                         </div>
                     </form>
@@ -325,7 +335,7 @@ const Login = () => {
                 {mode === 'verify-otp' && (
                     <form className="space-y-4" onSubmit={submitVerify}>
                         <div>
-                            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
                                 Verification Code (OTP)
                             </label>
                             <div className="relative">
@@ -335,7 +345,7 @@ const Login = () => {
                                 <input
                                     type="text"
                                     required
-                                    className="neo-input block w-full pl-10 pr-3 py-2.5 rounded-xl text-sm font-mono tracking-widest text-slate-800 placeholder-slate-400"
+                                    className="neo-input block w-full pl-10 pr-3.5 py-2.5 rounded-xl text-sm font-mono tracking-widest text-slate-900 placeholder-slate-400"
                                     placeholder="Enter 6-digit OTP"
                                     value={otp}
                                     onChange={(e) => setOtp(e.target.value)}
@@ -347,16 +357,16 @@ const Login = () => {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full py-2.5 px-4 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 active:scale-[0.98] transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="w-full py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-slate-900 hover:bg-slate-800 active:scale-[0.98] transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 {loading ? 'Verifying...' : 'Verify Security Code'}
                             </button>
                             <button 
                                 type="button" 
                                 onClick={() => setMode('forgot-email')} 
-                                className="w-full py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition"
+                                className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
                             >
-                                Back
+                                ← Back
                             </button>
                         </div>
                     </form>
@@ -366,7 +376,7 @@ const Login = () => {
                 {mode === 'reset' && (
                     <form className="space-y-4" onSubmit={submitReset}>
                         <div>
-                            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
                                 New Password
                             </label>
                             <div className="relative">
@@ -376,7 +386,7 @@ const Login = () => {
                                 <input
                                     type="password"
                                     required
-                                    className="neo-input block w-full pl-10 pr-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400"
+                                    className="neo-input block w-full pl-10 pr-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400"
                                     placeholder="Enter new password"
                                     value={newPassword}
                                     onChange={(e) => setNewPassword(e.target.value)}
@@ -385,7 +395,7 @@ const Login = () => {
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
                                 Confirm New Password
                             </label>
                             <div className="relative">
@@ -395,8 +405,8 @@ const Login = () => {
                                 <input
                                     type="password"
                                     required
-                                    className="neo-input block w-full pl-10 pr-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400"
-                                    placeholder="Confirm new password"
+                                    className="neo-input block w-full pl-10 pr-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400"
+                                    placeholder="Re-enter password"
                                     value={confirmNewPassword}
                                     onChange={(e) => setConfirmNewPassword(e.target.value)}
                                 />
@@ -407,16 +417,16 @@ const Login = () => {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full py-2.5 px-4 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 active:scale-[0.98] transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="w-full py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-slate-900 hover:bg-slate-800 active:scale-[0.98] transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
                             >
-                                {loading ? 'Updating Password...' : 'Save New Password'}
+                                {loading ? 'Saving...' : 'Update Password'}
                             </button>
                             <button 
                                 type="button" 
                                 onClick={() => setMode('login')} 
-                                className="w-full py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition"
+                                className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
                             >
-                                Back to sign in
+                                ← Return to Sign In
                             </button>
                         </div>
                     </form>
