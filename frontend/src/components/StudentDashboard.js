@@ -20,9 +20,9 @@ const StudentDashboard = () => {
     };
 
     return (
-        <div>
+        <div className="min-h-screen bg-slate-50">
             <Navbar user={user} onLogout={handleLogout} />
-            <main className="p-4">
+            <main className="lg:pl-72 p-4 sm:p-6 lg:p-8">
                 <Routes>
                     <Route index element={<TeamRules />} />
                     <Route path="team" element={<TeamFormation />} />

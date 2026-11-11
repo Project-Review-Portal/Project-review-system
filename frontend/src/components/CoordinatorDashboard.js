@@ -228,12 +228,9 @@ const CoordinatorDashboard = () => {
     const currentRole = user?.role === 'assistant coordinator' ? 'assistant coordinator' : 'coordinator';
 
     return (
-        <div>
+        <div className="min-h-screen bg-slate-50">
             <Navbar user={{ ...user, role: currentRole }} onLogout={handleLogout} />
-            
-         
-            
-            <div className="p-4">
+            <main className="lg:pl-72 p-4 sm:p-6 lg:p-8">
                 <Routes>
                     <Route path="dashboard" element={<CoordinatorRulesDashboard />} />
                     {/* Show the new live editor on the existing letter-generation route */}
@@ -252,7 +249,7 @@ const CoordinatorDashboard = () => {
                     <Route path="marking-scheme" element={<CoordinatorMarkingScheme />} />
                     <Route path="*" element={<Navigate to="dashboard" replace />} />
                 </Routes>
-            </div>
+            </main>
         </div>
     );
 };

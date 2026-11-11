@@ -47,10 +47,11 @@ const AdminDashboard = () => {
     const activeProgramme = programmeMatch ? decodeURIComponent(programmeMatch[1]) : null;
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-slate-50">
             {showNavbar && <Navbar user={user} onLogout={handleLogout} activeProgramme={activeProgramme} />}
-            <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-                <div key={contentKey} className="px-4 py-6 sm:px-0">
+            <main className={`${showNavbar ? 'lg:pl-72' : ''} p-4 sm:p-6 lg:p-8`}>
+                <div className="max-w-7xl mx-auto py-2">
+                    <div key={contentKey} className="px-4 py-2 sm:px-0">
                     <Routes>
                         {/* Default home — session selection */}
                         <Route index element={<AdminHome />} />
@@ -83,6 +84,7 @@ const AdminDashboard = () => {
                     </Routes>
                 </div>
             </div>
+            </main>
         </div>
     );
 };

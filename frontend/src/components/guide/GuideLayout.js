@@ -19,11 +19,11 @@ const GuideLayout = () => {
     }
 
     return (
-        <div>
+        <div className="min-h-screen bg-slate-50">
             <Navbar user={user} onLogout={handleLogout} />
-            <div className="container mx-auto p-4">
+            <main className="lg:pl-72 p-4 sm:p-6 lg:p-8">
                 <Outlet />
-            </div>
+            </main>
         </div>
     );
 };
